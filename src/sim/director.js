@@ -1,82 +1,9 @@
-import { THREAT_AXIS } from '../deploy.js';
+import { ERA, THREAT_AXIS, WAVES } from '../deploy.js';
 
-// The battle: escalating waves, lulls between them, win and loss. Groups: type, count, bearing offset
-// from the threat axis (deg), spawn range (m), delay after the wave starts (s), what they go for, and
-// per type extras (role, weapons and release range for aircraft, altitude, standoff for helicopters:
-// 5.5 km from their target, close enough for the short-range units and the airbase's cover to meet
-// them, so the raids do not hang on the battalion cover's 20 km 57E6, which a Tunguska there lacks).
-// Each wave runs about three to five minutes at x1 from the call to the last threat.
-export const WAVES = [
-  {
-    title: 'Wave 1: drones', sub: 'One-way attack drones, low and slow, from the west',
-    groups: [
-      { type: 'drone', count: 6, bearing: 0, range: 9000, spread: 14, delay: 0, target: 'assets' },
-      { type: 'drone', count: 4, bearing: 28, range: 9000, spread: 8, delay: 40, target: 'short' },
-      { type: 'drone', count: 4, bearing: -25, range: 9000, spread: 10, delay: 70, target: 'any' },
-    ],
-  },
-  {
-    title: 'Wave 2: cruise missiles', sub: 'Terrain-hugging cruise missiles with drones in support',
-    groups: [
-      { type: 'cruise', count: 4, bearing: -8, range: 30000, spread: 10, delay: 0, target: 'any' },
-      { type: 'drone', count: 5, bearing: 32, range: 9000, spread: 10, delay: 10, target: 'assets' },
-      { type: 'cruise', count: 4, bearing: 18, range: 30000, spread: 8, delay: 60, target: 'radar' },
-      { type: 'drone', count: 4, bearing: -30, range: 9000, spread: 10, delay: 80, target: 'short' },
-    ],
-  },
-  {
-    title: 'Wave 3: suppression strike', sub: 'Fighters hunting radars, decoys and cruise missiles',
-    groups: [
-      { type: 'fighter', count: 4, bearing: 0, range: 85000, spread: 14, delay: 0, role: 'sead', weapons: 2, target: 'assets' },
-      { type: 'decoy', count: 6, bearing: 5, range: 80000, spread: 20, delay: 5, target: 'radar' },
-      { type: 'drone', count: 4, bearing: -20, range: 9000, spread: 10, delay: 20, target: 'short' },
-      { type: 'cruise', count: 4, bearing: 15, range: 30000, spread: 8, delay: 60, target: 'radar' },
-    ],
-  },
-  {
-    title: 'Wave 4: standoff bombing', sub: 'Glide bombers behind decoys, drones from the south',
-    groups: [
-      { type: 'fighter', count: 4, bearing: -5, range: 70000, spread: 12, delay: 0, role: 'glide', weapons: 2, target: 'assets' },
-      { type: 'decoy', count: 3, bearing: 0, range: 75000, spread: 16, delay: 0, target: 'radar' },
-      { type: 'drone', count: 8, bearing: -65, range: 9000, spread: 14, delay: 15, target: 'any' },
-      { type: 'cruise', count: 3, bearing: 10, range: 30000, spread: 6, delay: 70, target: 'assets' },
-    ],
-  },
-  {
-    title: 'Wave 5: helicopters', sub: 'Radar hunters and cruise missiles, then attack helicopters against the short-range units',
-    groups: [
-      { type: 'fighter', count: 2, bearing: 0, range: 85000, spread: 8, delay: 0, role: 'sead', weapons: 2, target: 'assets' },
-      { type: 'cruise', count: 6, bearing: 5, range: 30000, spread: 14, delay: 0, target: 'any' },
-      { type: 'drone', count: 4, bearing: 40, range: 9000, spread: 10, delay: 20, target: 'short' },
-      { type: 'helo', count: 4, bearing: -20, range: 9500, spread: 24, delay: 50, target: 'short', weapons: 4, standoff: 5500 },
-      { type: 'cruise', count: 3, bearing: -35, range: 30000, spread: 8, delay: 100, target: 'radar' },
-    ],
-  },
-  {
-    title: 'Wave 6: ballistic missiles', sub: 'Ballistic missiles at the battalion and the airbase, behind cruise missiles and drones',
-    groups: [
-      { type: 'cruise', count: 8, bearing: -15, range: 30000, spread: 20, delay: 0, target: 'any' },
-      { type: 'drone', count: 10, bearing: 40, range: 9000, spread: 20, delay: 10, target: 'any' },
-      { type: 'tbm', count: 2, bearing: 10, range: 120000, spread: 6, delay: 60, target: 'radar' },
-      { type: 'cruise', count: 4, bearing: 20, range: 30000, spread: 10, delay: 90, target: 'radar' },
-      { type: 'tbm', count: 2, bearing: -10, range: 120000, spread: 6, delay: 110, target: 'assets' },
-    ],
-  },
-  {
-    title: 'Wave 7: saturation', sub: 'Everything at once, from three directions',
-    groups: [
-      { type: 'fighter', count: 4, bearing: 0, range: 85000, spread: 16, delay: 0, role: 'sead', weapons: 2, target: 'assets' },
-      { type: 'decoy', count: 6, bearing: -10, range: 80000, spread: 24, delay: 0, target: 'radar' },
-      { type: 'drone', count: 6, bearing: 0, range: 9000, spread: 20, delay: 0, target: 'any' },
-      { type: 'fighter', count: 4, bearing: 20, range: 70000, spread: 12, delay: 20, role: 'glide', weapons: 2, target: 'assets' },
-      { type: 'cruise', count: 6, bearing: -25, range: 30000, spread: 10, delay: 30, target: 'any' },
-      { type: 'helo', count: 2, bearing: 30, range: 10000, spread: 12, delay: 40, target: 'short', weapons: 4, standoff: 5500 },
-      { type: 'cruise', count: 4, bearing: 45, range: 30000, spread: 10, delay: 60, target: 'assets' },
-      { type: 'drone', count: 6, bearing: -80, range: 9000, spread: 16, delay: 60, target: 'short' },
-      { type: 'tbm', count: 2, bearing: 5, range: 120000, spread: 6, delay: 80, target: 'radar' },
-    ],
-  },
-];
+// The battle: the era in play's waves (eras/<era>.js `waves`: groups of threats with their bearing
+// offset from the threat axis, spawn range, delay and what they go for), lulls between them, win and loss.
+// WAVES is deploy.js's live binding, exported here as before.
+export { WAVES };
 
 const BRIEF = 15;
 // between raids (s): the reload jobs (30 to 120 s in SYSTEMS) start as the supply column arrives, so with
@@ -154,7 +81,7 @@ export class Director {
             this.wave++;
             this.setState('lull');
             sim.unitsAI.resupply();
-            sim.radio('Command: raid over. Supply column is up, reload and stand by.', 'info');
+            sim.radio(ERA.text.lull, 'info');
           }
         }
         break;
@@ -169,10 +96,12 @@ export class Director {
     }
   }
 
-  // the base is lost with its runway and command post, or when no fire unit is left
+  // the base is lost with all its vital assets (the modern era's runway and command post), or when no
+  // fire unit is left
   lost() {
     const sim = this.sim;
     const a = (id) => sim.assets.find((x) => x.id === id)?.alive;
-    return (!a('runway') && !a('cp')) || sim.units.every((u) => !u.alive);
+    const vital = ERA.layout.vital;
+    return (vital.length > 0 && vital.every((id) => !a(id))) || sim.units.every((u) => !u.alive);
   }
 }

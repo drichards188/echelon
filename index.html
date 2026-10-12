@@ -36,14 +36,18 @@
       <div id="title-screen">
         <div class="brand">
           <h1>ECHELON</h1>
-          <p class="sub">Layered air defense</p>
-          <p class="blurb">An S-400 battalion, two Pantsir-S1, an Osa and a Strela-10 stand between the airbase and the raids, or the alternatives you pick for them. The long layer sees them first; the short layer catches what leaks through.</p>
+          <p class="sub" id="title-sub">Layered air defense</p>
+          <p class="blurb" id="title-blurb">An S-400 battalion, two Pantsir-S1, an Osa and a Strela-10 stand between the airbase and the raids, or the alternatives you pick for them. The long layer sees them first; the short layer catches what leaks through.</p>
         </div>
         <div class="loader">
           <div id="load-bar"><div id="load-bar-fill"></div></div>
           <p id="status">Surveying the steppe</p>
         </div>
         <div id="options">
+          <div id="era-box">
+            <div id="era" role="radiogroup" aria-label="Era"></div>
+            <p id="era-desc"></p>
+          </div>
           <div id="difficulty">
             <button data-d="Easy">Easy</button>
             <button data-d="Normal" class="on">Normal</button>

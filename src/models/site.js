@@ -398,6 +398,11 @@ function tower() {
 
 const BUILD = { runway, command, shelter, fuel, tower };
 
+/** Registers asset builders, { kind: (asset) => THREE.Group } (an era's lazily loaded content, eras/index.js). */
+export function registerAssets(builders) {
+  Object.assign(BUILD, builders);
+}
+
 /** asset from deploy.js ASSETS -> THREE.Group (origin on the ground at the asset, model -Z along its bearing) */
 export function buildAsset(asset) {
   const f = BUILD[asset.kind];

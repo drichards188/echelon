@@ -4,7 +4,8 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { buildVehicle, VEHICLE_KINDS } from '../models/vehicles.js';
 import { buildThreat, buildInterceptor, THREAT_TYPES, INTERCEPTOR_KINDS } from '../models/threats.js';
 import { buildAsset } from '../models/site.js';
-import { ASSETS } from '../deploy.js';
+import { ASSETS, setEra } from '../deploy.js';
+import { eraById, loadEra } from '../eras/index.js';
 import { buildCrewman, CREW_POSES, CREW_GAITS, CREW_OUTFITS } from '../models/v/crew.js';
 
 // Standalone model viewer. ?kind=pantsir | cruise | 48N6 | asset:runway ; ?all=vehicles|threats|interceptors|assets ;
@@ -17,6 +18,7 @@ import { buildCrewman, CREW_POSES, CREW_GAITS, CREW_OUTFITS } from '../models/v/
 // phase, &anim=1 animates the pose (or cycles through all of them without &pose); outfit with
 // &headgear=cap|helmet|hardhat|none &vest=none|webbing|hiviz &pattern=emr|olive &gloves=0 &skin=0..3;
 // &mix=1 varies the outfits along ?all=crew; &load=0 hides the stand-in load on the carry anchor.
+// &era=<id> (src/eras): that era's models (its lazily loaded content), markings and assets.
 const q = new URLSearchParams(location.search);
 const VEHICLES = VEHICLE_KINDS; // every registered vehicle, new builders included
 
@@ -154,12 +156,17 @@ function addItem(kind, x) {
   return items[items.length - 1];
 }
 
+if (eraById(q.get('era'))) {
+  await loadEra(q.get('era'));
+  setEra(q.get('era'));
+}
+
 const all = q.get('all');
 let list;
 if (all === 'vehicles') list = VEHICLES;
 else if (all === 'threats') list = THREAT_TYPES;
 else if (all === 'interceptors') list = INTERCEPTOR_KINDS;
-else if (all === 'assets') list = ['runway', 'command', 'shelter', 'fuel', 'tower'].map((k) => 'asset:' + k);
+else if (all === 'assets') list = [...new Set(ASSETS.map((a) => a.kind))].map((k) => 'asset:' + k);
 else if (all === 'crew') list = CREW_POSES.map((p) => 'crew:' + p);
 else list = [q.get('kind') || 'pantsir'];
 

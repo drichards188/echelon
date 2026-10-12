@@ -11,12 +11,12 @@ import { PostFX, GRADES } from './post.js';
 import { FX, SMOKE } from './fx.js';
 import { HUD } from './hud.js';
 import { ChaseCamera } from './camera.js';
-import { UNITS, SLOT_OPTIONS, DEFAULT_LOADOUT } from './deploy.js';
+import { UNITS, SLOT_OPTIONS, DEFAULT_LOADOUT, ERA, setEra as deployEra } from './deploy.js';
+import { ERAS, eraById, playableEra, loadEra } from './eras/index.js';
 import { heightAt, los } from './terrain.js';
 import { Sim } from './sim/sim.js';
 import { SYSTEMS, THREATS, MISSILES } from './sim/systems.js';
 import { buildInterceptor } from './models/threats.js';
-import { WAVES } from './sim/director.js';
 import { UnitViews } from './render/units.js';
 import { Entities } from './render/entities.js';
 import { SightRenderer } from './sight.js';
@@ -73,36 +73,71 @@ const BRASS = {
   shilka: { back: 1.7, front: true, v: [0.6, -0.8, 2.2], d: 0.025, len: 0.152 },
 };
 
-// ---------------------------------------------------------------- loadout
-// The title screen's picker: one option per slot (deploy.js SLOT_OPTIONS), kept in local storage.
-// Short names, the slot's class and a one-line trade-off for each option (DESIGN.md, "Loadout").
-const SLOT_CLASS = ['Area layer', 'Battalion cover', 'Airbase cover', 'Short range', 'Very short range'];
-const OPTION_INFO = {
-  s400: ['S-400', 'Longest reach, stops ballistic missiles; few, costly rounds'],
-  buk: ['Buk-M2', '70 km, cheap rounds; one target per TELAR, no ballistic targets'],
-  pantsir: ['Pantsir-S1', 'Missiles to 20 km and 30 mm guns; takes some ballistic missiles'],
-  tunguska: ['Tunguska', 'Guns first, tougher; cheap 9M311 to 10 km on the optical sight'],
-  osa: ['Osa-AKM', 'Six missiles to 10 km, fired in pairs; one target at a time'],
-  tor: ['Tor-M2', 'Four targets at once inside its radar sector; quick, dearer rounds'],
-  strela: ['Strela-10M3', 'IR missiles to 5 km, no radar: silent, and you aim the sight'],
-  shilka: ['Shilka-M4', 'Four 23 mm guns, free to fire; very short range, its radar emits'],
-};
+// ---------------------------------------------------------------- era and loadout
+// The era (src/eras) and, for each era, the loadout the title screen's picker chose (one option per slot
+// of its SLOT_OPTIONS; the slots' classes, short names and trade-offs come from the era's `slots`) are
+// kept in local storage: `echelon.era` and `echelon.loadout.<era>`. Before there were eras the loadout
+// was kept under `echelon.loadout`: it was the modern era's and moves to its key.
+const ERA_KEY = 'echelon.era';
 const LOADOUT_KEY = 'echelon.loadout';
-// one offered kind per slot, the slot's default for anything else
+const loadoutKey = (era) => `${LOADOUT_KEY}.${era}`;
+const stored = (key) => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null; // private mode
+  }
+};
+const store = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // private mode: the choice lasts until the page is reloaded
+  }
+};
+const migrateLoadout = () => {
+  try {
+    const old = localStorage.getItem(LOADOUT_KEY);
+    if (old === null) return;
+    if (localStorage.getItem(loadoutKey('modern')) === null) localStorage.setItem(loadoutKey('modern'), old);
+    localStorage.removeItem(LOADOUT_KEY);
+  } catch {
+    // private mode: nothing was kept
+  }
+};
+// one offered kind per slot of the era in play, the slot's default for anything else
 const validLoadout = (kinds) => SLOT_OPTIONS.map((opts, i) => (opts.some((o) => o.kind === kinds?.[i]) ? kinds[i] : opts[0].kind));
-const savedLoadout = () => {
-  const q = query.get('loadout');
+// the loadout kept for the era in play; `q` (the ?loadout= parameter: kinds in slot order, or 'alt' for
+// every alternative) overrides it without being kept
+const savedLoadout = (q = null) => {
   if (q) return validLoadout(q === 'alt' ? SLOT_OPTIONS.map((o) => o[1]?.kind) : q.split(','));
   try {
-    return validLoadout(JSON.parse(localStorage.getItem(LOADOUT_KEY) || 'null'));
+    return validLoadout(JSON.parse(stored(loadoutKey(ERA.id)) || 'null'));
   } catch {
     return [...DEFAULT_LOADOUT];
   }
+};
+// The era's look on the page: the title screen's text and the class `era-<theme>` for its CSS (the
+// console panel takes the same class, Panel.setTheme).
+const applyEraLook = () => {
+  document.getElementById('title-sub').textContent = ERA.text.sub;
+  document.getElementById('title-blurb').textContent = ERA.text.blurb;
+  for (const c of [...document.body.classList]) if (c.startsWith('era-')) document.body.classList.remove(c);
+  document.body.classList.add(`era-${ERA.theme}`);
 };
 const WSIZE = { cruise: 1.6, drone: 0.8, arm: 1, glide: 1.8, atgm: 0.6, tbm: 2.6, fighter: 1.2, helo: 1.2, decoy: 0.5 };
 const _p = new THREE.Vector3();
 
 async function init() {
+  // The era: `?era=` (not kept), else the one kept, else the default; one still in development falls back
+  // to the default. Its own modules load first (none for the modern era, whose modules the registries
+  // import statically) and its layout is in place before the terrain levels its pads.
+  migrateLoadout();
+  const startEra = playableEra(query.get('era') ?? stored(ERA_KEY));
+  await loadEra(startEra);
+  deployEra(startEra);
+  applyEraLook();
+
   const view = document.getElementById('view');
   const canvas = document.getElementById('c');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
@@ -140,7 +175,7 @@ async function init() {
   // title screen; Take command starts the real one. Vehicles, buildings and everything that flies are
   // drawn from its state (src/render), its events drive fx, sound and the HUD.
   const sim = new Sim({ heightAt, los, scene, seed: (Math.random() * 1e9) | 0 });
-  const loadout = savedLoadout();
+  const loadout = savedLoadout(query.get('loadout'));
   sim.newGame({ attract: true, loadout });
   const views = new UnitViews(scene, sim);
   const entities = new Entities(scene);
@@ -173,6 +208,7 @@ async function init() {
     dynamicRes: true,
     timeScale: 1,
     difficulty: 'Normal',
+    era: ERA.id,
     loadout,
     fov: 50,
     elevation: 38,
@@ -399,68 +435,67 @@ async function init() {
     chase.goalDist = 28;
     newBattle({ difficulty: params.difficulty, loadout: params.loadout, seed: (Math.random() * 1e9) | 0 });
     selectUnit(selected);
-    hud.toast('Echelon', 'Layered air defense', 3000);
+    hud.toast('Echelon', ERA.text.sub, 3000);
     hud.setScore(0);
     audio.start();
     audio.vehicle(UNITS[selected].kind);
     audio.mood('brief');
-    hud.radio(`Command: all units, weapons free. First raid expected shortly.`, 'info');
+    hud.radio(ERA.text.orders, 'info');
     iads.events.start?.(params.difficulty);
   };
   playBtn.addEventListener('click', start);
 
-  // The loadout picker, next to the difficulty: a row per slot with its two options and the chosen
-  // one's trade-off (the other's while the pointer is on it). A change on the title screen rebuilds the
-  // demonstration battle with it and cuts to that slot's unit.
+  // The loadout picker, next to the difficulty: a row per slot of the era in play with its options and
+  // the chosen one's trade-off (another's while the pointer is on it). A change on the title screen
+  // rebuilds the demonstration battle with it and cuts to that slot's unit. Built again for another era.
   const pickerEl = document.getElementById('loadout');
-  const pickRows = SLOT_OPTIONS.map((opts, slot) => {
-    const row = document.createElement('div');
-    row.className = 'lo-slot';
-    const key = document.createElement('span');
-    key.className = 'lo-key';
-    key.textContent = String(slot + 1);
-    const cls = document.createElement('span');
-    cls.className = 'lo-class';
-    cls.textContent = SLOT_CLASS[slot];
-    const btns = document.createElement('span');
-    btns.className = 'lo-opts';
-    const desc = document.createElement('span');
-    desc.className = 'lo-desc';
-    const show = (kind) => (desc.textContent = OPTION_INFO[kind]?.[1] ?? '');
-    const buttons = opts.map((o) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.dataset.kind = o.kind;
-      b.textContent = OPTION_INFO[o.kind]?.[0] ?? o.name;
-      b.title = `${o.name}: ${OPTION_INFO[o.kind]?.[1] ?? ''}`;
-      b.addEventListener('click', () => pickOption(slot, o.kind));
-      b.addEventListener('pointerenter', () => show(o.kind));
-      b.addEventListener('pointerleave', () => show(params.loadout[slot]));
-      btns.appendChild(b);
-      return b;
+  let pickRows = [];
+  const buildPicker = () => {
+    pickerEl.replaceChildren();
+    pickRows = ERA.slots.map(({ cls: slotClass, options: opts }, slot) => {
+      const row = document.createElement('div');
+      row.className = 'lo-slot';
+      const key = document.createElement('span');
+      key.className = 'lo-key';
+      key.textContent = String(slot + 1);
+      const cls = document.createElement('span');
+      cls.className = 'lo-class';
+      cls.textContent = slotClass;
+      const btns = document.createElement('span');
+      btns.className = 'lo-opts';
+      const desc = document.createElement('span');
+      desc.className = 'lo-desc';
+      const show = (kind) => (desc.textContent = opts.find((o) => o.kind === kind)?.info ?? '');
+      const buttons = opts.map((o) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.dataset.kind = o.kind;
+        b.textContent = o.label ?? o.name;
+        b.title = `${o.name}: ${o.info ?? ''}`;
+        b.addEventListener('click', () => pickOption(slot, o.kind));
+        b.addEventListener('pointerenter', () => show(o.kind));
+        b.addEventListener('pointerleave', () => show(params.loadout[slot]));
+        btns.appendChild(b);
+        return b;
+      });
+      row.append(key, cls, btns, desc);
+      pickerEl.appendChild(row);
+      return { buttons, show };
     });
-    row.append(key, cls, btns, desc);
-    pickerEl.appendChild(row);
-    return { buttons, show };
-  });
+    showLoadout();
+  };
   const showLoadout = () =>
     pickRows.forEach((r, slot) => {
       for (const b of r.buttons) b.classList.toggle('on', b.dataset.kind === params.loadout[slot]);
       r.show(params.loadout[slot]);
     });
-  showLoadout();
-  // Sets the loadout for the next battles and keeps it. On the title screen the demonstration battle is
-  // rebuilt with it; during a battle (tests, the console) a new battle starts with it; during a tutorial
-  // it waits for the next Take command (the lessons run on the default units).
+  buildPicker();
+  // Sets the loadout for the next battles and keeps it (for the era in play). On the title screen the
+  // demonstration battle is rebuilt with it; during a battle (tests, the console) a new battle starts
+  // with it; during a tutorial it waits for the next Take command (the lessons run on the default units).
   const setLoadout = (kinds, { save = true, cut = -1 } = {}) => {
     params.loadout = validLoadout(kinds);
-    if (save) {
-      try {
-        localStorage.setItem(LOADOUT_KEY, JSON.stringify(params.loadout));
-      } catch {
-        // private mode: the choice lasts until the page is reloaded
-      }
-    }
+    if (save) store(loadoutKey(ERA.id), JSON.stringify(params.loadout));
     showLoadout();
     if (state === 'title') {
       following = false;
@@ -475,6 +510,77 @@ async function init() {
     const next = [...params.loadout];
     next[slot] = kind;
     setLoadout(next, { cut: slot });
+  };
+
+  // The era toggle, the title screen's main control: a button per era (eras/index.js ERAS), the era's
+  // years under its name; an era still in development shows greyed out with its tag and cannot be
+  // picked. The line under it is the setting of the era in play (another's while the pointer is on it).
+  const eraEl = document.getElementById('era');
+  const eraDesc = document.getElementById('era-desc');
+  const showSetting = (era) => (eraDesc.textContent = era.text.setting ?? '');
+  const eraBtns = ERAS.map((era) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.era = era.id;
+    b.setAttribute('role', 'radio');
+    b.innerHTML = '<b></b><span><small></small></span>';
+    b.querySelector('b').textContent = era.name;
+    b.querySelector('small').textContent = era.years;
+    b.title = `${era.name}, ${era.years}`;
+    if (!era.available) {
+      b.classList.add('soon');
+      b.setAttribute('aria-disabled', 'true');
+      b.querySelector('span').insertAdjacentHTML('beforeend', '<em>In development</em>');
+      b.title += ': in development';
+    }
+    b.addEventListener('click', () => setEra(era.id));
+    b.addEventListener('pointerenter', () => showSetting(era));
+    b.addEventListener('pointerleave', () => showSetting(ERA));
+    eraEl.appendChild(b);
+    return b;
+  });
+  const showEras = () => {
+    for (const b of eraBtns) {
+      b.classList.toggle('on', b.dataset.era === ERA.id);
+      b.setAttribute('aria-checked', String(b.dataset.era === ERA.id));
+    }
+    showSetting(ERA);
+  };
+  showEras();
+  // Sets the era for the next battles and keeps it. Its modules load first (eras/index.js loadEra), then
+  // the layout (deploy.js), the terrain's pads, the vehicles and buildings, the title screen's text and
+  // theme, the loadout picker (with the loadout kept for that era) and the tutorial list follow it. On
+  // the title screen the demonstration battle is rebuilt in it; during a battle a new battle starts in it.
+  // Refused for an era still in development and during a tutorial. Resolves to the era's id, or false.
+  let eraAsk = 0;
+  const setEra = async (id, { save = true } = {}) => {
+    const era = eraById(id);
+    if (!era?.available || state === 'tutorial') return false;
+    const ask = ++eraAsk;
+    await loadEra(era.id);
+    // a later pick overtook this one while its modules loaded
+    if (ask !== eraAsk || state === 'tutorial') return false;
+    if (save) store(ERA_KEY, era.id);
+    if (era === ERA) return era.id;
+    deployEra(era.id);
+    params.era = era.id;
+    params.loadout = savedLoadout();
+    applyEraLook();
+    panel.setTheme(ERA.theme);
+    terrain.relayout(camera);
+    entities.sync();
+    showEras();
+    buildPicker();
+    tutorial.buildMenu();
+    document.getElementById('tutorials').disabled = !ERA.tutorials.length;
+    selected = 0;
+    if (state === 'title') {
+      following = false;
+      newBattle({ attract: true, loadout: params.loadout, seed: (Math.random() * 1e9) | 0 });
+      cineClock = 0;
+      selectUnit(0);
+    } else if (state === 'playing' || state === 'ended') start();
+    return era.id;
   };
 
   // ---------------------------------------------------------------- tutorials (src/tutorial.js)
@@ -779,8 +885,8 @@ async function init() {
     const sc = sim.score;
     hud.showEnd(
       {
-        title: s === 'victory' ? 'Airbase held' : 'Airbase lost',
-        sub: s === 'victory' ? `All ${WAVES.length} raids beaten off.` : `Overrun in wave ${sim.wave} of ${WAVES.length}.`,
+        title: s === 'victory' ? ERA.text.victory : ERA.text.defeat,
+        sub: s === 'victory' ? `All ${ERA.waves.length} raids beaten off.` : `Overrun in wave ${sim.wave} of ${ERA.waves.length}.`,
         victory: s === 'victory',
         stats: [
           ['Score', sc.points.toLocaleString('en-US')],
@@ -814,7 +920,7 @@ async function init() {
   hud.setLoading(1, '');
   hud.ready();
   playBtn.disabled = false;
-  document.getElementById('tutorials').disabled = false;
+  document.getElementById('tutorials').disabled = !ERA.tutorials.length;
   hud.setTimeScale(1);
 
   // ---------------------------------------------------------------- loop
@@ -966,7 +1072,7 @@ async function init() {
     sim.units.forEach((un, i) => {
       if (i !== selected && un.alive) markers.push({ pos: un.pos, kind: 'unit', label: un.id });
     });
-    markers.push({ pos: sim.assets[0].pos, kind: 'friend', label: 'RWY' });
+    for (const a of sim.assets) if (a.label) markers.push({ pos: a.pos, kind: 'friend', label: a.label });
     const near = sim.picture.slice().sort((a, b) => a.range - b.range);
     for (let i = 0; i < Math.min(10, near.length); i++) markers.push({ pos: near[i].pos, kind: 'enemy', label: CLS_SHORT[near[i].cls] ?? '' });
     hud.updateCompass(camera, markers);
@@ -1009,7 +1115,7 @@ async function init() {
     tutorial,
     renderer, scene, camera, terrain, atmosphere, post, fx, hud, chase, params, frame, clouds, weather, eyes,
     sim, views, entities, panel, audio, sight,
-    select: selectUnit, start, setTimeScale, setLoadout,
+    select: selectUnit, start, setTimeScale, setLoadout, setEra, eras: ERAS,
     // headless tests: stop the loop, run `seconds` of battle without drawing, then draw a few frames
     fastForward(seconds, { unit = null, scale = 8, settle = 6 } = {}) {
       renderer.setAnimationLoop(null);
@@ -1026,8 +1132,9 @@ async function init() {
       };
     },
   });
-  // a live getter (Object.assign would copy its value once)
+  // live getters (Object.assign would copy their values once)
   Object.defineProperty(iads, 'state', { get: () => state, configurable: true });
+  Object.defineProperty(iads, 'era', { get: () => ERA.id, configurable: true });
 }
 
 // tests and tools: every system, plus `events` (start, select) and per-frame callbacks in onFrame

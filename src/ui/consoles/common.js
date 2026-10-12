@@ -1,31 +1,14 @@
 // Pieces every console shares: the unit header (name, status, health, alerts) and small data helpers.
 import { SYSTEMS } from '../../sim/systems.js';
+import { ERA } from '../../deploy.js';
 import { el, setText, setCls, Bar, Lamp, label, fmtKm, fmtAlt, fmtTti } from '../widgets.js';
 
-// Every alert the sim raises (units.js describe) with its cabin caption, a plain English meaning and a rank.
-const ALERTS = {
-  'ARM INBOUND': ['ПРР НА ПОДЛЁТЕ', 'ANTI-RADAR MISSILE: RADAR OFF!', 0],
-  'ATGM INBOUND': ['ПТУР НА ПОДЛЁТЕ', 'GUIDED MISSILE AT THIS UNIT', 0],
-  'INBOUND': ['ЦЕЛЬ БЛИЗКО', 'ENEMY CLOSING ON THIS UNIT', 1],
-  'NO MISSILES': ['НЕТ РАКЕТ', 'NO MISSILES READY', 1],
-  'OVERHEAT': ['ПЕРЕГРЕВ', 'GUNS OVERHEATED, WAIT', 1],
-  'DAMAGED': ['ПОВРЕЖДЕНИЕ', 'UNIT BELOW HALF HEALTH', 2],
-  'LOW AMMO': ['МАЛО БК', 'LOW AMMUNITION, RELOAD', 2],
-  'NO LINK': ['НЕТ СВЯЗИ', 'NO DATA LINK TO S-400', 3],
-  'GLIDE BOMB': ['УПАБ НА ПОДЛЁТЕ', 'GLIDE BOMB INBOUND', 0],
-  'ATGM LAUNCH': ['ПУСК ПТУР', 'ATGM LAUNCHED', 0],
-  'BALLISTIC': ['БАЛЛИСТИКА', 'BALLISTIC MISSILE', 0],
-  'RADAR OFF': ['РЛС ВЫКЛ', 'RADAR OFF', 3],
-  // a dispersed battery's vehicles knocked out (Buk; a standing state, ranked as DAMAGED): СОУ the TELAR,
-  // ПЗУ the loader-launcher, СОЦ the search radar, КП the command post
-  'TELAR DOWN': ['СОУ ПОРАЖЕНА', 'A TELAR IS KNOCKED OUT', 2],
-  'LOADER DOWN': ['ПЗУ ПОРАЖЕНА', 'LOADER-LAUNCHER KNOCKED OUT', 2],
-  'RADAR DOWN': ['СОЦ ПОРАЖЕНА', 'SEARCH RADAR KNOCKED OUT', 2],
-  'CP DOWN': ['КП ПОРАЖЁН', 'COMMAND POST OUT: NO LINK', 2],
-};
-export const alertRu = (a) => (ALERTS[a] ? ALERTS[a][0] : 'ТРЕВОГА');
-export const alertEn = (a) => (ALERTS[a] ? ALERTS[a][1] : a);
-const alertRank = (a) => (ALERTS[a] ? ALERTS[a][2] : 2);
+// Every alert the sim raises (units.js describe) with its cabin caption, a plain English meaning and a
+// rank: the era in play's table (eras/<era>.js `alerts`), since the captions are in its consoles' language.
+const alertOf = (a) => ERA.alerts[a];
+export const alertRu = (a) => (alertOf(a) ? alertOf(a)[0] : 'ТРЕВОГА');
+export const alertEn = (a) => (alertOf(a) ? alertOf(a)[1] : a);
+const alertRank = (a) => (alertOf(a) ? alertOf(a)[2] : 2);
 // Sirens only for what can kill the unit right now.
 export const alertSevere = (a) => alertRank(a) === 0;
 

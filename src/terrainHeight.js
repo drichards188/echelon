@@ -2,9 +2,9 @@
 // and radar masking and by the renderer to build the mesh, so the two always agree.
 //
 // Rolling steppe with long swells, a meandering river valley, a few long low ridges 9 to 18 km out
-// (up to ~150 m, placed where they mask low flyers from the radars) and the flattened pads from
-// deploy.js. Everything is deterministic value noise from an integer hash.
-import { flatPads } from './deploy.js';
+// (up to ~150 m, placed where they mask low flyers from the radars) and the flattened pads of the era
+// in play from deploy.js. Everything is deterministic value noise from an integer hash.
+import { flatPads, ERA } from './deploy.js';
 
 const smooth = (a, b, x) => {
   const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
@@ -110,9 +110,11 @@ function withRiver(x, z, h) {
 }
 
 // ---------------------------------------------------------------- pads
-let PADS = null;
+// the era in play's (deploy.js flatPads), made again when the era changes
+let PADS = null, padsEra = null;
 function pads() {
-  if (PADS) return PADS;
+  if (PADS && padsEra === ERA) return PADS;
+  padsEra = ERA;
   PADS = flatPads().map((p) => ({
     x: p.x, z: p.z, rx: p.rx, rz: p.rz, c: Math.cos(p.heading), s: Math.sin(p.heading), blend: p.blend,
     reach: Math.hypot(p.rx, p.rz) + p.blend, h: 0, small: p.rx <= 22,

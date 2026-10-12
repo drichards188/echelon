@@ -1,5 +1,5 @@
 // Headless battles: node tools/simtest.mjs [seeds] [--both | --all | --players auto,s400,full]
-//   [--difficulty Easy|Normal|Hard|all] [--loadout KINDS] [--quiet] [--table] [--log] [--jobs N]
+//   [--difficulty Easy|Normal|Hard|all] [--era ID] [--loadout KINDS] [--quiet] [--table] [--log] [--jobs N]
 // Runs whole games at dt = 0.05 with every unit on auto ('auto'), with a scripted player running the
 // area unit, the S-400 or the Buk ('s400', --both adds it), or with one who also runs both point
 // defense units, Pantsirs or Tunguskas ('full', --all adds both), and prints per wave what came in,
@@ -7,13 +7,16 @@
 // wave reached, game time, wave durations and kills per layer (one column per slot, the point defense
 // pair's guns apart). --loadout picks the unit of each slot, comma separated in slot order
 // (s400|buk, pantsir|tunguska, pantsir|tunguska, osa|tor, strela|shilka; an empty entry keeps the
-// default), or 'default', or 'alt' for every alternative. --table prints only the summary, --log the
-// whole radio log. Games run in worker threads; the sim is deterministic per seed.
+// default), or 'default', or 'alt' for every alternative. --era picks the era (src/eras, default
+// 'modern'; any registered era with units, available on the menu or not), whose slots --loadout then
+// names. --table prints only the summary, --log the whole radio log. Games run in worker threads; the
+// sim is deterministic per seed.
 import { Worker, isMainThread, parentPort } from 'node:worker_threads';
 import os from 'node:os';
 import { Sim } from '../src/sim/sim.js';
 import { WAVES } from '../src/sim/director.js';
-import { SLOT_OPTIONS, DEFAULT_LOADOUT } from '../src/deploy.js';
+import { ERA, SLOT_OPTIONS, DEFAULT_LOADOUT, setEra } from '../src/deploy.js';
+import { ERAS, DEFAULT_ERA, eraById } from '../src/eras/index.js';
 import { MISSILES } from '../src/sim/systems.js';
 
 let heightAt, los;
@@ -38,16 +41,20 @@ try {
 }
 
 // kills are counted per slot (the area unit, the point defense pair's missiles, their guns, the
-// short-range missile unit, the very short range unit), labelled by the kinds in the loadout
+// short-range missile unit, the very short range unit), labelled by the kinds in the loadout; another
+// era's slots get a column each
 const LABEL = { s400: 'S400', buk: 'BUK', pantsir: 'PAN', tunguska: 'TUN', osa: 'OSA', tor: 'TOR', strela: 'STR', shilka: 'SHK' };
 const NAME = { s400: 'S-400', buk: 'Buk', pantsir: 'Pantsirs', tunguska: 'Tunguskas' };
+const modern = () => ERA.id === 'modern';
 function layersFor(loadout) {
+  if (!modern()) return loadout.map((k, i) => (LABEL[k] ?? k.toUpperCase()) + (loadout.indexOf(k) < i ? i + 1 : ''));
   const pd = loadout[1] === loadout[2] ? LABEL[loadout[1]] : 'PD';
   return [LABEL[loadout[0]], pd, 'GUN', LABEL[loadout[3]], LABEL[loadout[4]]];
 }
 // the layer a kill key (`unitId:weapon`) counts in
 function layerOf(sim, layers, key) {
   const [id, weapon] = key.split(':');
+  if (!modern()) return layers[sim.unitById.get(id)?.slot ?? 0];
   const slot = sim.unitById.get(id)?.slot ?? 4;
   if ((slot === 1 || slot === 2) && /mm$/.test(weapon)) return 'GUN';
   return layers[slot === 2 ? 1 : slot];
@@ -189,19 +196,20 @@ function areaPlayer(sim) {
 
 function fullPlayer(sim) {
   areaPlayer(sim);
-  for (const u of sim.units) if ((u.slot === 1 || u.slot === 2) && u.alive) pdPlayer(sim, u);
+  for (const u of sim.units) if ((u.slot === 1 || u.slot === 2) && u.alive && u.weapons.missiles && u.weapons.gun) pdPlayer(sim, u);
 }
 
 const PLAYERS = { auto: null, s400: areaPlayer, area: areaPlayer, full: fullPlayer };
 const playerName = (player, loadout) => {
-  const pd = loadout[1] === loadout[2] ? NAME[loadout[1]] : 'Pantsir and Tunguska';
-  return { auto: 'all auto', s400: `scripted ${NAME[loadout[0]]}`, area: `scripted ${NAME[loadout[0]]}`, full: `scripted ${NAME[loadout[0]]} + ${pd}` }[player];
+  const pd = loadout[1] === loadout[2] ? NAME[loadout[1]] ?? loadout[1] : 'Pantsir and Tunguska';
+  const area = NAME[loadout[0]] ?? loadout[0];
+  return { auto: 'all auto', s400: `scripted ${area}`, area: `scripted ${area}`, full: `scripted ${area} + ${pd}` }[player];
 };
 
 // ---------------------------------------------------------------- one game
-function run(seed, player, difficulty, fullLog = false, loadout = DEFAULT_LOADOUT) {
+function run(seed, player, difficulty, fullLog = false, loadout = DEFAULT_LOADOUT, era = DEFAULT_ERA) {
   const sim = new Sim({ heightAt, los, seed });
-  sim.newGame({ difficulty, seed, loadout });
+  sim.newGame({ difficulty, seed, loadout, era });
   const LAYERS = layersFor(loadout);
   const log = [];
   const waves = [];
@@ -267,7 +275,7 @@ function run(seed, player, difficulty, fullLog = false, loadout = DEFAULT_LOADOU
 if (!isMainThread) {
   parentPort.on('message', (job) => {
     if (!job) return process.exit(0);
-    parentPort.postMessage(run(job.seed, job.player, job.difficulty, job.log, job.loadout));
+    parentPort.postMessage(run(job.seed, job.player, job.difficulty, job.log, job.loadout, job.era));
   });
 } else {
   const args = process.argv.slice(2);
@@ -279,6 +287,13 @@ if (!isMainThread) {
   const players = flag('--player') ? ['s400'] : flag('--all') ? ['auto', 's400', 'full'] : flag('--both') ? ['auto', 's400'] : opt('--players', 'auto').split(',');
   const quiet = flag('--quiet');
   const table = flag('--table');
+  const era = opt('--era', DEFAULT_ERA);
+  if (!eraById(era)?.slots.length) {
+    console.error(`--era: '${era}' is not an era with units (${ERAS.filter((e) => e.slots.length).map((e) => e.id).join(', ')})`);
+    process.exit(1);
+  }
+  setEra(era);
+  if (era !== DEFAULT_ERA) console.log(`era: ${era}`);
   let loadout;
   try {
     loadout = parseLoadout(opt('--loadout', 'default'));
@@ -290,7 +305,7 @@ if (!isMainThread) {
   if (loadout.some((k, i) => k !== DEFAULT_LOADOUT[i])) console.log(`loadout: ${loadout.join(', ')}`);
 
   const jobs = [];
-  for (const difficulty of difficulties) for (const player of players) for (const seed of seeds.length ? seeds : [1, 2, 3]) jobs.push({ seed, player, difficulty, log: flag('--log'), loadout });
+  for (const difficulty of difficulties) for (const player of players) for (const seed of seeds.length ? seeds : [1, 2, 3]) jobs.push({ seed, player, difficulty, log: flag('--log'), loadout, era });
   const nWorkers = Math.max(1, Math.min(jobs.length, Number(opt('--jobs', Math.min(12, os.cpus().length - 2)))));
   const results = new Array(jobs.length);
   let next = 0;

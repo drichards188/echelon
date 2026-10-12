@@ -21,10 +21,11 @@ shared interface, keep it backward compatible and note it in the "Changelog" at 
   why rather than what. No em dashes in prose or comments (use commas, colons, parentheses).
 - Units: metres, seconds, radians (degrees only in tables meant for people and in `deploy.js` bearings).
 - World frame: y up, origin at the runway centre, north is -Z, east is +X. See `src/deploy.js`
-  (`fromBearing`, `bearingOf`, `headingFor`, `UNITS`, `ASSETS`, `partPlacements`, `flatPads`, and the
-  loadout: `SLOT_OPTIONS`, `DEFAULT_LOADOUT`, `LOADOUT`, `buildUnits`, `setLoadout`). `UNITS` and
-  `LOADOUT` change in place with the loadout: read them when needed, never keep anything derived from
-  them at import time.
+  (`fromBearing`, `bearingOf`, `headingFor`, `UNITS`, `ASSETS`, `partPlacements`, `flatPads`, the
+  loadout: `SLOT_OPTIONS`, `DEFAULT_LOADOUT`, `LOADOUT`, `buildUnits`, `setLoadout`, and the era in play:
+  `ERA`, `setEra`, see "Eras"). `UNITS` and `LOADOUT` change in place with the loadout, `ERA`,
+  `THREAT_AXIS`, `ASSETS`, `SLOT_OPTIONS`, `DEFAULT_LOADOUT` and `WAVES` are live bindings that follow
+  the era: read them when needed, never keep anything derived from them at import time.
 - Model/vehicle space: front -Z, right +X, ground contact at y = 0, real-world size in metres.
   Headings are `rotation.y` (0 = facing north). Turret azimuth is `rotation.y` of the turret pivot
   relative to the hull (+ = left); elevation is `rotation.x` of the elevation pivot (+ = up).
@@ -122,11 +123,12 @@ sim.events = {
   wave(n, title, sub), state(state),  // director
   partDestroyed(unit, partIndex),     // optional: one vehicle of a dispersed unit (Buk) knocked out
 };
-sim.newGame({ difficulty: 'Normal', loadout });   // loadout optional, see "Loadout"
+sim.newGame({ difficulty: 'Normal', loadout, era });   // loadout and era optional, see "Loadout" and "Eras"
 sim.update(dt);                      // dt already scaled by the time compression
 sim.command(unitId, name, args);
 sim.units; sim.threats; sim.missiles; sim.assets; sim.picture; sim.state; sim.wave; sim.score; sim.time;
 sim.loadout;                         // the kinds in play, slot order
+sim.era;                             // the id of the era in play
 sim.area;                            // the area layer's unit (S-400 or Buk), or null
 sim.linkUp();                        // the data link stands (area unit alive, and its command post vehicle)
 sim.nextLauncher(unitOrId, type?);   // { part, slot } the next round of `type` (default: selected) leaves from
@@ -234,10 +236,125 @@ drones, cruise missiles, a SEAD strike (ARMs + decoys), glide bombs from standof
 pop-ups with ATGMs against the short-range units, a tactical ballistic missile, then mixed saturation.
 The S-400 alone must not be able to win: tune so every layer matters and the player's choices count.
 
+### Eras (`src/eras/`, `src/deploy.js`)
+
+One game holds several eras ("AA through the ages"). The modern era is the one described everywhere
+else in this file and the only playable one; a late-war WW2 era (German flak, 1944 to 1945) is
+registered as a placeholder. The era toggle is the main menu's top control; an era with
+`available: false` shows on it greyed out and marked "In development", and cannot be picked.
+
+**An era is a plain data module**, `src/eras/<id>.js` (default export; Node-safe, `tools/simtest.mjs`
+reads it), registered in `src/eras/index.js` `ERAS` (the menu's order). Everything that belongs to the
+setting lives in it:
+
+```js
+{
+  id: 'modern', name: 'Modern', years: '2020s',   // the toggle
+  available: true,              // false: on the menu, disabled and marked in development
+  theme: 'modern',              // the class `era-modern` on <body> and on the console panel's root
+  markings: 'ua',               // the markings set its vehicles carry (models/markings.js MARKING_SETS), or null
+  text: {
+    sub,                        // under the title, and the toast at Take command
+    blurb,                      // the title screen's paragraph
+    setting,                    // the line under the toggle: the framing ("Ukraine defends an airbase...")
+    orders, lull,               // the radio at Take command and between raids (director)
+    victory, defeat,            // the end screen's title
+  },
+  layout: {
+    threatAxis: 250,            // the compass bearing the raids come from
+    assets: [{ id, kind, name, x, z, bearing, hp, label? }],   // the defended assets; `label` puts one on the HUD's compass ('RWY')
+    vital: ['runway', 'cp'],    // the battle is lost when all of these are destroyed, or no fire unit is left (only
+                                // that with none listed)
+    sites: [{ x, z, bearing }], // where each slot's unit stands, in slot order
+  },
+  slots: [{ cls: 'Area layer',  // the picker's class label
+    options: [{ kind, id, name, callsign, label, info, parts: [{ kind, dx, dz }] }] }],  // option 0 is the default;
+                                // label and info: the picker's short name and one-line trade-off
+  waves: [{ title, sub, groups: [...] }],   // the raids (sim/director.js; group fields there)
+  alerts: { 'NO LINK': ['НЕТ СВЯЗИ', 'NO DATA LINK TO S-400', 3], ... },  // [cabin caption, English meaning,
+                                // rank] for every alert the sim raises (ui/consoles/common.js Header)
+  tutorials: ['basics', 's400', ...],       // the tutorial.js TUTORIALS ids its Tutorials list offers
+  content: () => import('./ww2/content.js'),  // optional: its heavy browser modules (below)
+}
+```
+
+`eras/index.js` derives `defaultLoadout` (every slot's option 0, frozen), `slotOptions` (deploy.js
+`SLOT_OPTIONS`) and `kinds` (the unit kinds its slots offer), and exports `ERAS`, `DEFAULT_ERA`
+('modern'), `eraById(id)`, `playableEra(id)` (the id when that era is available, else the default)
+and `loadEra(id)`.
+
+**Per-kind tables stay global registries** keyed by kind, since they are era-neutral: `SYSTEMS`,
+`MISSILES`, `THREATS`, `PART_ROLE`, `SLOTS` (sim/systems.js), `VEHICLE_KINDS` (models/vehicles.js), the
+asset builders (models/site.js), the flyer models (models/threats.js), `MARKINGS` (models/markings.js),
+the console `MOUNT` table (ui/panel.js), `RELOAD_SCENES` (render/reload.js), the tutorial lessons and
+main's per-kind effect tables (`MSIZE`, `COLD`, `SLOT_AT`, `BRASS`, ...). An era lists the kinds it uses
+(its options' kinds, their parts' kinds, its waves' threat types, its lesson ids); eras may share kinds.
+
+**The era in play** is deploy.js's. `ERA` and the live bindings `THREAT_AXIS`, `ASSETS`,
+`SLOT_OPTIONS`, `DEFAULT_LOADOUT` and `WAVES` (re-exported by sim/director.js) follow it; `UNITS` and
+`LOADOUT` change in place. Read them when needed, never derive anything from them at import time.
+
+```js
+import { ERA, setEra } from './deploy.js';
+setEra(id)                          // any registered era (throws on an unknown id); a new era starts on its
+                                    // default loadout, the same era keeps the loadout; returns ERA
+sim.newGame({ era, loadout, ... })  // with `era`: setEra(era) first, then setLoadout(loadout); sim.era is its id
+flatPads()                          // the era in play's pads; terrainHeight.js makes them again when ERA changes
+```
+
+Everything built from the layout follows the era: the sim (unit and asset positions, `vital`, the
+raids, the radio lines), the terrain (its pads, so `heightAt`; in the browser `terrain.relayout(camera)`
+rebuilds the meshes and the trees), the render layer (`views.reset(sim)` rebuilds the vehicle rigs and
+the asset models when the units or the assets changed), the HUD (the labelled assets on the compass,
+the title, toast, radio and end screen text), the consoles (`ERA.alerts`) and the tutorial list
+(`ERA.tutorials`).
+
+**Menu and storage** (main.js). `setEra(id, { save = true })` (also `__iads.setEra`; resolves to the id,
+or false) refuses an era that is not available and runs no switch during a tutorial. It loads the era's
+content, sets it in deploy.js, then the theme classes, the title text, `terrain.relayout`,
+`entities.sync()`, the loadout picker for its slots with the loadout kept for it, and the tutorial list
+follow; on the title screen the demonstration battle is rebuilt in it, during a battle a new one
+starts in it. Local storage: `echelon.era`, and the loadout per era in `echelon.loadout.<era>`. The
+loadout kept before there were eras (`echelon.loadout`) moves to `echelon.loadout.modern` at start (an
+existing per-era key wins). `?era=<id>` starts in that era without keeping it (one in development, or a
+kept one, falls back to the default); `?loadout=` applies to the era the page starts in. `__iads.era`
+is the era in play, `__iads.eras` the registry.
+
+**Theme hook.** The class `era-<theme>` sits on `<body>` and on the console panel's root
+(`Panel.setTheme`), so an era restyles its title screen and consoles in CSS under it.
+
+**Lazy content.** An era's heavy browser modules (its vehicle and asset models, flyer models, markings
+set, consoles and reload scenes) are fetched with a dynamic import only when it is picked: its
+`content: () => import('./<id>/content.js')`, run once by `loadEra(id)` (main awaits it before the era
+is set, at start and on a switch). The module registers its kinds when it runs:
+`registerVehicles({ kind: builder })` (models/vehicles.js), `registerAssets({ kind: builder })`
+(models/site.js), `registerFlyers({ threats, interceptors })` (models/threats.js; main's
+`entities.sync()` adds their instanced pools), `registerMarkingSet(id, { type: { px, aspect, draw } })`
+with the decals' places in `MARKINGS[kind]` (models/markings.js), `registerConsole(kind, { mount, label,
+sight })` (ui/panel.js) and `RELOAD_SCENES[kind] = scene` (render/reload.js). Vite puts each content
+module in its own chunk, so the modern game never downloads another era's. The modern era has no
+`content`: its modules are imported statically by the registries. Game values stay in
+sim/systems.js for every era (the headless sim needs them). `/models.html?era=<id>` loads an era's
+content (and sets the era, for its markings and `?all=assets`).
+
+**Adding an era.**
+
+1. `src/eras/<id>.js` with the fields above (eras/modern.js is the example), added to `ERAS`, with
+   `available: false` while it is in development.
+2. Its game values in sim/systems.js (`SYSTEMS` for its unit kinds, `MISSILES`, `THREATS`, `PART_ROLE`
+   and `SLOTS` for its vehicles); its models, consoles and reload scenes registered from its `content`
+   module (for example under `src/eras/<id>/`); main's per-kind effect tables and audio for its kinds.
+3. Its lessons in tutorial.js `TUTORIALS` (taking its own threat axis and default loadout, as the modern
+   lessons take the modern era's), listed in its `tutorials`.
+4. `node tools/simtest.mjs --era <id>` runs it headless (any registered era with slots, available or
+   not; another era's summary has a column per slot, and the scripted players are the modern era's).
+   Then set `available: true`.
+
 ### Loadout (`src/deploy.js`, `src/sim/`, simulation agent)
 
-The main menu lets the player swap each unit for an alternative of the same class. Five slots, each a
-site (where it stands) with its options; option 0 is the default:
+The main menu lets the player swap each unit for an alternative of the same class. The slots, their
+sites and options belong to the era in play (see "Eras"); the modern era's five slots, each a site
+(where it stands) with its options; option 0 is the default:
 
 | Slot | Class | Options (`kind`, unit id) |
 |---|---|---|
@@ -249,8 +366,8 @@ site (where it stands) with its options; option 0 is the default:
 
 ```js
 import { SLOT_OPTIONS, DEFAULT_LOADOUT, LOADOUT, UNITS, buildUnits, setLoadout } from './deploy.js';
-SLOT_OPTIONS       // [slot][option] = { kind, id, name, callsign, parts: [{ kind, dx, dz }] }
-DEFAULT_LOADOUT    // ['s400', 'pantsir', 'pantsir', 'osa', 'strela'] (frozen)
+SLOT_OPTIONS       // [slot][option] = { kind, id, name, callsign, label, info, parts: [{ kind, dx, dz }] } (the era's)
+DEFAULT_LOADOUT    // ['s400', 'pantsir', 'pantsir', 'osa', 'strela'] (frozen; the era's)
 setLoadout(kinds)  // one kind per slot (missing, null or '': the slot's default; throws on a kind the slot
                    // does not offer); rebuilds UNITS and LOADOUT in place, returns UNITS
 buildUnits(kinds)  // the same unit definitions as fresh objects ({ id, kind, name, callsign, slot, x, z,
@@ -268,8 +385,8 @@ sim.newGame({ difficulty, loadout })   // with `loadout`: setLoadout(loadout) fi
   init time today (owners please change): `ui/panel.js` `KIND_OF`, main's `eyes` map, `UnitViews` (built
   once at init; `views.reset(sim)` assumes the same unit ids), the panel's tabs. (All rebuilt now on a
   loadout change: main's `newBattle`, see the Client changelog lines.)
-- `flatPads()` covers the vehicles of every option of every slot (the terrain keeps its pads from its
-  first use), so any loadout stands on level ground. The Buk's five vehicles stand on five of the
+- `flatPads()` covers the vehicles of every option of every slot of the era in play (the terrain keeps
+  its pads until the era changes), so any loadout stands on level ground. The Buk's five vehicles stand on five of the
   S-400's six spots (two TELARs in front, the loader-launcher on their flank, the search radar 420 m and
   the command post 800 m behind, every vehicle at least 180 m from the next so one warhead never catches
   two); the single-vehicle alternatives stand where the default stands.
@@ -883,3 +1000,4 @@ Reuse the maxgfx engine core (distance delay, air absorption, voice stealing, re
 - Sim: `SYSTEMS.pantsir.reloadPose { az: PI/2, el: 0, guns: true }`, `SYSTEMS.tunguska.reloadPose { az: PI/2, el: 0.5, guns: true }` (the DESIGN "Loading poses" note's "Tunguska rear" is now its front, to the left). New `reloadPose.guns`: `FireUnits.reloadPose` lets the guns take the turret while they have a target (two lines in units.js; without it the scripted S-400 won 28 of 48 instead of 40). Balance, seeds 1 to 72, Normal, without the poses / with them: default all-auto 7 / 6, scripted S-400 58 / 54; all alternatives all-auto 37 / 24, scripted Buk 44 / 53, Buk + Tunguskas 65 / 63.
 - Balance (final pass on the finished tree, see "Balance"): `director.js` `LULL` 20 to 40 s (the reload jobs, durations unchanged, now mostly run and play between raids), the helicopters' `standoff` 6.5 to 5.5 km (waves 5 and 7), the Tunguska's `gun.range` 2000 to 2200 and `gun.settle` 4 to 3. Normal, seeds 1 to 144: default 29 / 117 / 127, all alternatives 51 / 110 / 132; every single swap within 10 points of the default's scripted S-400 over seeds 1 to 72.
 - UI: the dispersed battery's alerts have their cabin captions (`consoles/common.js` `ALERTS`): 'TELAR DOWN' СОУ ПОРАЖЕНА, 'LOADER DOWN' ПЗУ ПОРАЖЕНА, 'RADAR DOWN' СОЦ ПОРАЖЕНА, 'CP DOWN' КП ПОРАЖЁН (ranked as DAMAGED, a standing state); they showed only the generic ТРЕВОГА. `vite.config.js` `chunkSizeWarningLimit` 1600 to 2000 kB (the bundle is 1.69 MB with the reload scenes).
+- Eras: `src/eras/` (`index.js` registry `ERAS`, `DEFAULT_ERA`, `eraById`, `playableEra`, `loadEra`; `modern.js`; `ww2.js` a placeholder with `available: false`; `ww2/content.js` its empty lazy content). The modern era's layout (`THREAT_AXIS`, `ASSETS`, the sites), slots (with the picker's `label`/`info` and the slot classes that were main's `OPTION_INFO`/`SLOT_CLASS`), `WAVES` (were in director.js), the consoles' `ALERTS` (were in ui/consoles/common.js) and its text moved into `eras/modern.js`. deploy.js holds the era in play: `ERA`, `setEra(id)`, and `THREAT_AXIS`, `ASSETS`, `SLOT_OPTIONS`, `DEFAULT_LOADOUT`, `WAVES` are live bindings now (director.js re-exports `WAVES`); `sim.newGame({ era })`, `sim.era`; director's loss check reads `ERA.layout.vital`, its lull line `ERA.text.lull`; terrainHeight.js makes the pads again when the era changes, `terrain.relayout(camera)` rebuilds the meshes; `views.reset(sim)` also rebuilds the asset models when the assets changed. Registries for lazily loaded eras: `registerVehicles`, `registerAssets`, `registerFlyers` (+ `entities.sync()`), `registerMarkingSet`/`MARKING_SETS` (markings.js now paints per set; `applyMarkings(rig, kind, set = ERA.markings)`), `registerConsole`; `Panel.setTheme(theme)`. Main: the era toggle (`#era-box`), `setEra`, `__iads.setEra`/`era`/`eras`, `?era=`, local storage `echelon.era` and `echelon.loadout.<era>` (the old `echelon.loadout` moves to `echelon.loadout.modern`); the HUD compass shows every asset with a `label`. `simtest.mjs --era <id>`; `/models.html?era=<id>`. See "Eras".
