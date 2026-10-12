@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { fromBearingVec } from './sim/flight.js';
-import { THREAT_AXIS, DEFAULT_LOADOUT } from './deploy.js';
+import { ERA } from './deploy.js';
+import { eraById } from './eras/index.js';
 import { setHighlight } from './ui/highlight.js';
 
 // Tutorials: one lesson per vehicle plus the basics, each a list of steps run on a scripted range
@@ -16,10 +17,13 @@ import { setHighlight } from './ui/highlight.js';
 
 const STORE = 'echelon.tutorials';
 const DEG = Math.PI / 180;
-const FROM = THREAT_AXIS; // the compass bearing the raids come from
+// The lessons below are the modern era's (eras/modern.js lists them in `tutorials`; the list shows the
+// lessons of the era in play): its units, its threat axis and its default loadout.
+const MODERN = eraById('modern');
+const FROM = MODERN.layout.threatAxis; // the compass bearing the raids come from
 
 // the default loadout with one slot's alternative swapped in
-const swap = (slot, kind) => DEFAULT_LOADOUT.map((k, i) => (i === slot ? kind : k));
+const swap = (slot, kind) => MODERN.defaultLoadout.map((k, i) => (i === slot ? kind : k));
 const LIVE = ['aligning', 'launch', 'flying'];
 const liveEngagements = (T) => T.u.engagements.filter((e) => LIVE.includes(e.state)).length;
 
@@ -1059,7 +1063,7 @@ export class Tutorials {
     this.hud = hud;
     this.host = host;
     this.run = null; // the lesson in progress
-    this.defs = TUTORIALS;
+    this.defs = []; // the era's lessons (buildMenu)
     this.done = this.load();
     this.card = document.getElementById('tut-card');
     this.menu = document.getElementById('tut-menu');
@@ -1092,7 +1096,9 @@ export class Tutorials {
     } catch (e) { /* private mode */ }
   }
 
+  // the lessons the era in play offers (its `tutorials`); built again when the era changes
   buildMenu() {
+    this.defs = ERA.tutorials.map((id) => TUTORIALS.find((d) => d.id === id)).filter(Boolean);
     const list = document.getElementById('tut-list');
     list.replaceChildren();
     this.items = new Map();

@@ -7,7 +7,8 @@ import { ReloadScenes } from './reload.js';
 // The fire units and the airbase in the world, bound to the simulation's state: turrets, elevation,
 // search antennas following `radar.sweep`, the S-400 erectors, which launcher slots still hold a
 // round, and wrecks and fires once something is destroyed or hit hard. The rigs are built for the
-// units in play; `reset(sim)` rebuilds them when the loadout changed (see DESIGN.md, "Loadout").
+// units in play and the buildings for the era's assets; `reset(sim)` rebuilds them when the loadout or
+// the era changed (see DESIGN.md, "Loadout" and "Eras").
 
 const _p = new THREE.Vector3();
 const _d = new THREE.Vector3();
@@ -34,6 +35,8 @@ const RAISED = new Set(['buk-radar', 'tor', 'tunguska', 'shilka']);
 
 // The units' signature: a new one (another loadout) means new rigs.
 const signature = (sim) => sim.units.map((u) => `${u.id}:${u.parts.map((p) => p.kind).join('+')}`).join(',');
+// the assets' (another era): new buildings
+const assetSignature = (sim) => sim.assets.map((a) => `${a.id}:${a.kind}:${a.x}:${a.z}:${a.bearing}`).join(',');
 
 export class UnitViews {
   constructor(scene, sim) {
@@ -43,14 +46,25 @@ export class UnitViews {
     this.reloads = new ReloadScenes(scene, this);
     this.build(sim);
     this.assets = new Map();
+    this.buildAssets(sim);
+    this.fireT = 0;
+  }
+
+  // the era's buildings (models/site.js), standing where the sim has them
+  buildAssets(sim) {
+    for (const g of this.assets.values()) {
+      this.scene.remove(g);
+      g.traverse((o) => o.geometry?.dispose());
+    }
+    this.assets.clear();
+    this.assetSig = assetSignature(sim);
     for (const a of sim.assets) {
       const g = buildAsset(a);
       g.position.copy(a.pos);
       g.rotation.y = headingFor(a.bearing);
-      scene.add(g);
+      this.scene.add(g);
       this.assets.set(a.id, g);
     }
-    this.fireT = 0;
   }
 
   build(sim) {
@@ -151,16 +165,19 @@ export class UnitViews {
     }
   }
 
-  // a new game: everything stands again; another loadout gets its own rigs. Returns true when the rigs
-  // were rebuilt (the caller then patches the new materials and rebinds anything it took from them).
+  // a new game: everything stands again; another loadout gets its own rigs, another era's assets their
+  // own buildings. Returns true when the rigs or the buildings were rebuilt (the caller then patches the
+  // new materials and rebinds anything it took from them).
   reset(sim) {
+    const era = assetSignature(sim) !== this.assetSig;
+    if (era) this.buildAssets(sim);
     if (signature(sim) !== this.sig) {
       this.dispose();
       this.build(sim);
       return true;
     }
     this.place(sim);
-    return false;
+    return era;
   }
 
   update(dt, rawDt, sim, fx) {

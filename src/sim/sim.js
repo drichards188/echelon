@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ASSETS, partPlacements, setLoadout } from '../deploy.js';
+import { ERA, ASSETS, partPlacements, setLoadout, setEra } from '../deploy.js';
 import { mulberry32 } from '../noise.js';
 import { Ballistics } from '../ballistics.js';
 import { THREATS, MISSILES, DIFFICULTY, SYSTEMS } from './systems.js';
@@ -77,10 +77,13 @@ export class Sim {
 
   // scripted: a tutorial range. The director spawns nothing (the tutorial places its own threats with
   // threatAI.spawnOne), nothing is damaged or lost, the launchers start erected and interceptors hit
-  // reliably so a lesson never stalls on bad luck. loadout: one kind per slot (deploy.js setLoadout);
-  // without it the units in deploy.js UNITS as they are.
-  newGame({ difficulty = 'Normal', attract = false, scripted = false, seed = this.seed, loadout = null } = {}) {
+  // reliably so a lesson never stalls on bad luck. era: the era id (deploy.js setEra; a new era starts
+  // on its default loadout); loadout: one kind per slot (deploy.js setLoadout); without them the era
+  // and the units in deploy.js as they are.
+  newGame({ difficulty = 'Normal', attract = false, scripted = false, seed = this.seed, loadout = null, era = null } = {}) {
+    if (era) setEra(era);
     if (loadout) setLoadout(loadout);
+    this.era = ERA.id;
     this.rng = mulberry32(seed);
     this.difficultyName = difficulty;
     this.difficulty = DIFFICULTY[difficulty] ?? DIFFICULTY.Normal;

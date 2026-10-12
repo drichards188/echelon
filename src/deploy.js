@@ -1,10 +1,13 @@
-// Where everything sits. Shared by terrain (flattened pads), sim (unit and asset positions) and
-// the render layer, so it holds plain numbers only.
+// Where everything sits, in the era in play (src/eras). Shared by terrain (flattened pads), sim (unit and
+// asset positions) and the render layer, so it holds plain data only.
 //
-// World frame: metres, y up, origin at the middle of the airbase runway. North is -Z, east is +X.
+// World frame: metres, y up, origin at the middle of the defended site (the modern era's: its airbase
+// runway). North is -Z, east is +X.
 // A bearing (degrees clockwise from north) at range r is x = r * sin(b), z = -r * cos(b).
 // Vehicle and model space: front -Z, right +X, ground contact y = 0; headings are three's
 // rotation.y (0 = facing north, + = turning left/west).
+
+import { ERAS, DEFAULT_ERA, eraById } from './eras/index.js';
 
 export const DEG = Math.PI / 180;
 
@@ -21,84 +24,26 @@ export function bearingOf(dx, dz) {
 // rotation.y that makes a model (front -Z) face a bearing
 export const headingFor = (bearingDeg) => -bearingDeg * DEG;
 
-// The attacks come mostly out of the west-south-west; later waves widen the arc.
-export const THREAT_AXIS = 250;
-
-// The defended airbase. `hp` is gameplay hit points; losing the runway and the command post ends the battle.
-export const ASSETS = [
-  { id: 'runway', kind: 'runway', name: 'Runway 07/25', x: 0, z: 0, bearing: 70, length: 2800, width: 45, hp: 400 },
-  { id: 'cp', kind: 'command', name: 'Air defense command post', x: -350, z: 650, bearing: 70, hp: 250 },
-  { id: 'has1', kind: 'shelter', name: 'Shelter 1', x: -700, z: 420, bearing: 160, hp: 150 },
-  { id: 'has2', kind: 'shelter', name: 'Shelter 2', x: -520, z: 480, bearing: 160, hp: 150 },
-  { id: 'has3', kind: 'shelter', name: 'Shelter 3', x: 520, z: 260, bearing: 160, hp: 150 },
-  { id: 'has4', kind: 'shelter', name: 'Shelter 4', x: 700, z: 200, bearing: 160, hp: 150 },
-  { id: 'fuel', kind: 'fuel', name: 'Fuel farm', x: 900, z: 650, bearing: 70, hp: 120 },
-  { id: 'tower', kind: 'tower', name: 'Control tower', x: 150, z: 380, bearing: 70, hp: 80 },
-];
-
+// The era in play (src/eras): its map, its slots and its raids. Everything below follows it and changes
+// with setEra: ERA, THREAT_AXIS, ASSETS, SLOT_OPTIONS, DEFAULT_LOADOUT and WAVES are live bindings (read
+// them when needed, never keep anything derived from them at import time), UNITS and LOADOUT change in
+// place.
+export let ERA = eraById(DEFAULT_ERA);
+// the compass bearing the raids come from (later waves widen the arc)
+export let THREAT_AXIS = ERA.layout.threatAxis;
+// The defended assets. `hp` is gameplay hit points; losing all of ERA.layout.vital ends the battle.
+export let ASSETS = ERA.layout.assets;
 // The fire units, one per slot, in the order the number keys select them. Each slot has a site (where
-// it stands) and the options the player can pick on the main menu, all of the same class: the area
-// layer, two gun-missile point defense units, a short-range missile system and a very short range one.
-// `parts` are the vehicles of a unit in the unit's own frame (metres; -dz is toward `bearing`), the
-// first part carries the third-person camera. Everything faces the threat axis unless it says otherwise.
-// Unit ids belong to the option, not the slot: the default loadout keeps 'S400', 'P1', 'P2', 'OSA' and
-// 'STR'; the alternatives are 'BUK', 'T1' / 'T2' (a Tunguska in slot 1 or 2), 'TOR' and 'SHK'.
-const SITES = [
-  { x: 7000, z: 2600, bearing: THREAT_AXIS },
-  { x: 6300, z: 2050, bearing: THREAT_AXIS },
-  { x: -2300, z: -700, bearing: THREAT_AXIS },
-  { x: -1500, z: 2300, bearing: 230 },
-  { x: 950, z: -750, bearing: 270 },
-];
-const one = (kind) => [{ kind, dx: 0, dz: 0 }];
-
-export const SLOT_OPTIONS = [
-  [
-    {
-      kind: 's400', id: 'S400', name: 'S-400 Triumf', callsign: 'Granit',
-      parts: [
-        { kind: 's400-tel', dx: 0, dz: 0 },
-        { kind: 's400-tel', dx: -180, dz: 60 },
-        { kind: 's400-tel', dx: 180, dz: 60 },
-        { kind: 's400-radar', dx: 0, dz: 420 },
-        { kind: 's400-search', dx: -420, dz: 700 },
-        { kind: 's400-cp', dx: 260, dz: 760 },
-      ],
-    },
-    {
-      // two TELARs in front with the loader-launcher on their flank, the search radar and the command
-      // post behind; every vehicle stands on one of the battalion's levelled spots, at least 180 m from
-      // the next so one warhead never catches two
-      kind: 'buk', id: 'BUK', name: 'Buk-M2 battery', callsign: 'Beech',
-      parts: [
-        { kind: 'buk-telar', dx: 0, dz: 0 },
-        { kind: 'buk-telar', dx: -180, dz: 60 },
-        { kind: 'buk-loader', dx: 180, dz: 60 },
-        { kind: 'buk-radar', dx: 0, dz: 420 },
-        { kind: 'buk-cp', dx: 260, dz: 760 },
-      ],
-    },
-  ],
-  [
-    { kind: 'pantsir', id: 'P1', name: 'Pantsir-S1 (battalion cover)', callsign: 'Shield 1', parts: one('pantsir') },
-    { kind: 'tunguska', id: 'T1', name: '2S6M Tunguska (battalion cover)', callsign: 'Sabre 1', parts: one('tunguska') },
-  ],
-  [
-    { kind: 'pantsir', id: 'P2', name: 'Pantsir-S1 (airbase)', callsign: 'Shield 2', parts: one('pantsir') },
-    { kind: 'tunguska', id: 'T2', name: '2S6M Tunguska (airbase)', callsign: 'Sabre 2', parts: one('tunguska') },
-  ],
-  [
-    { kind: 'osa', id: 'OSA', name: 'Osa-AKM', callsign: 'Wasp', parts: one('osa') },
-    { kind: 'tor', id: 'TOR', name: 'Tor-M2', callsign: 'Hammer', parts: one('tor') },
-  ],
-  [
-    { kind: 'strela', id: 'STR', name: 'Strela-10M3', callsign: 'Arrow', parts: one('strela') },
-    { kind: 'shilka', id: 'SHK', name: 'ZSU-23-4M4 Shilka-M4', callsign: 'Saw', parts: one('shilka') },
-  ],
-];
+// it stands) and the options the player can pick on the main menu, all of the same class (the era's
+// `slots`). `parts` are the vehicles of a unit in the unit's own frame (metres; -dz is toward `bearing`),
+// the first part carries the third-person camera.
+let SITES = ERA.layout.sites;
+export let SLOT_OPTIONS = ERA.slotOptions;
+// the raids (sim/director.js)
+export let WAVES = ERA.waves;
 
 // the kind picked for each slot; the first option of every slot
-export const DEFAULT_LOADOUT = Object.freeze(SLOT_OPTIONS.map((opts) => opts[0].kind));
+export let DEFAULT_LOADOUT = ERA.defaultLoadout;
 
 /**
  * Unit definitions for a loadout (one kind per slot; a missing, null or empty entry takes the slot's
@@ -130,6 +75,27 @@ export function setLoadout(loadout = DEFAULT_LOADOUT) {
   return UNITS;
 }
 
+/**
+ * Picks the era for the next game (before sim.newGame, or pass `era` to newGame) and with it the layout,
+ * the slots and the raids; a new era starts on its default loadout, the same era keeps the loadout.
+ * Throws on an unknown id; any registered era is accepted (the menu offers only the available ones,
+ * eras/index.js playableEra). Returns ERA.
+ */
+export function setEra(id) {
+  const era = eraById(id);
+  if (!era) throw new Error(`no era '${id}' (${ERAS.map((e) => e.id).join(', ')})`);
+  if (era === ERA) return ERA;
+  ERA = era;
+  THREAT_AXIS = era.layout.threatAxis;
+  ASSETS = era.layout.assets;
+  SITES = era.layout.sites;
+  SLOT_OPTIONS = era.slotOptions;
+  DEFAULT_LOADOUT = era.defaultLoadout;
+  WAVES = era.waves;
+  setLoadout(DEFAULT_LOADOUT);
+  return ERA;
+}
+
 // World position and heading of every part of a unit.
 export function partPlacements(unit) {
   const h = headingFor(unit.bearing);
@@ -143,9 +109,10 @@ export function partPlacements(unit) {
   }));
 }
 
-// Pads the terrain flattens: each vehicle gets a level spot and the runway a strip. The terrain keeps
-// them from its first use, so they cover every option of every slot (the default loadout's first, any
-// spot another option shares is not repeated) and whatever the menu picks stands on level ground.
+// Pads the terrain flattens for the era in play: each vehicle gets a level spot and the runway a strip.
+// The terrain keeps them until the era changes (terrainHeight.js), so they cover every option of every
+// slot (the default loadout's first, any spot another option shares is not repeated) and whatever the
+// menu picks stands on level ground.
 export function flatPads() {
   const pads = [];
   const defs = buildUnits();

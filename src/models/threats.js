@@ -366,3 +366,18 @@ const build = (k) => {
 /** -> { parts: [{ geometry, material, spin?, pivot? }], length, plume? }; cached and shared, do not dispose. */
 export const buildThreat = (type) => build(type);
 export const buildInterceptor = (kind) => build(kind);
+
+/**
+ * Registers flyer models (an era's lazily loaded content, eras/index.js): threats { type: () => model }
+ * and interceptors { kind: () => model }, models of the shape above. Entities.sync() draws them.
+ */
+export function registerFlyers({ threats = {}, interceptors = {} }) {
+  for (const [type, b] of Object.entries(threats)) {
+    if (!THREAT_TYPES.includes(type)) THREAT_TYPES.push(type);
+    BUILDERS[type] = b;
+  }
+  for (const [kind, b] of Object.entries(interceptors)) {
+    if (!INTERCEPTOR_KINDS.includes(kind)) INTERCEPTOR_KINDS.push(kind);
+    BUILDERS[kind] = b;
+  }
+}

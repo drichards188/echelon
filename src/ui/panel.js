@@ -1,7 +1,7 @@
 // The right half of the screen: a unit selector strip and the selected unit's control console.
 // Driven only by panel.update() data; talks back only through onSelect and onCommand.
 import './panel.css';
-import { UNITS } from '../deploy.js';
+import { UNITS, ERA } from '../deploy.js';
 import { el, hw, snd, setText, setCls, Bar, Led, label } from './widgets.js';
 import { SIGHT_W, SIGHT_H } from './sightview.js';
 import { threatOrder, alertSevere } from './consoles/common.js';
@@ -18,9 +18,20 @@ import { mountFallback } from './fallback.js';
 
 const DESIGN_W = 760;
 const DESIGN_H = 860;
+// The consoles by unit kind (a global registry: each era lists the kinds it uses), the tab's type label
+// and the kinds whose console shows a sight picture. An era's lazily loaded content adds its own with
+// registerConsole.
 const MOUNT = { s400: mountS400, pantsir: mountPantsir, osa: mountOsa, strela: mountStrela, tunguska: mountTunguska, shilka: mountShilka, buk: mountBuk, tor: mountTor };
 const TYPE_LABEL = { s400: 'С-400', pantsir: 'ПАНЦИРЬ-С1', osa: 'ОСА-АКМ', strela: 'СТРЕЛА-10М3', tunguska: 'ТУНГУСКА-М', shilka: 'ШИЛКА-М4', buk: 'БУК-М2', tor: 'ТОР-М2' };
 const SIGHT_KINDS = new Set(['pantsir', 'strela', 'tunguska', 'shilka']);
+
+/** Registers the console of a unit kind: mount({ id, send, memo, sight }) -> { el, update, key, dispose? }. */
+export function registerConsole(kind, { mount, label = kind, sight = false }) {
+  MOUNT[kind] = mount;
+  TYPE_LABEL[kind] = label;
+  if (sight) SIGHT_KINDS.add(kind);
+}
+
 // UNITS changes in place with the loadout (deploy.js): look kinds up when needed
 const kindOf = (id) => UNITS.find((u) => u.id === id)?.kind;
 const STATE_RU = { brief: 'ИНСТРУКТАЖ', raid: 'НАЛЁТ', wave: 'НАЛЁТ', lull: 'ПАУЗА', victory: 'ПОБЕДА', defeat: 'ПОРАЖЕНИЕ' };
@@ -53,6 +64,7 @@ export class Panel {
     this.opts = opts;
     hw.audio = opts.audio || null;
     root.classList.add('pn-root');
+    this.setTheme(ERA.theme);
     this.scaleEl = el('div', 'pn-scale');
     this.tabsEl = el('div', 'tabs');
     this.host = el('div', 'conhost');
@@ -124,6 +136,13 @@ export class Panel {
     this.tabIds = '';
     this.alertSeen.clear();
     this.primed = false;
+  }
+
+  // The era's console theme: the class `era-<theme>` on the panel's root, for the era's CSS (main.js puts
+  // the same class on the page).
+  setTheme(theme) {
+    for (const c of [...this.root.classList]) if (c.startsWith('era-')) this.root.classList.remove(c);
+    if (theme) this.root.classList.add(`era-${theme}`);
   }
 
   dispose() {

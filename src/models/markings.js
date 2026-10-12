@@ -1,8 +1,11 @@
 import * as THREE from 'three';
 import { mulberry32 } from '../noise.js';
+import { ERA } from '../deploy.js';
 
 // National markings painted onto the vehicles, as thin decal planes (no photo pixels: everything is
-// drawn onto one canvas atlas at load). Sources and measurements: refs/markings/README.md.
+// drawn onto one canvas atlas per markings set at load). Sources and measurements: refs/markings/README.md.
+// A set is what the decal types look like in an era (eras/<era>.js `markings`, MARKING_SETS below); the
+// modern era's is 'ua', the national markings of Ukraine:
 //
 //   emblem  The emblem of the Armed Forces of Ukraine (Presidential Decree 551/2006): an equal-armed
 //           cross with divergent arms in crimson with a gold edge, a round blue medallion (2/5 of the
@@ -11,7 +14,7 @@ import { mulberry32 } from '../noise.js';
 //   flag    A small blue over yellow rectangle (3:2), the field marking on the front of many vehicles.
 //
 // MARKINGS[kind] lists decals. Every entry:
-//   type   'emblem' | 'flag'
+//   type   a type of the set: 'emblem' | 'flag' in 'ua'
 //   pivot  null (the rig root) or the name of a pivot in rig.pivots, so a decal on a turret turns with it
 //   pos    [x, y, z] centre in the parent's space, ON the surface (a 3 mm lift is added)
 //   face   'x' | '-x' | 'z' | '-z' | 'y' | '-y' or a normal [nx, ny, nz] the decal looks along
@@ -21,11 +24,6 @@ import { mulberry32 } from '../noise.js';
 // `pair()` mirrors an entry across the x = 0 plane (a hull side) and returns both. The vehicle model files
 // are not edited: positions were measured on the built models (see the README), so when a model changes
 // move its decals here.
-
-const ASPECT = { emblem: 1, flag: 2 / 3 };
-
-// atlas cells in the 1024 x 512 canvas, as pixel rectangles [x, y, w, h] (canvas y down)
-const PX = { emblem: [6, 6, 500, 500], flag: [518, 51, 500, 334] };
 
 const GOLD = '#ffdf00', GOLD_EDGE = '#806600', CRIMSON = '#d50663', BLUE = '#001788';
 // the SVG's paths (500 x 500 viewBox)
@@ -107,14 +105,27 @@ function weather(g, W, H, seed) {
   g.globalCompositeOperation = 'source-over';
 }
 
-let shared = null;
-function sharedAssets() {
-  if (shared) return shared;
+// The markings sets: every decal type a set paints, with its atlas cell in the 1024 x 512 canvas as a
+// pixel rectangle [x, y, w, h] (canvas y down), its aspect (height / width) and how it is drawn there.
+// An era's lazily loaded content adds its own set with registerMarkingSet.
+export const MARKING_SETS = {
+  ua: {
+    emblem: { px: [6, 6, 500, 500], aspect: 1, draw: (g, x, y, w) => drawEmblem(g, x, y, w / 500) },
+    flag: { px: [518, 51, 500, 334], aspect: 2 / 3, draw: drawFlag },
+  },
+};
+export function registerMarkingSet(id, set) {
+  MARKING_SETS[id] = set;
+}
+
+const shared = new Map();
+function sharedAssets(id) {
+  if (shared.has(id)) return shared.get(id);
+  const set = MARKING_SETS[id];
   const cv = document.createElement('canvas');
   cv.width = 1024; cv.height = 512;
   const g = cv.getContext('2d');
-  drawEmblem(g, 6, 6, 1);
-  drawFlag(g, ...PX.flag);
+  for (const t of Object.values(set)) t.draw(g, ...t.px);
   weather(g, 1024, 512, 4471);
   const map = new THREE.CanvasTexture(cv);
   map.colorSpace = THREE.SRGBColorSpace;
@@ -127,14 +138,14 @@ function sharedAssets() {
   });
   mat.name = 'markings';
   const geo = {};
-  for (const [type, [x, y, w, h]] of Object.entries(PX)) {
+  for (const [type, { px: [x, y, w, h] }] of Object.entries(set)) {
     const g2 = new THREE.PlaneGeometry(1, 1);
     const uv = g2.attributes.uv;
     for (let i = 0; i < uv.count; i++) uv.setXY(i, (x + uv.getX(i) * w) / 1024, 1 - (y + (1 - uv.getY(i)) * h) / 512);
     geo[type] = g2;
   }
-  shared = { mat, geo, map };
-  return shared;
+  shared.set(id, { mat, geo, map, set });
+  return shared.get(id);
 }
 
 const NORMALS = { x: [1, 0, 0], '-x': [-1, 0, 0], z: [0, 0, 1], '-z': [0, 0, -1], y: [0, 1, 0], '-y': [0, -1, 0] };
@@ -308,19 +319,22 @@ export const MARKINGS = {
   ],
 };
 
-/** Parent every decal of `kind` to the rig root or its pivot. Returns the decal meshes. */
-export function applyMarkings(rig, kind) {
+/**
+ * Parent every decal of `kind` to the rig root or its pivot, painted in a markings set (by default the
+ * era in play's; none without one). Returns the decal meshes.
+ */
+export function applyMarkings(rig, kind, setId = ERA.markings) {
   const list = MARKINGS[kind];
-  if (!list || !list.length) return [];
-  const { mat, geo } = sharedAssets();
+  if (!list || !list.length || !MARKING_SETS[setId]) return [];
+  const { mat, geo, set } = sharedAssets(setId);
   const out = [];
   for (const e of list) {
     const parent = e.pivot ? rig.pivots[e.pivot] : rig.root;
-    if (!parent) continue;
+    if (!parent || !set[e.type]) continue;
     const mesh = new THREE.Mesh(geo[e.type], mat);
     const f = e.face || 'x';
     const n = new THREE.Vector3(...(typeof f === 'string' ? NORMALS[f] : f)).normalize();
-    const [w, h] = Array.isArray(e.size) ? e.size : [e.size, e.size * ASPECT[e.type]];
+    const [w, h] = Array.isArray(e.size) ? e.size : [e.size, e.size * set[e.type].aspect];
     mesh.scale.set(w, h, 1);
     mesh.position.set(...e.pos).addScaledVector(n, 0.003);
     // the plane's front faces +Z: build the basis with z = n

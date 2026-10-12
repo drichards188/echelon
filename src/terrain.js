@@ -208,6 +208,19 @@ export class Terrain {
     return los(ax, ay, az, bx, by, bz);
   }
 
+  /**
+   * The ground changed under the geometry: another era levels other pads (deploy.js setEra,
+   * terrainHeight.js). Every level and the trees are built again around the camera.
+   */
+  relayout(camera) {
+    for (const lv of this.levels) {
+      lv.valid = false;
+      lv.cx = lv.cz = 1e9;
+    }
+    this.trees.dirty = true;
+    this.update(camera, true);
+  }
+
   /** Recentre the camera-following geometry (call every frame; it rebuilds only when a level moves). */
   update(camera, all = false) {
     const p = camera.position;

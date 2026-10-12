@@ -60,6 +60,7 @@ export class Entities {
       }
       this.groups.set(key, { parts, model, cap, n: 0, radius });
     };
+    this.addGroup = add;
     for (const t of THREAT_TYPES) add(t, buildThreat(t), CAP[t] ?? 32, true);
     for (const k of INTERCEPTOR_KINDS) add(k, buildInterceptor(k), MCAP, false);
     for (const k of Object.values(INTERCEPTOR_STAGES)) add(k, buildInterceptor(k), MCAP, false);
@@ -69,6 +70,12 @@ export class Entities {
     this.boosters = [];
     this.split = new WeakSet();
     this.pulses = new WeakMap();
+  }
+
+  // flyers registered since the pools were made (an era's content, models/threats.js registerFlyers)
+  sync() {
+    for (const t of THREAT_TYPES) if (!this.groups.has(t)) this.addGroup(t, buildThreat(t), CAP[t] ?? 32, true);
+    for (const k of INTERCEPTOR_KINDS) if (!this.groups.has(k)) this.addGroup(k, buildInterceptor(k), MCAP, false);
   }
 
   // a round's booster drops at burnout: placed where it sat on the round, it keeps most of the round's

@@ -31,6 +31,14 @@ VEHICLE_KINDS.push('9t217'); BUILDERS['9t217'] = build9T217; // Osa-AKM transloa
 VEHICLE_KINDS.push('9t244'); BUILDERS['9t244'] = build9T244; // Tor-M2 transloader (render/reload/tor.js)
 VEHICLE_KINDS.push('kamaz-5350'); BUILDERS['kamaz-5350'] = buildKamaz5350; // Shilka ammunition truck (render/reload/shilka.js)
 
+/** Registers vehicle builders, { kind: () => rig } with the rig contract (an era's lazily loaded content, eras/index.js). */
+export function registerVehicles(builders) {
+  for (const [kind, b] of Object.entries(builders)) {
+    if (!VEHICLE_KINDS.includes(kind)) VEHICLE_KINDS.push(kind);
+    BUILDERS[kind] = b;
+  }
+}
+
 export function buildVehicle(kind) {
   const b = BUILDERS[kind];
   if (!b) throw new Error('unknown vehicle ' + kind);
