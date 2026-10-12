@@ -140,7 +140,8 @@ sim.visibility = 1;                  // 1 clear; lower (rain, fog, dark) shorten
   mode: 'auto' | 'manual' | 'hold',
   radar: { search: bool, track: bool, sweep: rad /* current search antenna azimuth, world */, range },
   tracks: Track[], selected: trackId | null,
-  engagements: [{ trackId, missileIds: [], state: 'aligning' | 'launch' | 'flying' | 'kill' | 'miss' }],
+  engagements: [{ trackId, missileIds: [], state: 'aligning' | 'launch' | 'flying' | 'kill' | 'miss',
+                  wait /* s until the rate cap lets its first round leave, 0 = none (targetGap) */ }],
   weapons: {
     missiles: { type, ready, reserve, max, reload /* s left, 0 = idle */ },   // S-400: per type, see below
     gun: { rounds, max, firing, heat },                                      // Pantsir only
@@ -301,23 +302,24 @@ relative to the systems already there.
   S-400's role of fusing the picture and linking it); the battery is out with its last TELAR. Raids
   sent at 'radar' aim at the search radar vehicle's site (also once it is knocked out).
 - **2S6M Tunguska** (`tunguska`): guns first. Two twin 30 mm with 2400 rounds (the Pantsir 1400) whose
-  crew opens fire out to 2.2 km, as far as its shells reach, 3 s after it takes a target (the Pantsir's
-  at 1.6 km after 4 s), eight cheap 9M311 (cost 5, 8 + 24) of shorter reach (10 km against 20) guided
+  crew opens fire at 3.5 km, 3 s after it takes a target (the Pantsir's at 2.5 km after 4 s; the shells
+  reach about 4.2 km), eight cheap 9M311 (cost 5, 8 + 24) of shorter reach (10 km against 20) guided
   only through the optical sight (`missileFc: 'eo'`: silent, needs line of sight, 12 km shortened by
-  poor `sim.visibility`), one missile channel (the crew fires pairs), tougher (160 hp), a shorter
-  search radar (24 km against 36). Its tracking radar lays only the guns (`trackSource` picks radar or
-  EO for them). No answer to ballistic missiles.
+  poor `sim.visibility`), one missile channel (the crew fires pairs) and a new missile target every 8 s
+  at most (`targetGap`), tougher (160 hp), a shorter search radar (24 km against 36). Its tracking
+  radar lays only the guns (`trackSource` picks radar or EO for them). No answer to ballistic missiles.
 - **Tor-M2** (`tor`): eight 9M338 in vertical cells, cold-launched straight up and turning after a
   0.9 s eject at 25 m/s, lighting about 18 m over its cell (`vertical`, the S-400's eject phase), four channels but only inside its turret-mounted
   array's sector (`track.sector` 0.9 rad around the bore: the turret turns to the middle of its
   engagements and refuses a new one outside 80 % of the sector), quick to react (3 s against the Osa's
   5), best against small fast targets (hit 0.7 to 0.8 against cruise missiles, glide bombs, ARMs,
-  drones), dearer rounds (14 against 8), 8 + 12. The AI crew fires pairs; a player firing single rounds
-  gets more out of it.
+  drones), dearer rounds (14 against 8), 8 + 12, a new target every 4 s at most (`targetGap`). The AI
+  crew fires pairs; a player firing single rounds gets more out of it.
 - **ZSU-23-4M4 Shilka-M4** (`shilka`): guns only, no missiles (`weapons.missiles` null). Four 23 mm
   barrels, 2400 rounds, 75 rounds/s in bursts, radar fire control with the optical sight taking over
   while the tracking radar is off (`eoFallback`), a short search radar (14 km). Very short range: the
-  23 mm self-destructs at about 1.9 km and the crew opens fire inside 1.4 km, nothing above 1.5 km.
+  23 mm takes 3 s to 2 km and self-destructs at about 2.8 km, and the crew opens fire inside 2 km,
+  nothing above 1.5 km.
   Free per kill (guns cost nothing in `score.cost`); it takes drones, ATGMs, ARMs and cruise missiles
   diving close by. Its radar emits, unlike the Strela.
 
@@ -327,34 +329,74 @@ Game values (`SYSTEMS`, `MISSILES`), for comparison with the existing systems:
 |---|---|---|---|---|---|
 | s400 | 48N6 200 km, 1700 m/s, 8 + 8, 40; 9M96 100 km, 1000, 16 + 16, 15 | 8 | - | 240 km / search radar | 300 |
 | buk | 9M317 70 km, 1300 m/s, 12 + 20 (4 per launcher vehicle), 12 | 1 per TELAR (2) | - | 160 km / 80 km per TELAR | 110 + 110 + 80 + 130 + 90 |
-| pantsir | 57E6 20 km, 1250 m/s, 12 + 12, 8 | 2 | 30 mm, 1400, opens at 1.6 km | 36 / 24 / 14 km | 120 |
-| tunguska | 9M311 10 km, 1100 m/s, 8 + 24, 5 (EO only, pairs) | 1 | 30 mm, 2400, opens at 2.2 km | 24 / 14 / 12 km | 160 |
+| pantsir | 57E6 20 km, 1250 m/s, 12 + 12, 8 | 2, a new target every 6 s | 30 mm, 1400, opens at 2.5 km, reach 4.2 km | 36 / 24 / 14 km | 120 |
+| tunguska | 9M311 10 km, 1100 m/s, 8 + 24, 5 (EO only, pairs) | 1, a new target every 8 s | 30 mm, 2400, opens at 3.5 km, reach 4.2 km | 24 / 14 / 12 km | 160 |
 | osa | 9M33 10 km, 800 m/s, 6 + 12, 8 (pairs) | 1 | - | 30 / 20 km | 90 |
-| tor | 9M338 15 km, 1000 m/s, 8 + 12, 14 (cold launch, pairs) | 4 inside a 0.9 rad sector | - | 28 / 18 km | 100 |
+| tor | 9M338 15 km, 1000 m/s, 8 + 12, 14 (cold launch, pairs) | 4 inside a 0.9 rad sector, a new target every 4 s | - | 28 / 18 km | 100 |
 | strela | 9M37 5 km, 560 m/s, 4 + 4, 5 | 1 (seeker) | - | sight 6.5 km | 70 |
-| shilka | - | 1 | 23 mm, 2400, opens at 1.4 km, reach 1.9 km | 14 / 6 / 4 km | 80 |
+| shilka | - | 1 | 23 mm, 2400, opens at 2 km, reach 2.8 km | 14 / 6 / 4 km | 80 |
 
 **Balance** (`node tools/simtest.mjs <seeds> --all --loadout ...`, Normal; games won by the all-auto
 crews / the scripted area player / the scripted area player with the point defense pair; the other
-units on auto). The final pass, on the finished tree (loadout, tracking and designation fixes, gun fire
-control, launch sequences, reload jobs with their realistic durations and scenes), with the changes it
-made (below):
+units on auto). The gun range pass (realistic gun ranges, the engagement rate cap and the re-tune
+below; measured with the trigger's out-of-range hold, which only changes the third column):
 
 | Loadout | Seeds 1 to 72 | Seeds 1 to 144 | Scripted area player against the default (1 to 72) |
 |---|---|---|---|
-| default | 14 / 56 / 60 | 29 / 117 / 127 | |
-| Buk | 21 / 49 / 58 | | -10 points |
-| Tunguska in slot 1 | 4 / 50 / 55 | | -8 |
-| Tunguska in slot 2 | 9 / 62 / 66 | | +8 |
-| two Tunguskas | 4 / 58 / 58 | | +3 |
-| Tor | 15 / 61 / 68 | | +7 |
-| Shilka | 16 / 58 / 68 | | +3 |
-| all alternatives | | 51 / 110 / 132 | |
+| default | 7 / 54 / 61 | 20 / 107 / 128 | |
+| Buk | 18 / 47 / 67 | | -10 points |
+| Tunguska in slot 1 | 6 / 52 / 53 | | -4 |
+| Tunguska in slot 2 | 7 / 57 / 69 | | +4 |
+| two Tunguskas | 5 / 43 / 65 | | -15 (seeds 1 to 144: 87 against 107, -14) |
+| Tor | 19 / 59 / 70 | | +7 |
+| Shilka | 11 / 59 / 64 | | +7 |
+| all alternatives | 28 / 52 / 70 | 52 / 113 / 136 | |
 
-On Hard (default, seeds 1 to 48) 0 / 7 / 17, on Easy 48 / 48 / 48. Kills per game, all auto, default
-over 144 seeds: S-400 40, Pantsir missiles 58 and guns 13, Osa 26, Strela 12; all alternatives: Buk 39,
-Tunguska missiles 38 and guns 24, Tor 35, Shilka 6 (drones and what dives close by; it scores in about
-half the waves).
+On Hard (default, seeds 1 to 48) 0 / 10 / 19 (the scripted S-400 won 5 of seeds 49 to 96, the tree
+before this pass 12), on Easy 48 / 48 / 48. Kills per game, all auto, over 144 seeds: default S-400 41,
+Pantsir missiles 54 and guns 13.5, Osa 26, Strela 11; all alternatives Buk 39, Tunguska missiles 40 and
+guns 23, Tor 36, Shilka 10 (was 6: it opens fire farther out).
+
+What the pass changed and why, game values only (no reload duration shortened, no fix undone):
+
+- **The shells** (see "Gun ranges"): the 30 mm 0.0007 / 5.5 s to 0.00025 / 8 s, the 23 mm 0.0008 / 5 s
+  to 0.00036 / 5 s. Alone (the old opening ranges) they made the guns far stronger, mostly the
+  Tunguska's, whose tight dispersion profits most from the shorter flight times: the all-auto
+  alternatives won 99 of 144 with the new 30 mm alone (51 before), the new 23 mm alone changed nothing
+  (57).
+- **The engagement rate cap** (`targetGap`, Pantsir 6 s, Tor 4 s, Tunguska 8 s). Without it the AI crews
+  won 7 more of 144 with the default loadout and 12 more with the alternatives.
+- **When the crews open fire**: `gun.range` 1600 to 2500 (Pantsir), 2200 to 3500 (Tunguska), 1400 to
+  2000 (Shilka), with fire discipline (full bursts and pauses inside half the range, half bursts and twice
+  the pause at it) and the missiles leaving targets to the guns inside `gun.range` (was 1.4 times it).
+  Opening at the full 4 km emptied the Pantsir's 1400 rounds at targets it could not hit (12 minutes dry
+  per game, all auto default 4 of 72, scripted S-400 46); with the hand-off at 1.4 times 2.5 km the
+  Pantsir's missiles left drones inside 3.5 km to guns that missed them (all auto 14 of 144). The
+  Tunguska is the swing unit through its hand-off: opening at 2.5 km the all-auto alternatives won 104 of
+  144, at 3 km 79, at 3.5 km 52, at 4 km 31 (measured along the way); the pauses at range (on top of the
+  shorter bursts) kept it from running dry (464 s a game at the airbase without them) and moved the
+  Tunguska at the airbase from -11 to +4 points (seeds 1 to 72).
+- **Dispersion growing with the range** (`grow` 0.5 per km for both shells): the rounds' scatter and the
+  fire control's errors build up over a long flight, so the guns do most of their killing inside 2 km and
+  little beyond 3 km. 0.3 left the alternatives too strong (41 of 72 all auto), 0.6 to 0.8 cost the
+  default's crews (11 of 144 all auto at 0.8).
+- Damage per hit stays 0.15 (30 mm) and 0.14 (23 mm): 0.12 and 0.13 barely moved the outcome (the
+  stream overkills close in) and cost the default's scripted player at range.
+
+Tried and not kept: the Tunguska's dispersion 1.3 or 1.5 times (no change in the wins), its `settle` 4,
+its `gun.dmg` 0.75 to 0.8 (about -3 games of 144 each, noise); the Shilka opening at 1.4 or 1.8 km (no
+change in the wins, fewer Shilka kills); the old 23 mm shell (no change); a shorter hand-off for fast
+targets (half `gun.range` above 150 m/s: no change). The two Tunguskas are now the weakest swap (-14
+points over 144 seeds, about level before): their 9M311 leave cruise missiles inside 3.5 km to guns that
+seldom hit them that far out (wave 7 cruise missile leaks 3.7 to 5.1); each Tunguska alone is within 5
+points.
+
+The pass before it (the final pass of the loadout work), for the record: seeds 1 to 72 and 1 to 144,
+default 14 / 56 / 60 and 29 / 117 / 127, Buk 21 / 49 / 58 (-10 points), Tunguska in slot 1 4 / 50 / 55
+(-8), in slot 2 9 / 62 / 66 (+8), two Tunguskas 4 / 58 / 58 (+3), Tor 15 / 61 / 68 (+7), Shilka 16 / 58 /
+68 (+3), all alternatives 51 / 110 / 132 of 144; Hard 0 / 7 / 17 of 48, Easy 48 / 48 / 48. Kills per
+game, all auto, default over 144 seeds: S-400 40, Pantsir missiles 58 and guns 13, Osa 26, Strela 12;
+all alternatives: Buk 39, Tunguska missiles 38 and guns 24, Tor 35, Shilka 6.
 
 The final pass started from the tree as the other passes left it (seeds 1 to 144 for the default and
 the alternatives, 1 to 72 for the swaps): default 12 / 109 / 121, all alternatives 44 / 102 / 125; the
@@ -474,22 +516,53 @@ channel, the tracking radar (switched on for it unless the player silenced it) o
 track or a search track coasting between sweeps): its velocity smoothed over 0.25 s, brought up to date
 by its rate of change (0.6 s), and that rate of change (smoothed over 0.5 s, at most 25 m/s2) bending
 the lead, so a turning, diving or speeding target is led too. `solveLead` takes the closed form
-(`leadPoint`, the gravity drop under drag, `dropAt`, about two thirds of the vacuum drop at 2 km) and
+(`leadPoint`, the gravity drop under drag, `dropAt`, about 85 % of the vacuum drop at 2 km) and
 flies a shell through the game's own integrator in the sim's order (as maxgfx's `solveLead`),
 correcting the aim by its miss until it passes within 0.3 m; no lead where the shells cannot get
-(their reach, about 2.2 km for the 30 mm and 2.0 km for the 23 mm, or a target they cannot catch).
+(their reach, about 4.2 km for the 30 mm and 2.8 km for the 23 mm, or a target they cannot catch).
 The turret lays the guns, from their mount, on the lead continuously, before, during and between
 bursts (on the target itself while there is no lead, to bring it into the channel); `gun.laid` while
 the guns have the turret. The shells leave after the turret has moved in the same step, along the
-bore with the shell's `spread` (5 mrad, the Pantsir's twice that), a hit doing the shell's `dmg` times
-`gun.dmg` and the difficulty's `hit`. The AI opens fire once the channel has held the target for
-`gun.settle` s (4, the Tunguska 3, the Shilka 2.5) and fires its bursts only while the bore is within 4 m of the lead at
-its range (0.14 to 1.1 degrees), stopping when it is not. `gun.hold` says why the guns cannot fire
+bore with the shell's `spread` (5 mrad, the Pantsir's twice that) grown by the shell's `grow` per km to
+the lead (0.5: twice at 2 km, three times at 4 km), a hit doing the shell's `dmg` times `gun.dmg` and
+the difficulty's `hit`. The AI opens fire inside `gun.range` (2.5 km, the Tunguska 3.5, the Shilka 2)
+once the channel has held the target for `gun.settle` s (4, the Tunguska 3, the Shilka 2.5) and fires its
+bursts only while the bore is within 4 m of the lead at its range (0.14 to 1.1 degrees), stopping when
+it is not; fire discipline: full bursts and pauses inside half of `gun.range`, half bursts and twice the
+pause at it. `gun.hold` says why the guns cannot fire
 on their target ('no lock', 'out of reach', 'target lost', 'turret on the missile target'; null when
-they can): the console's status line shows it while the player wants the guns, and a manual trigger
-is held, with a radio line, while the missile channel keeps the turret off the gun target (otherwise
-the player fires wherever the guns point). Releasing the trigger stops the fire and moves nothing; when
+they can; 'out of reach' when the shells cannot get to the target before they self-destruct, from the
+lead solution, or without a lock from the shells' straight-line reach): the console's status line shows
+it while the player wants the guns, and a manual trigger is held, with a radio line, while the missile
+channel keeps the turret off the gun target or the target is out of reach (otherwise the player fires
+wherever the guns point). The trigger button follows the selected track (`gunReach`/`setTrigger` in
+consoles/common.js): greyed out, ВНЕ ЗОНЫ / OUT OF RANGE, beyond the shells' reach; a blinking LONG
+RANGE: FEW HITS beyond `gun.range` or `gun.maxAlt`; the plain FIRE inside them. Releasing the trigger stops the fire and moves nothing; when
 the target dies or its track drops the turret goes on to the next target or holds where it is.
+
+**Gun ranges** (`ballistics.js` `SHELLS`, `SYSTEMS[kind].gun`). Drag and life are game values that give
+the public figures' feel (effective to about 4 km slant and 3 km up for the 30 mm of the Pantsir-S1 and
+the Tunguska, about 2.5 km and 1.5 km for the Shilka's 23 mm), nothing more detailed. The 30 mm (c
+0.00025, life 8 s) takes 1.2 s to 1 km, 2.75 s to 2 km, 4.7 s to 3 km and 7.2 s to 4 km and
+self-destructs at 4.2 to 4.4 km (the old 0.0007 and 5.5 s, from a WW2 game, took 4.6 s to 2 km and burnt
+out at 2.2 km, so beyond that the fire control had no lead and the guns pointed straight at the target);
+the 23 mm (c 0.00036, life 5 s) takes 1.3 s to 1 km and 3.05 s to 2 km and self-destructs at 2.7 to 2.9
+km. A head-on target at 3 km gets about 1.7 degrees of gravity aim-off, a crossing drone 6 degrees of
+lead. `maxAlt` stays 3000 m (30 mm) and 1500 m (23 mm). The crews open fire well inside the reach (see
+"Balance" for why): the guns' dispersion grows with the range, so far out the rounds mostly go to waste.
+The missile crew of a gun-missile unit leaves targets inside `gun.range` below `maxAlt` to its guns (it
+was 1.4 times `gun.range`, about the same distances with the old opening ranges).
+
+**Engagement rate cap** (`SYSTEMS[kind].targetGap`, `FireUnits.targetWait`): the least time between the
+first rounds at two new targets, whoever fires (the crew or the player): Pantsir 6 s (publicly about ten
+targets a minute; with fast kills close in one Pantsir had launched at four targets within 6 s), Tor 4 s
+(four channels and quick: a full set in 12 s), Tunguska 8 s (one optical channel the gunner lays on each
+new target). A new target is one none of the unit's rounds has gone at yet (`unit.fired`, pruned of dead
+threats); a re-fire at a target its round missed, or a second engagement on the same target, does not
+wait. The player's engagement is accepted and its first round waits with the launcher laid on the target
+(`e.wait`, the seconds left; the radio adds "next target in N s" and the status line reads NEXT TARGET IN
+N s); the AI crew starts no engagement at a new target while the cap runs, nor while an engagement at a
+new target still waits for its first round. The channels are unchanged (the Pantsir keeps its two).
 
 **Turret priority** (every turret unit): the missile channel comes first. A round leaves only with
 the launcher on its target (within about 1 degree), and while a command-guided round flies the turret
@@ -883,3 +956,6 @@ Reuse the maxgfx engine core (distance delay, air absorption, voice stealing, re
 - Sim: `SYSTEMS.pantsir.reloadPose { az: PI/2, el: 0, guns: true }`, `SYSTEMS.tunguska.reloadPose { az: PI/2, el: 0.5, guns: true }` (the DESIGN "Loading poses" note's "Tunguska rear" is now its front, to the left). New `reloadPose.guns`: `FireUnits.reloadPose` lets the guns take the turret while they have a target (two lines in units.js; without it the scripted S-400 won 28 of 48 instead of 40). Balance, seeds 1 to 72, Normal, without the poses / with them: default all-auto 7 / 6, scripted S-400 58 / 54; all alternatives all-auto 37 / 24, scripted Buk 44 / 53, Buk + Tunguskas 65 / 63.
 - Balance (final pass on the finished tree, see "Balance"): `director.js` `LULL` 20 to 40 s (the reload jobs, durations unchanged, now mostly run and play between raids), the helicopters' `standoff` 6.5 to 5.5 km (waves 5 and 7), the Tunguska's `gun.range` 2000 to 2200 and `gun.settle` 4 to 3. Normal, seeds 1 to 144: default 29 / 117 / 127, all alternatives 51 / 110 / 132; every single swap within 10 points of the default's scripted S-400 over seeds 1 to 72.
 - UI: the dispersed battery's alerts have their cabin captions (`consoles/common.js` `ALERTS`): 'TELAR DOWN' СОУ ПОРАЖЕНА, 'LOADER DOWN' ПЗУ ПОРАЖЕНА, 'RADAR DOWN' СОЦ ПОРАЖЕНА, 'CP DOWN' КП ПОРАЖЁН (ranked as DAMAGED, a standing state); they showed only the generic ТРЕВОГА. `vite.config.js` `chunkSizeWarningLimit` 1600 to 2000 kB (the bundle is 1.69 MB with the reload scenes).
+- Sim/ballistics (gun ranges, see "Gun ranges"): `SHELLS['30mm']` c 0.00025, life 8 (2.75 s to 2 km, self-destruct at 4.2 to 4.4 km; was 0.0007, 5.5 s, burnt out at 2.2 km), `SHELLS['23mm']` c 0.00036, life 5 (3.05 s to 2 km, gone at 2.7 to 2.9 km; was 0.0008, 5 s, 1.9 km); new `SHELLS[k].grow` (0.5: the dispersion grows by that fraction per km to the lead or target, `fireGuns`). `gun.range` (the AI's opening range) Pantsir 2500, Tunguska 3500, Shilka 2000 (was 1600, 2200, 1400); the AI fires half bursts with twice the pause at `gun.range` (full inside half of it); a gun-missile crew's missiles leave targets inside `gun.range` to the guns (was 1.4 times). Ballistics `MAX` 6000 unchanged (a heavy raid keeps up to about 1100 shells in the air).
+- Sim: engagement rate cap `SYSTEMS[kind].targetGap` (Pantsir 6, Tor 4, Tunguska 8 s, see "Engagement rate cap"), `FireUnits.targetWait(u, id)`, unit fields `fired` (Map of target id to the time of its first round) and `nextTarget`, engagement field `wait` (s until its first round may leave). UI: `statusLine` shows NEXT TARGET IN N s while an engagement waits; `inGunRange` also checks `maxAlt`; the Shilka's LEAD readout has four digits (over 1 km on a fast target near the shells' reach).
+- Tutorials: the Pantsir, Tunguska and Shilka gun steps quote the new ranges and the trigger's OUT OF RANGE / LONG RANGE: FEW HITS faces, their gun drones start at 3.5 km (were 2.6), and the Pantsir, Tunguska and Tor lessons mention the rate cap. Balance in "Balance" (the gun range pass).

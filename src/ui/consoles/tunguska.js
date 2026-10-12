@@ -6,7 +6,7 @@ import { Scope } from '../scope.js';
 import { SightView, sightFov } from '../sightview.js';
 import { TrackTable } from '../tracktable.js';
 import { tut } from '../highlight.js';
-import { Header, SelBar, threatOrder, abbrev, engagedSet, selectedTrack, Slewer, reloadFrac, takeManual, channelLock, channelsSee, inGunRange, MODE_ITEMS } from './common.js';
+import { Header, SelBar, threatOrder, abbrev, engagedSet, selectedTrack, Slewer, reloadFrac, takeManual, channelLock, channelsSee, inGunRange, setTrigger, MODE_ITEMS } from './common.js';
 
 const MODES = ['auto', 'manual', 'hold'];
 
@@ -216,7 +216,7 @@ export function mountTunguska(ctx) {
       rl.set(reloadFrac(memo, 't', m.reload));
       setText(rlTxt, m.reload > 0 ? `${Math.ceil(m.reload)} с` : m.ready === 0 ? 'ПУСТО' : 'ГОТОВО');
       trig.set(g.firing);
-      trig.enable(g.rounds > 0 && !g.overheated);
+      setTrigger(trig, u, t, 'FIRE GUNS (HOLD)', g.rounds > 0 && !g.overheated);
       launch.enable(!!t && m.ready > 0);
       launch.set(t && t.engagedBy && t.engagedBy.includes(u.id));
     },

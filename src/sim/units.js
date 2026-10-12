@@ -34,6 +34,8 @@ const GUN_LAID = 4, GUN_LAID_MIN = 0.0025, GUN_LAID_MAX = 0.02;
 const GUN_VEL = 0.25, GUN_ACC = 0.5, GUN_ACC_MAX = 25, GUN_LAG = 0.6;
 // gun.hold when a missile channel (or a designation) keeps the turret off the gun target
 const TURRET_HELD = 'turret on the missile target';
+// gun.hold when the shells cannot get to the target before they self-destruct
+const OUT_OF_REACH = 'out of reach';
 
 // the area unit crew's preference by track class, added to the time to impact (s): ballistic targets
 // and aircraft first, drones and helicopters last
@@ -1213,15 +1215,15 @@ export class FireUnits {
     if (tr.engagedBy.length && !(mine && tr.tti < 12)) return false;
     const slow = tr.cls === 'drone' || tr.cls === 'helo' || tr.cls === 'atgm' || tr.cls === 'unknown';
     if (sys.area) return !slow || mine || tr.range < sys.close;
-    // short-range units take drones close in; units with guns leave the last stretch, and drones that
-    // come for them, to the guns while they can fire
+    // short-range units take drones close in; units with guns leave the last stretch (inside the guns'
+    // opening range, gun.range), and drones that come for them, to the guns while they can fire
     const g = u.weapons.gun;
     const guns = !!g && g.rounds > 0 && !g.overheated;
     if (tr.cls === 'drone') {
       if (mine ? guns : tr.range > sys.close) return false;
       if (u.weapons.missiles.ready <= (sys.keep ?? 0)) return false;
     }
-    if (guns && tr.range < (sys.gun.leave ?? sys.gun.range * 1.4) && tr.alt < sys.gun.maxAlt) return false;
+    if (guns && tr.range < sys.gun.range && tr.alt < sys.gun.maxAlt) return false;
     return true;
   }
 
@@ -1434,7 +1436,9 @@ export class FireUnits {
       g.tof = Math.max(tof, 0);
     }
     // (aimTurret adds 'turret on the missile target' when the missile channel keeps the turret)
-    g.hold = g.target == null ? null : !t?.alive ? 'target lost' : !g.locked ? 'no lock' : !g.aimOk ? 'out of reach' : null;
+    // (unlocked, a target beyond the shells' straight-line reach is out of reach as well)
+    const far = !g.locked && (this.trackOf(u, g.target)?.range ?? 0) > reachOf(kind);
+    g.hold = g.target == null ? null : !t?.alive ? 'target lost' : !g.locked ? (far ? OUT_OF_REACH : 'no lock') : !g.aimOk ? OUT_OF_REACH : null;
   }
 
   // The fire control's estimate of the target's motion from the channel's track: the velocity smoothed
@@ -1500,14 +1504,19 @@ export class FireUnits {
     if (u.mode === 'auto') {
       const tr = g.laid && g.aimOk ? this.trackOf(u, g.target) : null;
       const on = !!tr && tr.range < gs.range && g.lockT >= (gs.settle ?? 0) && this.onLead(u, g);
-      if (g.burst <= 0 && (g.cool -= dt) <= 0 && on) g.burst = gs.burst;
+      // fire discipline: full bursts and pauses inside half the opening range; farther out, where the
+      // shells take long to arrive and scatter, shorter bursts and longer pauses (half and twice at gun.range)
+      const k = on ? clamp(1.5 - tr.range / gs.range, 0.5, 1) : 1;
+      if (g.burst <= 0 && (g.cool -= dt) <= 0 && on) g.burst = gs.burst * k;
       if (g.burst > 0 && on) {
         want = true;
-        if ((g.burst -= dt) <= 0) g.cool = gs.cool;
+        if ((g.burst -= dt) <= 0) g.cool = gs.cool / k;
       }
     } else if (u.mode === 'manual' && g.trigger) {
-      want = g.hold !== TURRET_HELD;
-      if (!want) sim.say(u, 'guns held: the turret is on the missile target', 'warn', 'gunheld' + u.id);
+      // the player's trigger too holds while the shells cannot reach the target (the console greys it out)
+      want = g.hold !== TURRET_HELD && g.hold !== OUT_OF_REACH;
+      if (g.hold === TURRET_HELD) sim.say(u, 'guns held: the turret is on the missile target', 'warn', 'gunheld' + u.id);
+      else if (g.hold === OUT_OF_REACH) sim.say(u, 'guns held: the target is out of range', 'warn', 'gunfar' + u.id);
     }
     g.firing = want && g.rounds > 0 && !g.overheated;
     if (!g.firing) return;

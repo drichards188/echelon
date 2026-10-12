@@ -1,5 +1,6 @@
 // Pieces every console shares: the unit header (name, status, health, alerts) and small data helpers.
 import { SYSTEMS } from '../../sim/systems.js';
+import { SHELLS, reachOf } from '../../ballistics.js';
 import { el, setText, setCls, Bar, Lamp, label, fmtKm, fmtAlt, fmtTti } from '../widgets.js';
 
 // Every alert the sim raises (units.js describe) with its cabin caption, a plain English meaning and a rank.
@@ -220,11 +221,33 @@ export const MODE_ITEMS = [
   { v: 'hold', ru: 'ЗАПРЕТ', en: 'HOLD FIRE', color: 'red' },
 ];
 
-// Is this track inside the unit's gun range (the sim's own rule: the crew opens fire inside it)?
+// Is this track inside the unit's gun range (the sim's own rule: the crew opens fire inside it, below maxAlt)?
 export const inGunRange = (u, t) => {
   const g = SYSTEMS[u.kind] && SYSTEMS[u.kind].gun;
-  return !!(t && g && t.range < g.range);
+  return !!(t && g && t.range < g.range && !(t.alt > g.maxAlt));
 };
+
+// How well the guns reach this track: 'out' where their shells cannot get to it before they self-destruct
+// (the sim's own ballistic solution, gun.hold, while the guns are on it; otherwise the shells' straight-line
+// reach), 'long' beyond the crew's opening range or ceiling (the shells arrive slow and scattered, few hit),
+// 'in' inside them; null without a track.
+export function gunReach(u, t) {
+  const gs = SYSTEMS[u.kind] && SYSTEMS[u.kind].gun;
+  if (!t || !gs) return null;
+  const g = u.weapons && u.weapons.gun;
+  const out = g && g.target === t.id && g.hold !== undefined ? g.hold === 'out of reach' : t.range > reachOf(SHELLS[gs.shell]);
+  return out ? 'out' : inGunRange(u, t) ? 'in' : 'long';
+}
+
+// The gun trigger's face for the selected track: greyed out (no fire) beyond the shells' reach, a warning
+// beyond the crew's opening range.
+export function setTrigger(btn, u, t, en, ok) {
+  const r = gunReach(u, t);
+  btn.enable(ok && r !== 'out');
+  btn.text(r === 'out' ? 'ВНЕ ЗОНЫ' : 'ОГОНЬ', r === 'out' ? 'OUT OF RANGE' : r === 'long' ? 'LONG RANGE: FEW HITS' : en);
+  setCls(btn.el, 'warn', r === 'long' && ok);
+  setCls(btn.el, 'out', r === 'out');
+}
 
 // Which of a gun unit's two channels see the track: the tracking radar (on, inside its range) and the EO sight.
 export function channelsSee(u, t) {
