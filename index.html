@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Echelon: layered air defense</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 fill=%22%23111%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2211%22 fill=%22none%22 stroke=%22%2377e08a%22 stroke-width=%222.5%22/%3E%3Cpath d=%22M16 4v24M4 16h24%22 stroke=%22%2377e08a%22 stroke-width=%221.5%22/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body class="title">
+    <div id="view">
+      <canvas id="c"></canvas>
+
+      <div id="hud">
+        <div id="unit"><b id="unit-name"></b><span id="unit-call"></span></div>
+        <div id="compass"><div id="compass-strip"></div><div class="compass-center"></div><div id="heading">000</div></div>
+        <div id="score-box"><span>Score</span><b id="score">0</b></div>
+        <div id="timescale" data-tut="timescale"><button id="ts-down" type="button" title="Slower ([)">&minus;</button><span id="ts-arrows">&#9654;</span><b id="ts-val" title="Back to real time">x1</b><button id="ts-up" type="button" title="Faster (])">+</button></div>
+        <div id="radio"></div>
+        <div id="toast"><div id="toast-main"></div><div id="toast-sub"></div></div>
+        <div id="kills"></div>
+        <div id="bracket"><span></span><i></i></div>
+        <div id="hint"></div>
+        <pre id="debug"></pre>
+      </div>
+
+      <div id="end">
+        <div class="card">
+          <h2 id="end-title">Airbase held</h2>
+          <p id="end-sub"></p>
+          <div id="end-stats"></div>
+          <button id="end-restart">Fight again</button>
+        </div>
+      </div>
+
+      <div id="title-screen">
+        <div class="brand">
+          <h1>ECHELON</h1>
+          <p class="sub">Layered air defense</p>
+          <p class="blurb">An S-400 battalion, two Pantsir-S1, an Osa and a Strela-10 stand between the airbase and the raids, or the alternatives you pick for them. The long layer sees them first; the short layer catches what leaks through.</p>
+        </div>
+        <div class="loader">
+          <div id="load-bar"><div id="load-bar-fill"></div></div>
+          <p id="status">Surveying the steppe</p>
+        </div>
+        <div id="options">
+          <div id="difficulty">
+            <button data-d="Easy">Easy</button>
+            <button data-d="Normal" class="on">Normal</button>
+            <button data-d="Hard">Hard</button>
+          </div>
+          <div id="loadout-box">
+            <div class="lo-head"><b>Loadout</b><span>each unit or an alternative of its class</span></div>
+            <div id="loadout"></div>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="play" disabled>Take command</button>
+          <button id="tutorials" disabled>Tutorials</button>
+        </div>
+        <ul class="keys">
+          <li><kbd>1</kbd>-<kbd>5</kbd> select unit</li>
+          <li><kbd>Drag</kbd> orbit</li>
+          <li><kbd>Wheel</kbd> zoom</li>
+          <li><kbd>F</kbd> chase the unit's latest missile</li>
+          <li><kbd>C</kbd> free camera</li>
+          <li><kbd>V</kbd> padlock the selected track</li>
+          <li><kbd>M</kbd> mute</li>
+          <li><kbd>[</kbd> <kbd>]</kbd> time compression</li>
+          <li><kbd>H</kbd> hide overlay</li>
+          <li><kbd>F3</kbd> stats</li>
+        </ul>
+      </div>
+
+      <div id="tut-menu">
+        <h2>Tutorials</h2>
+        <p class="tm-sub">Short guided lessons on a quiet range. Nothing is scored and nothing is destroyed.</p>
+        <div id="tut-list"></div>
+        <button id="tut-back">Back</button>
+      </div>
+
+      <div id="tut-card">
+        <div class="tc-head"><span class="tc-name"></span><span class="tc-step"></span></div>
+        <div class="tc-bar" aria-hidden="true"><i></i></div>
+        <h3 class="tc-title"></h3>
+        <p class="tc-text"></p>
+        <div class="tc-goal"><i class="tc-box"></i><span></span></div>
+        <div class="tc-keys">
+          <button class="tc-btn" id="tc-exit">Exit</button>
+          <span class="tc-spacer"></span>
+          <button class="tc-btn" id="tc-skip">Skip step</button>
+          <button class="tc-btn main" id="tc-next">Next</button>
+        </div>
+      </div>
+
+      <button id="gear" title="Settings">&#9881;</button>
+      <div id="gui-host"></div>
+    </div>
+
+    <div id="panel"><div class="placeholder">CONSOLE OFFLINE</div></div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

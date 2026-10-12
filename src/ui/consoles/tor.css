@@ -1,0 +1,44 @@
+/* Tor-M2 console. Same panel language as panel.css; only the pieces the Tor adds. */
+.tor .main2 { flex: 1; min-height: 0; }
+.tor .leftc { flex: none; }
+.tor .leftc .pl-table { flex: 1; }
+.tor .pl-ppi { flex: none; }
+.tor .rightc { flex: 1; min-width: 0; }
+.tor .rightc .plate { width: 100%; }
+.tor .pl-weap .pbody { width: 100%; }
+.tor .secv { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+.tor .rack.p8 { gap: 5px; justify-content: space-between; width: 100%; padding: 5px 8px; }
+.tor .rack.p8 .cell { width: 14px; height: 40px; border-radius: 7px 7px 2px 2px; }
+
+.chlist { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 4px; background: #0a0b07; border-radius: 2px; box-shadow: inset 0 1px 4px #000; }
+.chrow { display: grid; grid-template-columns: 22px 62px 70px 40px 40px 1fr; align-items: center; gap: 5px; height: 24px; padding: 0 3px; border-radius: 2px;
+  font: 700 11px/1 'DejaVu Sans Mono', monospace; color: #3b5a43; }
+.chrow.busy { background: #0f1a12; color: var(--phos); text-shadow: 0 0 5px rgba(92,255,134,.45); }
+.chrow.chhead { height: 18px; }
+.chrow.chhead .lbl b { font-size: 7.5px; }
+.chrow.chhead .lbl i { font-size: 6px; }
+.chno { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 2px; background: #bdb88f; color: #1b1c12; font: 800 11px/1 'DejaVu Sans Mono', monospace; }
+.chrow:not(.busy):not(.chhead) .chno { background: #3a3c2c; color: #1b1c12; }
+.chrow .ann.chl { min-width: 0; padding: 2px 4px; }
+.chrow .ann.chl b { font-size: 8px; }
+.chrow .ann.chl i { font-size: 6px; }
+.chrng, .chtti { text-align: right; color: var(--amber); }
+.chrow:not(.busy) .chrng, .chrow:not(.busy) .chtti { color: transparent; }
+.chph { font: 700 9px/1 'DejaVu Sans Condensed', sans-serif; letter-spacing: .06em; color: var(--amber); white-space: nowrap; text-align: right; }
+.chph.hot { color: #ff7a5a; }
+.chph.ok { color: var(--phos); }
+.chrow:not(.busy) .chph { color: #3b5a43; }
+.chrow:not(.busy) .chid { color: #3b5a43; font-size: 9px; letter-spacing: .06em; }
+.secrow { width: 100%; align-items: center; gap: 10px; flex-wrap: nowrap; }
+.secrow .ann.wide { min-width: 164px; max-width: 164px; }
+.secrow .ann.wide i { white-space: nowrap; font-size: 6.5px; }
+.sectxt { font: 600 9px/1.25 'DejaVu Sans Mono', monospace; color: var(--amber); white-space: pre-line; }
+.tor .pl-sw .rowc { align-items: center; justify-content: space-around; width: 100%; }
+
+.tor .rightc > .plate { flex: 1 1 auto; }
+.tor .rightc > .plate .pbody { height: 100%; justify-content: space-between; }
+.tor .pl-ch .pbody { justify-content: flex-start; gap: 10px; }
+.tor .chrow { height: 30px; }
+.tor .chrow.chhead { height: 20px; }
+.tor .chno { width: 22px; height: 22px; font-size: 13px; }
+.tor .rack.p8 .cell { height: 54px; }
