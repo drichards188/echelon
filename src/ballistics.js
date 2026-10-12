@@ -2,21 +2,23 @@ import * as THREE from 'three';
 
 // Shells and tracers, from maxgfx's ballistics.js: quadratic drag and gravity in typed arrays, every
 // tracer in one instanced mesh. Here the 30 mm of the Pantsir and the Tunguska and the Shilka's 23 mm
-// use it. Game values, tuned for play.
+// use it. Game values, tuned for play. MAX shells alive: a heavy raid keeps up to about 1100 in the air.
 const G = 9.81;
 
 // c: quadratic drag (1/m), v0 muzzle velocity, life: flight time before the round self-destructs,
 // dmg: game damage per hit, tracer: hdr colour, every: one round in `every` carries a tracer, spread: the
-// guns' dispersion (rad: each component of the bore's random error is within +-spread).
+// guns' dispersion (rad: each component of the bore's random error is within +-spread), grow: how much
+// the dispersion grows per km to the target (FireUnits.fireGuns: 0.5 doubles it at 2 km, a game value for
+// the rounds' scatter and the fire control's errors building up over a long flight).
 // Drag and life give the public figures' feel, nothing more (DESIGN.md "Simulation fidelity"): the 30 mm
 // (Pantsir-S1, Tunguska; effective to about 4 km slant, 3 km up) takes 1.2 s to 1 km, 2.75 s to 2 km,
 // 4.7 s to 3 km and 7.2 s to 4 km, and self-destructs at 4.2 to 4.4 km; the old 0.0007 and 5.5 s (from a
 // WW2 game) took 4.6 s to 2 km and burnt out at 2.2 km.
 export const SHELLS = {
-  '30mm': { id: 0, v0: 960, c: 0.00025, life: 8, dmg: 0.15, tracer: [22, 7, 2.2], width: 0.18, tail: 0.03, every: 4, radius: 2.2, spread: 0.005 },
+  '30mm': { id: 0, v0: 960, c: 0.00025, life: 8, dmg: 0.15, tracer: [22, 7, 2.2], width: 0.18, tail: 0.03, every: 4, radius: 2.2, spread: 0.005, grow: 0.5 },
   // lighter, slows sooner and self-destructs earlier (the Shilka; effective to about 2.5 km slant, 1.5 km
   // up): 1.3 s to 1 km, 3.05 s to 2 km, 4.25 s to 2.5 km, gone at 2.7 to 2.9 km
-  '23mm': { id: 1, v0: 970, c: 0.00036, life: 5, dmg: 0.14, tracer: [20, 9, 3], width: 0.14, tail: 0.025, every: 3, radius: 1.8, spread: 0.005 },
+  '23mm': { id: 1, v0: 970, c: 0.00036, life: 5, dmg: 0.14, tracer: [20, 9, 3], width: 0.14, tail: 0.025, every: 3, radius: 1.8, spread: 0.005, grow: 0.5 },
 };
 const BY_ID = Object.values(SHELLS);
 const NAMES = Object.keys(SHELLS);
@@ -34,7 +36,8 @@ export const reachOf = (kind) => Math.log(1 + kind.c * kind.v0 * kind.life) / ki
 
 /**
  * How far a shell falls below its line of departure after `t` seconds: gravity under the same quadratic
- * drag (the drag slows the fall too: for the 30 mm about 85 % of the vacuum drop at 2 km, three quarters at 4 km).
+ * drag (the drag slows the fall too: for the 30 mm about 85 % of the vacuum drop at 2 km, three quarters
+ * at 4 km).
  */
 export function dropAt(kind, t) {
   const a = kind.c * kind.v0;

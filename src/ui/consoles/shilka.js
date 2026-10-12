@@ -6,7 +6,7 @@ import { Scope } from '../scope.js';
 import { SightView, sightFov, aimTo, SIGHT_W, SIGHT_H } from '../sightview.js';
 import { TrackTable } from '../tracktable.js';
 import { tut } from '../highlight.js';
-import { Header, SelBar, abbrev, engagedSet, selectedTrack, Slewer, takeManual, channelLock, channelsSee, inGunRange, MODE_ITEMS } from './common.js';
+import { Header, SelBar, abbrev, engagedSet, selectedTrack, Slewer, takeManual, channelLock, channelsSee, inGunRange, setTrigger, MODE_ITEMS } from './common.js';
 
 const MODES = ['auto', 'manual', 'hold'];
 
@@ -77,7 +77,7 @@ export function mountShilka(ctx) {
   const pw = plate('ВООРУЖЕНИЕ', 'ARMAMENT: 4 x 23 mm', 'pl-weap');
   const rRounds = new Readout('СНАРЯДОВ', 'ROUNDS', '8888', '', 'sm');
   const rBurst = new Readout('ОЧЕРЕДЕЙ', 'BURSTS', '888', '', 'sm');
-  const rLead = new Readout('УПРЕЖДЕНИЕ', 'LEAD m', '888', '', 'sm');
+  const rLead = new Readout('УПРЕЖДЕНИЕ', 'LEAD m', '8888', '', 'sm'); // over 1 km on a fast target near the shells' reach
   const wr = el('div', 'rowc');
   wr.append(rRounds.el, rBurst.el, rLead.el);
   const ammo = new Bar({ segs: 14, cls: 'ammo', text: false });
@@ -208,7 +208,7 @@ export function mountShilka(ctx) {
       ammo.set(g.max ? g.rounds / g.max : 0);
       heat.set(g.heat || 0);
       trig.set(g.firing);
-      trig.enable(g.rounds > 0 && !g.overheated);
+      setTrigger(trig, u, t, 'FIRE (HOLD)', g.rounds > 0 && !g.overheated);
     },
     dispose() {
       slew.clear();

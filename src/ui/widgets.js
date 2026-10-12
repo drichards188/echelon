@@ -81,7 +81,8 @@ export class Btn {
     this.el.type = 'button';
     this.el.tabIndex = -1;
     this.face = el('span', 'face');
-    this.face.append(label(ru, en));
+    this.lbl = label(ru, en);
+    this.face.append(this.lbl);
     this.el.append(this.face);
     this.held = false;
     this.disabled = false;
@@ -112,6 +113,8 @@ export class Btn {
   // visual press from a key (the console sends the command itself)
   press(on) { this.el.classList.toggle('down', on); }
   enable(on) { if (this.disabled === !on) return; this.disabled = !on; this.el.classList.toggle('dis', !on); }
+  // relabel the face (a button whose meaning changes with the situation)
+  text(ru, en) { setText(this.lbl.firstChild, ru); setText(this.lbl.lastChild, en); }
 }
 
 // Toggle switch, optionally under a hinged guard cover (flip the cover, then the switch).

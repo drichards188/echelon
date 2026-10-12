@@ -150,6 +150,14 @@
 .btn.down { transform: translateY(2px); box-shadow: 0 0 0 #0a0a06, 0 1px 2px rgba(0,0,0,.6); }
 .btn.down .face { filter: brightness(1.45); }
 .btn.dis { opacity: .4; pointer-events: none; }
+/* a trigger that still fires but will hardly hit (long range): its caption blinks (amber while not lit);
+   one that cannot (out of range) is greyed out with its caption kept readable */
+.btn.warn .lbl i { animation: btnwarn 0.8s steps(2, jump-none) infinite; }
+.btn.warn:not(.lit) .lbl i { color: #ffb43c; }
+@keyframes btnwarn { 0% { opacity: 1; } 100% { opacity: .45; } }
+.btn.dis.out { opacity: .65; }
+.btn.out .face { filter: saturate(.3) brightness(.8); }
+.btn.out .lbl i { color: #ff7a5a; }
 .btn.big { min-width: 84px; height: 54px; }
 .btn.huge { min-width: 190px; height: 76px; }
 .btn.huge .lbl b { font-size: 20px; }

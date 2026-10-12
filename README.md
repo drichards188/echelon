@@ -23,15 +23,15 @@ Pick an era, a difficulty and a loadout and click **Take command**. A demonstrat
 | Slot | Default | Alternative |
 |---|---|---|
 | 1 area layer | S-400 | Buk-M2 battery: 70 km, cheaper rounds and a deep reserve, one target per TELAR, no answer to ballistic missiles; five vehicles knocked out one by one |
-| 2 battalion cover | Pantsir-S1 | 2S6M Tunguska: guns first (more 30 mm, opens fire out to 2.2 km, tougher), eight cheap 9M311 to 10 km guided only through the optical sight |
+| 2 battalion cover | Pantsir-S1 | 2S6M Tunguska: guns first (more 30 mm, its crew opens fire at 3.5 km, tougher), eight cheap 9M311 to 10 km guided only through the optical sight, a new missile target every 8 s at most |
 | 3 airbase cover | Pantsir-S1 | 2S6M Tunguska |
-| 4 short range | Osa-AKM | Tor-M2: four targets at once inside its radar sector, quick, best against small fast targets, dearer rounds fired straight up out of their cells |
-| 5 very short range | Strela-10M3 | ZSU-23-4M4 Shilka-M4: four 23 mm guns, free to fire, opens inside 1.4 km; its radar emits |
+| 4 short range | Osa-AKM | Tor-M2: four targets at once inside its radar sector (a new one every 4 s at most), quick, best against small fast targets, dearer rounds fired straight up out of their cells |
+| 5 very short range | Strela-10M3 | ZSU-23-4M4 Shilka-M4: four 23 mm guns, free to fire, its shells reach about 2.8 km and its crew opens fire inside 2 km; its radar emits |
 
 The search radars see high flyers far out and low flyers only close in and over open ground, so the long layer gets the aircraft, decoys and ballistic missiles, and what comes in low leaks through to the Pantsirs, the Osa and the Strela. Every unit starts in **auto** (its crew engages on its own, competently but wastefully: slow to react, it fires on decoys, uses the big missiles on everything and never switches its radar off). **Manual** fires only on your orders and your shots are a little better; **hold** never fires.
 
 - **S-400** (battalion command post): the big scope and the track table. Pick the 48N6 (long range, few) or the 9M96 (shorter range, cheap and plentiful), select a track and launch one or two (**NEXT THREAT** steps through the threats nobody is engaging yet). Slow "aircraft" that never close are often decoys: their class shows once a track has been held long enough. When a radar-seeking missile comes for the battalion, switching the emitter off makes it lose its aim, but blinds the battalion and its 48N6 in flight.
-- **Pantsir-S1**: missiles out to 20 km, twin 30 mm guns inside 4 km (hold Space or the FIRE button in manual). The tracking channel can be the radar or the silent electro-optical sight, whose picture is in the console.
+- **Pantsir-S1**: missiles out to 20 km on two channels, a new target every 6 s at most (about ten a minute; a re-fire at a target its missile missed goes at once); twin 30 mm guns whose shells reach about 4.2 km, taking about 3 s to 2 km and 7 s to 4 km and scattering more the farther they go, so the crew opens fire inside 2.5 km (hold Space or the FIRE button in manual: it greys out while the shells cannot reach the target). The tracking channel can be the radar or the silent electro-optical sight, whose picture is in the console.
 - **Osa-AKM**: one target at a time, salvoes of two, its tracking radar must hold the target until the missiles arrive.
 - **Strela-10M3**: no radar. Slew the optical sight onto the target (drag in the sight or arrow keys, the strip below it cues the bearings of the nearest threats from the battalion's picture), uncage the seeker (U), wait for the tone to steady and the LOCK lamp, then fire.
 
