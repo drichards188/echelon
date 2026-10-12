@@ -16,11 +16,12 @@
 // ballistic targets, one for the rest); giveUp, how long a TELAR tries to get a target before it
 // gives it up (s). targetGap: the engagement rate cap, the least time (s) between the first rounds
 // at two new targets (a re-fire at a target its round missed is not held back; FireUnits.targetWait).
-// gun.range is where the AI crew opens fire with its guns (the
-// player can fire at any range); shell is the ballistics.js kind, side and height place the guns on
-// the turret (m), rate is rounds per second, spread and dmg (optional) scale the shell's dispersion
-// and damage per hit, settle is how long the crew lets the fire control hold a new target before it
-// opens fire on it (s).
+// gun.range is where the AI crew opens fire with its guns (full bursts inside half of it, half bursts
+// and twice the pause at it), and inside it (below maxAlt) its missiles leave targets to the guns; the
+// player can fire anywhere the shells reach. shell is the ballistics.js kind, side and height place the
+// guns on the turret (m), rate is rounds per second, spread and dmg (optional) scale the shell's
+// dispersion and damage per hit, settle is how long the crew lets the fire control hold a new target
+// before it opens fire on it (s).
 //
 // Capabilities (instead of checks on the kind):
 //   area      the area layer: the crew takes the high layer and leaves drones and helicopters to the
@@ -117,15 +118,17 @@ export const SYSTEMS = {
     launchGap: 1.2,
     launchY: 3.4,
     stocks: { '57E6': { ready: 12, reserve: 12, load: 12 } },
-    gun: { shell: '30mm', rounds: 1400, range: 1600, maxAlt: 3000, rate: 80, burst: 1.4, cool: 0.9, side: 1.3, height: 3.6, settle: 4, spread: 2 },
+    // opens fire at 2.5 km; the 30 mm reaches about 4.2 km (effective to about 4 km, 3 km up)
+    gun: { shell: '30mm', rounds: 1400, range: 2500, maxAlt: 3000, rate: 80, burst: 1.4, cool: 0.9, side: 1.3, height: 3.6, settle: 4, spread: 2 },
     reload: 120, reloadMin: 40,
     reloadPose: { az: Math.PI / 2, el: 0, guns: true }, // combat module 90 degrees left, blocks level (render/reload/pantsir.js; reconstructed); the guns may take it
     turnAz: 1.6, turnEl: 1.2,
   },
   // Guns first: tougher, more 30 mm, a shorter search radar, and eight cheap missiles of shorter reach
   // guided only through the optical sight (silent, but it needs line of sight and good visibility). Its
-  // gun crew opens fire as far as the shells reach (2.2 km) after 3 s on a new target (the Pantsir's
-  // 1.6 km and 4 s): two Tunguskas won 97 of 144 for the scripted S-400 with 2 km and 4 s, 115 with these.
+  // gun crew opens fire at 3.5 km after 3 s on a new target (the Pantsir's 2.5 km and 4 s; the 30 mm
+  // reaches about 4.2 km). At 3 km (its 9M311 leaving targets to the guns 500 m closer in) the all-auto
+  // alternatives won 79 of 144 (51 before the gun ranges changed), at 3.5 km 52 (DESIGN.md "Balance").
   tunguska: {
     hp: 160,
     fc: 'track', missileFc: 'eo', salvo: 2, armFirst: true,
@@ -142,7 +145,7 @@ export const SYSTEMS = {
     launchGap: 1.2,
     launchY: 3.0,
     stocks: { '9M311': { ready: 8, reserve: 24, load: 8 } },
-    gun: { shell: '30mm', rounds: 2400, range: 2200, maxAlt: 3000, rate: 90, burst: 1.6, cool: 0.8, side: 1.7, height: 3.2, settle: 3 },
+    gun: { shell: '30mm', rounds: 2400, range: 3500, maxAlt: 3000, rate: 90, burst: 1.6, cool: 0.8, side: 1.7, height: 3.2, settle: 3 },
     reload: 45, reloadMin: 40,
     reloadPose: { az: Math.PI / 2, el: 0.5, guns: true }, // front to the 2F77M on the left, guns raised clear of the launchers (render/reload/tunguska.js; reconstructed); the guns may take it
     turnAz: 1.4, turnEl: 1.0,
@@ -215,7 +218,8 @@ export const SYSTEMS = {
     react: 2.5,
     close: 3000,
     stocks: {},
-    gun: { shell: '23mm', rounds: 2400, range: 1400, maxAlt: 1500, rate: 75, burst: 1.2, cool: 0.5, side: 0.3, height: 2.6, settle: 2.5 },
+    // opens fire at 2 km; the 23 mm reaches about 2.8 km (effective to about 2.5 km, 1.5 km up)
+    gun: { shell: '23mm', rounds: 2400, range: 2000, maxAlt: 1500, rate: 75, burst: 1.2, cool: 0.5, side: 0.3, height: 2.6, settle: 2.5 },
     reload: 0,
     turnAz: 1.8, turnEl: 1.3,
   },
