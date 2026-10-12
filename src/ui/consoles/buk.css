@@ -1,0 +1,44 @@
+/* Buk-M2 console: the battery's vehicle plate and the firing-vehicle selector. */
+.buk .ctl { flex: 1; min-width: 0; }
+.buk .ctl > .plate, .buk .ctl > .row { width: 100%; }
+.buk .ctl > .row > .plate:first-child { flex: none; }
+.buk .ctl > .row > .plate:last-child { flex: 1; }
+.buk .pl-ppi { padding-bottom: 6px; }
+.buk .rowc .lbl.cap { margin-bottom: 4px; }
+.buk .pl-table { flex: 1; }
+.buk .pl-pe .pbody, .buk .ctl .plate .pbody { width: 100%; }
+.btn.sm { min-width: 50px; height: 34px; }
+.btn.sm .lbl b { font-size: 9px; }
+.btn.sm .lbl i { font-size: 6px; white-space: nowrap; }
+.buk .seg.fire .sbtn { min-width: 58px; padding: 0 3px; }
+.buk .seg.fire .lbl b { font-size: 9px; }
+.buk .seg.fire .lbl i { font-size: 5.5px; }
+.buk .ctl > .plate:last-child { flex: 1; }
+.buk .ctl > .plate:last-child .pbody { justify-content: space-between; height: 100%; }
+.buk .seg.fire .sbtn.dis { opacity: .4; pointer-events: none; }
+.buk .seg.fire .lbl i { display: block; font-size: 6px; white-space: nowrap; }
+.buk .pl-veh { width: 318px; flex: none; }
+.buk .pl-veh .pbody { gap: 5px; width: 100%; }
+.veh { width: 100%; display: flex; flex-direction: column; gap: 4px; padding: 5px 6px; border-radius: 2px; background: #0e1009; box-shadow: inset 0 0 6px #000, 0 1px 0 rgba(255,255,220,.1); }
+.veh.dead { opacity: .55; filter: grayscale(.8); }
+.veh.gone { display: none; }
+.vhead { display: flex; align-items: center; gap: 7px; }
+.vname { display: flex; flex-direction: column; width: 74px; flex: none; }
+.vname b { font: 800 10px/1.05 'DejaVu Sans Condensed', sans-serif; letter-spacing: .08em; color: var(--cream); }
+.vname i { font: normal 6.5px/1.1 'DejaVu Sans Condensed', sans-serif; color: var(--muted); white-space: nowrap; }
+.vstate { font: 700 8.5px/1.1 'DejaVu Sans Mono', monospace; color: var(--phos); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+.vstate.dim { color: var(--muted); }
+.vstate.bad { color: #ff7a52; }
+.vrow { display: flex; align-items: center; gap: 6px; }
+.vrow .rack { flex: none; }
+.vrow .ann.chl { min-width: 0; padding: 2px 5px; }
+.vrow .ann.chl b { font-size: 8px; }
+.vrow .ann.chl i { font-size: 6px; }
+.vtgt { font: 700 10px/1 'DejaVu Sans Mono', monospace; color: var(--amber); white-space: nowrap; min-width: 52px; flex: 1; }
+.veh.telar .vrow { justify-content: space-between; }
+.veh.simple { padding: 4px 6px; }
+.veh.simple .vhead .led { flex: none; }
+.rowc.tight { gap: 4px; align-items: center; }
+.veh.loader .rack.big .cell { width: 10px; height: 18px; }
+.veh.telar .rack.big .cell { width: 10px; height: 20px; }
+.veh.loader .vrow .lbl.cap { margin-bottom: 0; }

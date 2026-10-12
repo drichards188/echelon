@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Echelon console harness</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; background: #05070a; overflow: hidden; }
+  /* stands in for the 3D view: the left half of the real game */
+  #view { position: fixed; left: 0; top: 0; bottom: 0; width: 50%; background: radial-gradient(ellipse at 50% 70%, #1d2a38, #080b10 70%); color: #3b4a5c; font: 14px monospace; display: grid; place-items: center; }
+  #view::after { content: '3D VIEW (selected: ' attr(data-sel) ')'; }
+  #panel { position: fixed; right: 0; top: 0; bottom: 0; width: 50%; min-width: 640px; max-width: 960px; }
+</style>
+</head>
+<body>
+<div id="view"></div>
+<div id="panel"></div>
+<script type="module">
+  import { startMock } from './src/ui/mock.js';
+  startMock();
+</script>
+</body>
+</html>
