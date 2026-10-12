@@ -5,7 +5,7 @@ import { Scope } from '../scope.js';
 import { SightView, sightFov } from '../sightview.js';
 import { TrackTable } from '../tracktable.js';
 import { tut } from '../highlight.js';
-import { Header, SelBar, threatOrder, abbrev, engagedSet, selectedTrack, Slewer, reloadFrac, takeManual, channelLock, MODE_ITEMS } from './common.js';
+import { Header, SelBar, threatOrder, abbrev, engagedSet, selectedTrack, Slewer, reloadFrac, takeManual, channelLock, MODE_ITEMS, setTrigger } from './common.js';
 
 const MODES = ['auto', 'manual', 'hold'];
 
@@ -208,7 +208,7 @@ export function mountPantsir(ctx) {
       trig.set(g.firing);
       launch.enable(!!sel && m.ready > 0);
       launch.set(sel && sel.engagedBy && sel.engagedBy.includes(u.id));
-      trig.enable(g.rounds > 0);
+      setTrigger(trig, u, sel, 'FIRE GUNS (HOLD)', g.rounds > 0);
       void info; void fmtTti;
     },
     dispose() {

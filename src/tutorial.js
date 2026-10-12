@@ -330,7 +330,7 @@ export const TUTORIALS = [
       },
       {
         title: 'Missiles or guns',
-        text: 'The 57E6 missiles reach out to 20 km and are best for distant or fast targets. The twin 30 mm guns work inside about 4 km: a stream of shells for what is close. G switches between them; the counters show what is left.',
+        text: 'The 57E6 missiles reach out to 20 km and are best for distant or fast targets; the fire control takes on a new target every 6 s at most (about ten a minute). The twin 30 mm guns work inside about 4 km: a stream of shells for what is close. G switches between them; the counters show what is left.',
         hi: ['weapon', 'stock'],
         tick: keeper('a', 'drone', { bearing: FROM, range: 13500 }),
       },
@@ -344,15 +344,15 @@ export const TUTORIALS = [
       },
       {
         title: 'A drone close in',
-        text: 'A drone is coming in low and close. Missiles need distance to turn; the guns do not. Select GUNS (or press G) and the drone. The guns are for close work: wait until it is inside about 1.5 km, then hold FIRE GUNS (or hold Space) with the tracking radar on (T) so the fire control can lead it. Farther out the shells scatter and the barrels heat up.',
+        text: 'A drone is coming in low and close. Missiles need distance to turn; the guns do not. Select GUNS (or press G) and the drone. The shells reach 4 km, but they take about 3 s to get to 2 km and 7 s to 4 km and scatter more the farther they go: wait until it is inside about 2.5 km, where the crew would open fire, then hold FIRE GUNS (or hold Space) with the tracking radar on (T) so the fire control can lead it. Farther out you mostly heat the barrels. The trigger greys out (OUT OF RANGE) while the shells cannot reach the target and blinks LONG RANGE: FEW HITS beyond where the crew would open fire.',
         goal: 'Shoot the drone down with the guns',
         hi: ['weapon', 'trigger', 'track-radar'],
         enter: (T) => {
           T.clear();
-          T.spawn('b', 'drone', { bearing: FROM + 10, range: 2600 });
+          T.spawn('b', 'drone', { bearing: FROM + 10, range: 3500 });
           if (T.u.sight.src === 'radar') T.u.radar.track = true;
         },
-        tick: keeper('b', 'drone', { bearing: FROM + 10, range: 2600 }),
+        tick: keeper('b', 'drone', { bearing: FROM + 10, range: 3500 }),
         done: (T) => T.killedBy('b', '30mm'),
       },
       {
@@ -747,15 +747,15 @@ export const TUTORIALS = [
       },
       {
         title: 'Hold to fire the guns',
-        text: 'A drone is coming in low and close: select it. GUNS is the selected weapon (G switches). The fire control computes where the target will be when the shells arrive, the lead, and swings the guns onto it, so you do not aim ahead yourself. The IN GUN RANGE lamp lights inside about 2 km; then hold FIRE GUNS (or hold Space) until it falls. Releasing stops the fire.',
+        text: 'A drone is coming in low and close: select it. GUNS is the selected weapon (G switches). The fire control computes where the target will be when the shells arrive, the lead, and swings the guns onto it, so you do not aim ahead yourself. The shells reach about 4 km; the IN GUN RANGE lamp lights inside 3.5 km, where the crew would open fire. Then hold FIRE GUNS (or hold Space) until it falls. Releasing stops the fire. The trigger greys out (OUT OF RANGE) while the shells cannot reach the target and blinks LONG RANGE: FEW HITS beyond where the crew would open fire.',
         goal: 'Shoot the drone down with the guns',
         hi: ['weapon', 'trigger', 'lamps', 'track-radar'],
         enter: (T) => {
           T.clear();
           topUp(T);
-          T.spawn('b', 'drone', { bearing: FROM + 10, range: 2600 });
+          T.spawn('b', 'drone', { bearing: FROM + 10, range: 3500 });
         },
-        tick: keeper('b', 'drone', { bearing: FROM + 10, range: 2600 }),
+        tick: keeper('b', 'drone', { bearing: FROM + 10, range: 3500 }),
         done: (T) => T.killedBy('b', '30mm'),
       },
       {
@@ -766,7 +766,7 @@ export const TUTORIALS = [
       },
       {
         title: 'The missile channel',
-        text: 'The eight 9M311 missiles reach about 10 km, far past the guns. They have no radar guidance: the optical sight alone guides them, silently, so it needs a clear line of view and reaches about 12 km (less in poor visibility). The sight follows the selected target by itself; the arrow keys slew it. One target at a time, fired as a pair.',
+        text: 'The eight 9M311 missiles reach about 10 km, far past the guns. They have no radar guidance: the optical sight alone guides them, silently, so it needs a clear line of view and reaches about 12 km (less in poor visibility). The sight follows the selected target by itself; the arrow keys slew it. One target at a time, fired as a pair, and a new target every 8 s at most while the gunner lays the sight on it.',
         hi: ['weapon', 'sight', 'stock'],
       },
       {
@@ -857,7 +857,7 @@ export const TUTORIALS = [
       {
         id: 'many',
         title: 'Several targets at once',
-        text: 'Three drones, spread across the sector. The Tor has four channels: launch at one, then select another and launch while the first missile flies, and each gets its own row in TRACKING CHANNELS. Work from the one that arrives first (TTI in the table).',
+        text: 'Three drones, spread across the sector. The Tor has four channels: launch at one, then select another and launch while the first missile flies, and each gets its own row in TRACKING CHANNELS. It takes on a new target every 4 s at most: a launch at the next one waits for it (NEXT TARGET IN on the status line). Work from the one that arrives first (TTI in the table).',
         goal: 'Have two engagements running at the same time',
         hi: ['channels', 'tracks', 'launch', 'sector'],
         enter: (T) => {
@@ -969,7 +969,7 @@ export const TUTORIALS = [
       },
       {
         title: 'The lead mark',
-        text: 'Shells take time to arrive, so the guns are not laid on the target but ahead of it. Once the target is inside the shells\' reach, about 2 km, the fire control shows that lead point in the sight as a yellow ring with the УПР label, joined to the target by a dashed line; LEAD m reads the distance. You never aim ahead yourself.',
+        text: 'Shells take time to arrive, so the guns are not laid on the target but ahead of it. Once the target is inside the shells\' reach, about 2.8 km, the fire control shows that lead point in the sight as a yellow ring with the УПР label, joined to the target by a dashed line; LEAD m reads the distance. You never aim ahead yourself.',
         goal: 'Wait until the lead mark appears in the sight',
         hi: ['sight', 'lamps'],
         tick: (T) => {
@@ -980,7 +980,7 @@ export const TUTORIALS = [
       },
       {
         title: 'Open fire',
-        text: 'The shells fall away fast: the 23 mm self-destructs at about 1.9 km and the fire control opens up inside about 1.4 km, so this is a very short range gun. The IN GUN RANGE lamp lights when the drone is near enough. Then hold FIRE (or hold Space) until it falls.',
+        text: 'The shells fall away fast: the 23 mm takes 3 s to get to 2 km, self-destructs at about 2.8 km and scatters more the farther it goes, and the crew opens fire inside about 2 km, so this is a very short range gun. The IN GUN RANGE lamp lights when the drone is near enough. Then hold FIRE (or hold Space) until it falls. The trigger greys out (OUT OF RANGE) while the shells cannot reach the target and blinks LONG RANGE: FEW HITS beyond where the crew would open fire.',
         goal: 'Shoot the drone down with the guns',
         hi: ['lamps', 'trigger', 'sight'],
         tick: (T) => {
