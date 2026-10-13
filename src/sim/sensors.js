@@ -1,12 +1,16 @@
 import * as THREE from 'three';
 import { SYSTEMS, THREATS } from './systems.js';
 import { TAU, horizon, bearingRange } from './flight.js';
+import { ERA } from '../deploy.js';
 
 // Search radars as a game rule: a target shows up when the rotating beam passes its bearing, it is
 // inside the set's game range for its size, above the earth-curvature line of sight and not hidden by
 // terrain. Tracks coast between sweeps (dead reckoning) and drop after a few missed sweeps.
 // The area unit's command post (S-400 or Buk) fuses every emitting unit's tracks into `sim.picture` and
-// links them to the rest of the force (source 'link').
+// links them to the rest of the force (source 'link'). Observers who scan the sky by eye (search.optical,
+// the WW2 flak's) sweep the same way, seeing by a target's visual size instead of its radar size; in an
+// era with a reporting service (layout.plot, the WW2 Flugmeldedienst) its plot fills the picture where no
+// unit has its own track, and reaches the units by telephone through its post (sim.linkUp).
 
 const _v = new THREE.Vector3();
 
@@ -25,12 +29,14 @@ export class Sensors {
   }
 
   // can `unit` see threat `t` right now with an antenna at height `antenna` and a game range `range`?
-  visible(unit, t, range, antenna, low = 1) {
+  // optical: an observer's eyes, by the target's visual size (THREATS vis; none for chaff and falling
+  // bombs) and shortened by poor visibility
+  visible(unit, t, range, antenna, low = 1, optical = false) {
     const def = THREATS[t.type];
     const dx = t.pos.x - unit.pos.x, dz = t.pos.z - unit.pos.z;
     const dist = Math.sqrt(dx * dx + dz * dz);
     const agl = t.pos.y - this.sim.heightAt(t.pos.x, t.pos.z);
-    let r = range * (0.35 + 0.65 * def.size);
+    let r = optical ? (def.vis ? range * (0.3 + 0.7 * def.vis) * (0.4 + 0.6 * (this.sim.visibility ?? 1)) : 0) : range * (0.35 + 0.65 * def.size);
     if (agl < 60) r *= low;
     if (dist > r) return false;
     if (dist > horizon(antenna + unit.pos.y - this.sim.heightAt(unit.pos.x, unit.pos.z), agl)) return false;
@@ -64,13 +70,13 @@ export class Sensors {
       if (s) {
         const prev = u.radar.sweep;
         u.radar.sweep = (prev + (TAU * dt) / s.period) % TAU;
-        if (u.radar.search) {
+        if (u.radar.search || s.optical) {
           const swept = (u.radar.sweep - prev + TAU) % TAU;
           for (const t of sim.threats) {
             if (!t.alive) continue;
             const [b] = bearingRange(u.pos.x, u.pos.z, t.pos.x, t.pos.z);
             if ((b - prev + TAU) % TAU > swept) continue;
-            if (!this.visible(u, t, s.range, s.height, s.low)) continue;
+            if (!this.visible(u, t, s.range, s.height, s.low, s.optical)) continue;
             let tr = u.trackMap.get(t.id);
             if (!tr) u.trackMap.set(t.id, (tr = newTrack(t.id, now)));
             this.measure(u, tr, t, now);
@@ -108,6 +114,8 @@ export class Sensors {
     const def = THREATS[t.type];
     if (tr.quality < 0.6) return;
     if (t.type === 'decoy') tr.cls = tr.held > 22 && dist < 70000 ? 'decoy' : 'aircraft';
+    // a Window cloud is a bomber's echo until the operator has watched it a while
+    else if (def.chaff) tr.cls = tr.held > 15 ? 'window' : 'bomber';
     else if (tr.held > 3 || def.cls === 'tbm' || def.cls === 'arm') tr.cls = def.cls;
   }
 
@@ -136,12 +144,50 @@ export class Sensors {
         seen.add(id);
       }
     }
+    if (ERA.layout.plot && sim.link) this.plot(now, map, seen);
     for (const id of map.keys()) if (!seen.has(id)) map.delete(id);
     sim.picture.length = 0;
     for (const p of map.values()) {
       this.describe(p, 0, 0, 0, now);
       sim.picture.push(p);
     }
+  }
+
+  // The reporting service's plot (layout.plot): every aircraft more than minAlt over the ground inside range
+  // of the field, plotted again every period s with an error of about `error` m and dead-reckoned between
+  // plots, its type known from the second plot on. It fills the picture where no unit has its own track.
+  plot(now, map, seen) {
+    const sim = this.sim;
+    const P = ERA.layout.plot;
+    const pm = this.plotMap ?? (this.plotMap = new Map());
+    for (const t of sim.threats) {
+      if (!t.alive || !THREATS[t.type].plane) continue;
+      let e = pm.get(t.id);
+      if (!e || now - e.t >= P.period) {
+        const covered = t.pos.y - sim.heightAt(t.pos.x, t.pos.z) >= P.minAlt && Math.hypot(t.pos.x, t.pos.z) <= P.range;
+        if (!covered) {
+          pm.delete(t.id);
+          continue;
+        }
+        if (!e) pm.set(t.id, (e = { t: now, first: now, pos: new THREE.Vector3(), vel: new THREE.Vector3() }));
+        e.t = now;
+        e.pos.set(t.pos.x + (sim.rng() - 0.5) * 2 * P.error, t.pos.y + (sim.rng() - 0.5) * P.error, t.pos.z + (sim.rng() - 0.5) * 2 * P.error);
+        e.vel.copy(t.vel);
+      }
+      if (seen.has(t.id)) continue;
+      let p = map.get(t.id);
+      if (!p) map.set(t.id, (p = newTrack(t.id, now)));
+      p.pos.copy(e.pos).addScaledVector(e.vel, now - e.t);
+      p.vel.copy(e.vel);
+      p.quality = 0.5;
+      p.lastSeen = e.t;
+      p.held = now - e.first;
+      p.cls = now - e.first >= P.period ? THREATS[t.type].cls : 'unknown';
+      p.source = 'own';
+      p.reporter = null;
+      seen.add(t.id);
+    }
+    for (const id of pm.keys()) if (!sim.threatById.get(id)?.alive) pm.delete(id);
   }
 
   // range, bearing (degrees), altitude, speed, time to impact and who is engaging, relative to (x, y, z)

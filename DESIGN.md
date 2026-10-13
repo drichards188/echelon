@@ -121,7 +121,10 @@ sim.events = {
   unitDamaged(unit), unitDestroyed(unit), assetDamaged(asset),
   radio(text, kind),                  // kind: 'info' | 'warn' | 'alert' | 'kill'
   wave(n, title, sub), state(state),  // director
-  partDestroyed(unit, partIndex),     // optional: one vehicle of a dispersed unit (Buk) knocked out
+  partDestroyed(unit, partIndex),     // optional: one vehicle of a dispersed unit (Buk, a WW2 battery's gun) knocked out
+  // the WW2 era's (all optional; payloads in "WW2 era"): muzzle(unit, part, pos, dir, shell),
+  // salvo(unit, guns, fuze), burst(pos, kind, hits, unitId), feed(unit, part, what, barrel),
+  // strafe(threat, point, victim), straggle(threat)
 };
 sim.newGame({ difficulty: 'Normal', loadout, era });   // loadout and era optional, see "Loadout" and "Eras"
 sim.update(dt);                      // dt already scaled by the time compression
@@ -131,7 +134,8 @@ sim.loadout;                         // the kinds in play, slot order
 sim.era;                             // the id of the era in play
 sim.area;                            // the area layer's unit (S-400 or Buk), or null
 sim.linkUp();                        // the data link stands (area unit alive, and its command post vehicle)
-sim.nextLauncher(unitOrId, type?);   // { part, slot } the next round of `type` (default: selected) leaves from
+sim.nextLauncher(unitOrId, type?);   // { part, slot } the next round of `type` (default: selected) leaves from; a WW2
+                                     // battery or platoon: { part: the gun that fires next, slot: -1 }
 sim.emitting(unit, part?);           // the unit (or that vehicle) emits: radar-seeking missiles can home on it
 sim.visibility = 1;                  // 1 clear; lower (rain, fog, dark) shortens the EO channels, see eo.vis
 ```
@@ -240,9 +244,10 @@ The S-400 alone must not be able to win: tune so every layer matters and the pla
 ### Eras (`src/eras/`, `src/deploy.js`)
 
 One game holds several eras ("AA through the ages"). The modern era is the one described everywhere
-else in this file and the only playable one; a late-war WW2 era (German flak, 1944 to 1945) is
-registered as a placeholder. The era toggle is the main menu's top control; an era with
-`available: false` shows on it greyed out and marked "In development", and cannot be picked.
+else in this file and the only playable one; a late-war WW2 era (German flak at a jet airfield, February
+to March 1945) is registered and plays in the headless sim, but stays `available: false` until its
+models, consoles and render wiring exist (see "WW2 era"). The era toggle is the main menu's top control;
+an era with `available: false` shows on it greyed out and marked "In development", and cannot be picked.
 
 **An era is a plain data module**, `src/eras/<id>.js` (default export; Node-safe, `tools/simtest.mjs`
 reads it), registered in `src/eras/index.js` `ERAS` (the menu's order). Everything that belongs to the
@@ -263,15 +268,19 @@ setting lives in it:
   },
   layout: {
     threatAxis: 250,            // the compass bearing the raids come from
-    assets: [{ id, kind, name, x, z, bearing, hp, label? }],   // the defended assets; `label` puts one on the HUD's compass ('RWY')
+    assets: [{ id, kind, name, x, z, bearing, hp, label?, weight? }],   // the defended assets; `label` puts one on the
+                                // HUD's compass ('RWY'); `weight`: how likely raids sent at 'assets' pick it
     vital: ['runway', 'cp'],    // the battle is lost when all of these are destroyed, or no fire unit is left (only
                                 // that with none listed)
     sites: [{ x, z, bearing }], // where each slot's unit stands, in slot order
+    plot?, repair?,             // optional (the WW2 era): a reporting service standing in for the data link, and
+                                // repairs between raids (see "WW2 era")
   },
   slots: [{ cls: 'Area layer',  // the picker's class label
     options: [{ kind, id, name, callsign, label, info, parts: [{ kind, dx, dz }] }] }],  // option 0 is the default;
                                 // label and info: the picker's short name and one-line trade-off
-  waves: [{ title, sub, groups: [...] }],   // the raids (sim/director.js; group fields there)
+  waves: [{ title, sub, radio?, groups: [...] }],   // the raids (sim/director.js; group fields there); `radio`: the
+                                // call at the wave's start (default "Command: <sub>. Stand by.")
   alerts: { 'NO LINK': ['НЕТ СВЯЗИ', 'NO DATA LINK TO S-400', 3], ... },  // [cabin caption, English meaning,
                                 // rank] for every alert the sim raises (ui/consoles/common.js Header)
   tutorials: ['basics', 's400', ...],       // the tutorial.js TUTORIALS ids its Tutorials list offers
@@ -929,6 +938,297 @@ Tor, climbs its side onto the turret roof, steadies each container into its cell
 (his hands on it with crew.js `reach`) and is down again before `dur` (the last step is stretched for it). Reconstructed: the cell order, the lids opening one at a time,
 the crewman's way up, the containers lying on the bed (none is seen loaded in the photos).
 
+### WW2 era (`src/eras/ww2.js`, `src/sim/mounts.js`, `src/sim/planes.js`, simulation agent)
+
+German flak defends Fliegerhorst Hopsten (Rheine-Hopsten), the Me 262 base of KG 51 in north-west
+Germany, against the Allied day raids of February and March 1945. The research is in
+`refs/ww2/README.md` (the setting, the order of battle, the waves, the sources) with one sheet per system
+and aircraft; the game values below cite them. It plays in the headless sim with the slot defaults only
+(`node tools/simtest.mjs --era ww2`); the alternatives in refs/ww2 section 3 come later. The render,
+consoles, fx and audio for it are other agents' work: everything here is plain sim state and events.
+
+**Layout** (`layout` in eras/ww2.js). Threat axis 250: Rheine, KG 51's second field, lies 12 km out on
+about 241 with the Allied fields beyond. The defended Fliegerhorst, as Hopsten's layout allows (its main
+runway lay about 085/265 and was 3,000 m; the shared `runway` keeps 070/250, 2,800 x 45 m): `runway` (hp
+900), `cp` (`command44`, the earth-covered Flak command post, 250), four `revetment` blast bays of the south
+dispersal (120 each; a bay's open side faces its bearing), `hangar` in the wood off the north boundary
+(200), `fuel44` toward the south-east corner (120), `tower44` the flight control building (80). Vital: the
+runway and the command post (defeat when both are destroyed). Three optional layout fields, read only when
+present (the modern era has none):
+
+- `plot: { post, range, period, minAlt, error }`: the aircraft reporting service (Flugmeldedienst), which
+  stands in for the modern data link. Every aircraft more than `minAlt` (250 m) over the ground inside
+  `range` (45 km) of the field is plotted every `period` (8 s) with an error of about `error` (350 m),
+  dead-reckoned between plots, its type known from the second plot (sensors.js `plot`); it fills
+  `sim.picture` where no unit has its own track and reaches every unit as link tracks by telephone through
+  the asset `post` ('cp'): `sim.linkUp()` is that asset standing (NO LINK once it is destroyed).
+- `repair: { assetId: share }`: between raids a standing asset gets back that share of its hit points
+  (director.js `repair`; the runway 0.25: Hopsten "was never seriously damaged, because of the strong flak and
+  the quickly executed repairs").
+- an asset's `weight`: how likely raids sent at 'assets' pick it (default the modern table, then 1).
+
+Sites: the heavy battery 3.8 km out on bearing 228, under the bombers' approach but beside the axis line
+(heavy batteries stood 2 to 5 km out, "none nearer than 3.2 km", MIS 10; a box on the axis passes it at about
+1.6 km, inside the guns' 85 degrees: on the axis line itself the boxes released right over it, out of reach);
+the 3.7 cm Zug in the Flak lane beside the extended centreline 2.7 km out and the other by the blast bays;
+the Vierlinge north of the centreline by the west threshold; the 2 cm by the fuel dump and flight control.
+
+| Slot | Unit (id, callsign) | Parts (in the unit's frame) |
+|---|---|---|
+| 0 heavy battery | `flak88` BTY Ludwig | six `flak88` A to F (`letter`), five on a ring of 32 m radius round the sixth, part 0 gun A; `kdo40` 95 m to one side, `wurzburg` 40 m beside it, two `flak38` (role 'close') between them and the ring (refs/ww2/battery 5.2) |
+| 1 medium, Flak lane | `flak43` MED1 Martha | three `flak43` in a triangle about 100 m a side (a Zug: 69 to 137 m apart, MIS 10) |
+| 2 medium, dispersal | `flak43` MED2 Nordpol | the same |
+| 3 light, quadruple | `flakvierling` VIER Otto | two `flakvierling` and a `flakvierling-tower` (on a wooden Flak tower, its guns 10.4 m up) |
+| 4 light, single | `flak38` LIGHT Paula | three `flak38` |
+
+**Gun units of several mounts** (SYSTEMS `mounts`, sim/mounts.js, hooked from units.js where a unit has
+it: update, command, channelTargets, channelSees, nextLauncher, resupply, partDown, describe). Every gun is a
+part with its own `turret` ({ az, el } relative to the hull, as the modern turrets) and `gun` state, firing
+from its own pit. The units are `dispersed` (each part knocked out on its own by bombs, rockets and strafing)
+and out with their last part of role `core` ('gun'). `u.weapons.gun` is the unit's summary for the
+existing code (rounds in all, firing, and the fire control of the predictor or of the camera's gun).
+New SYSTEMS fields: `mounts` ('battery' | 'platoon'), `core`, `roles` (a part kind's role in this unit),
+`guns` (per gun part kind, below), `predictor`, `radar` (the Wuerzburg), `search.optical`, and `stocks: {}`.
+
+| Gun (SYSTEMS guns) | Shell | Rate (cyclic, per barrel) | Feed | Hand laying (coarse) | AI opens fire | Sources |
+|---|---|---|---|---|---|---|
+| `flak88` 8.8 cm Flak 37 | `88mm` | one round per loading cycle | hand: 3.6 +- 0.5 s from the shot to the next round in the breech (15 to 20 rounds/min, TM E9-369A; 10 to 15, TTT 20), 150 rounds at the gun (E: 60 to 80 in the pit, the rest from the bunker) | 10.6 and 5.9 degrees/s, -3 to +85 degrees (the US test, TM E9-369A) | on the predictor's solution | refs/ww2/flak88 6 to 10 |
+| `flak43` 3.7 cm Flak 43 | `37mm` | 250/min | 8-round clips laid on a loading table holding two, a clip every 3.5 +- 0.6 s (E: 3 to 4 s), so about 140/min sustained (150 to 180 practical, WR 45); 480 rounds (E) | 23 and 10 degrees/s (E from 20 and 8 degrees per turn) | 2.4 km, below 3 km, after 2.5 s on the target | refs/ww2/flak43 6 to 10 |
+| `flakvierling` 2 cm Flakvierling 38 | `20mm` | 4 x 450/min | 20-round magazines, two loaders changing one each (3.5 s, E: not recorded), so about 690/min (700 to 800 practical, TM 9-228); 1,600 rounds (the mount's 320 and the pit's boxes, E) | 29 and 15 degrees/s (E from 22.5 and 12 degrees per turn) | 1.5 km, below 1.8 km, after 2 s | refs/ww2/flakvierling 6 to 10 |
+| `flak38` 2 cm Flak 38 | `20mm` | 450/min | 20-round magazines, one loader (3.5 s, E), so about 190/min (180 to 220, MIS 10); 640 rounds (E) | 34 and 20 degrees/s (E: the Vierling's gears; the Flak 38's were not found) | 1.4 km, below 1.5 km, after 2 s | refs/ww2/flak38 6 to 10 |
+
+The other gun fields: `height` (the bore above the ground), `muzzle`, `minEl`/`maxEl`, `sight` (how far the
+layer holds a target of visual size 1: 3.5 km for the 2 cm, 5.5 km for the 3.7 cm), `burst`/`cool` (the AI's
+bursts), `err` (the crew's aiming error, rad: 6, 5, 4 and 1.5 mrad), `spread`, `dmg`.
+
+| SHELLS | v0 | Drag, life | Damage | Notes |
+|---|---|---|---|---|
+| `88mm` | 820 | c 0.00015 with `H` 8500 m (the drag falls as exp(-y / H): the air thins with height), fuze 1.5 to 29.5 s | `burst` 55 m: every aircraft inside takes 1.5 x (1 - d / 55)^2 times the difficulty's `hit` (Sim.flakBurst); a direct hit bursts it | fitted to the sheet's trajectory model: 85 degrees to 7,000 m in 15.2 s, 60 degrees 21.8 s (here 15.2, 21.8); no tracer |
+| `37mm` | 820 | c 0.00044, life 8.5 s +- 17 % (`lifeVar`): self-destruct at 2,800 to 3,500 m | 0.55 per hit | times of flight fitted to the sheet (1.5 s to 1 km, 3.9 s to 2 km, 7.6 s to 3 km); every round a tracer |
+| `20mm` | 900 | c 0.00072, life 6 s +- 8 %, tracer `burn` 6 s | 0.25 per hit | 0.95 s to 650 m, 2,200 m at 6 s (TM 9-228 chart) |
+
+New SHELLS fields (optional, the modern shells have none, so their arithmetic is unchanged): `burst`
+(time-fuzed: `Ballistics.fire(..., { fuze })` sets the shell's life to the fuze, and at its end, or on
+contact, `ctx.burst(point, kind, owner, dmg, unit)` is called instead of `expire`/`hit`), `H`, `lifeVar`,
+`burn` (the tracer fades out over it), `every: 0` (no tracer). Targets with `ghost` (falling bombs,
+rockets, chaff) are never hit. `solveLead(..., warm)` starts from the aim point in `out` (a fire control
+following its target step to step); for a shell with `H` it scales its correction by the aim point's
+distance over the miss point's, so the long high-angle flights converge.
+
+**Detection.** Observers scan the sky by eye (`search.optical`: the platoons' spotters and range-takers 20 to
+22 km, the battery's lookouts and the predictor's telescopes 30 km, all for a visual size of 1, period 1.5
+and 2 s, `low` 0.6): Sensors sweeps them like a radar but an aircraft shows inside `range` x (0.3 + 0.7 x
+THREATS `vis`), shortened by poor `sim.visibility`, above the horizon and with terrain line of sight. They
+are not emitters (`radar.search` stays false). A gun's crew holds a target in its `sight` range scaled the
+same way, with line of sight from its pit (a tower sees over the trees). The heavy battery's Wuerzburg D
+(`radar`: 30 km x (0.35 + 0.65 x size), on while `radar.track`) gives its predictor a range and picks up
+everything in its beam (0.1 rad) round the predictor's target: chaff there becomes tracks in the battery's
+table, class 'bomber' until held 15 s, then 'window'. The reporting service's plot (above) fills in the
+rest.
+
+**The heavy battery** (`flak88`, `u.predictor`). The Kommandogeraet 40 holds one target (`predictor`: slant
+range 1.2 to 18 km, speed under 300 m/s, angular rate under 0.12 rad/s): by its telescopes and rangefinder
+('optical', needs to see it) or with the Wuerzburg's range ('radar'); `ranging` is the source the crew wants,
+`source` the one in use. Its solution settles while it holds the target (quality 1 - exp(-t / 9 s), 1.3
+times slower optical; "under 30 s from acquisition to the first round", refs/ww2/battery 1.7): the
+predicted burst for the battery's middle is flown through the game's own ballistics (solveLead, warm), and
+every gun is laid at that aim point from its own pit (the parallax taken out), its fuze scaled by its own
+distance. The error is a game rule: an offset at the target wandering every couple of seconds, of size
+(a + b x slant range) x (1 + 1.5 x (1 - quality)) with a, b = 10 m, 0.004 (radar) or 15 m, 0.0045 (optical),
+plus up to 300 m with Window in the radar's range gate (500 m), 1.3 times larger for the AI crew and scaled by
+the difficulty's `aim`. Each gun's `gun.order { az, el, fuze }` is the predictor's data at that gun (the
+follow-the-pointer dials, before its layers' own 1.5 mrad error; the render's `setOrder`). Guns fire together by salvo once at least 4 are loaded and laid (within 6 mrad of the
+data), or the first ready one has waited 1.5 s: in auto when the solution's quality is 0.55, in manual while
+the trigger is held (or one salvo on `fire`). Barrage fire (`barrage { on, trackId }`): a box 1,000 x 300 x
+160 m laid on a formation's course where the shells can meet it, fired at by every gun as it is loaded, from
+just before the formation reaches it until it should be through (fixed data: no predictor, no range, so it
+works without the Kommandogeraet and against Window). AI crew: notices a track after 8 s, takes the player's
+selection when it is one it would take, else the nearest aircraft at height it can follow (bombers first),
+and keeps it while it can (also a box that has bombed and is going away), stays on the radar range under
+Window until it has been spoiled for 60 s, falls back on barrage fire when its predictor is knocked out. The battery's own 2 cm guns fight as a platoon's guns, in
+auto in every mode but hold, on their own targets (the battery's selection is its predictor's).
+
+**Platoons** (`flak43`, `flakvierling`, `flak38`). Each gun's crew keeps the existing gun fire control:
+`gun.locked` while its sight holds the target and the platoon has a fresh own track of it, the estimate
+(FireUnits.gunEstimate), solveLead from the gun's own trunnion, `aimOk`, `tof`, `hold` ('no lock', 'out of
+reach', 'target lost'), the crew's wandering error (shrinking as they correct by the tracer, 0.55 of it
+after a few seconds on the target), laying at the hand-laid rates, and firing along the bore with the
+shell's dispersion grown with the range. In auto every gun takes its own target (the most urgent it can
+see and reach, an aircraft attacking this position first; another gun of the platoon on it counts against
+it, so the guns spread over the targets; the player's selection comes first for a gun that would take it,
+without the crew's reaction time, but not so far that the guns double up on it) and fires in bursts while on
+the lead inside its opening range, after `settle` s on the target; with `concentrate { on }` all three take
+the platoon's choice. In manual every gun takes the selection and fires while the trigger is held (the
+platoon leader's permission), each once it is laid on its own solution, and holds while its shells cannot
+reach (OUT OF REACH). Spreading the fire pays: an aircraft under fire aims worse (`rattle` below), so three
+aircraft each under one gun bomb worse than one under three.
+Feeds as in the table: each barrel fires at its cyclic rate while it has rounds; a magazine change takes a
+loader (between targets they top up magazines below half); the 3.7 cm's loader lays a clip whenever the table
+has room. A strafing burst within 25 m of a pit makes its crew duck for 1.2 to 2.4 s (`gun.cover`: no fire).
+
+**The aircraft** (THREATS `plane`, sim/planes.js; ThreatAI hands them over: `spawnGroup` for a group whose
+type is a plane, the update's default case). Kinematic flight as the modern threats (flight.js fly), roles:
+
+- `recon`: a straight photo run at height over the field, 6 km on, then away.
+- Fighters weave on their way in (the heading swinging 0.3 rad either way, about every 10 s, from 16 km to
+  3.5 km out): evasive action that spoils the heavy battery's straight-line prediction; the bombers fly
+  straight on their run, which is where the predicted fire tells.
+- `strafe` (P-51, Tempest, and every fighter-bomber after its bombs): in low (or from a patrol height), a
+  pop-up 1.7 km out and a shallow dive (a steep one from height), the guns firing from 1 km to 300 m while
+  the nose is on (`Sim.strafe` every 0.2 s: damage within 10 m of a point scattered round the aim point by
+  6 m + 0.8 % of the slant range, more under fire), the pull-out over the target, out 3 km and round again
+  while it has `passes`.
+- `dive` (P-47): to the roll-in point at height where the target lies `dive` degrees down, the dive with the
+  aim corrected for the bombs' fall, release at `release` m over the ground (a stick of `bombs`), pull-out,
+  then gun passes.
+- `rocket` (Typhoon): the same with a salvo of eight `rp3` in pairs 0.1 s apart (400 m/s more than the
+  aircraft for 1.2 s, then a ballistic coast).
+- `level` (B-17, A-26; a group with `box`): a formation of squadron boxes (refs/ww2/b17 6.1: flights of
+  three in vees, the high, low and low-low flights) or flights of three, one aim point. The leader flies the
+  bomb run; its bombsight works out four times a second where a bomb dropped now would fall (`gpbomb` with
+  drag) and steers out the cross-track error; it releases as that point passes the aim point, and every
+  other aircraft of the box 0.3 to 1.2 s after it (toggliers), each its own stick of `bombs` 0.25 s apart.
+  The lead bombardier's error (120 m x (1 + rattle)) is the box's; each aircraft adds 25 m. Then the box
+  rallies off to one side for 45 s (the A-26s 300 m lower) and goes home. Below half its hit points a
+  bomber falls out of the box and goes home (`straggle`, its bombs kept); the first aircraft left takes
+  over a box whose leader is lost (the deputy, its drop spoiled for 40 s). A box with `window` throws a chaff
+  cloud from one of its aircraft every 3 to 5 s inside 30 km.
+- `escort` (a group with `escort`): weaves 800 m over the nearest bomber of its wave that is still on its way
+  in; once none is, it strafes while it has passes, else goes home.
+
+Flak spoils the aim (`rattle`, 0 to 3): the light guns' tracer at it (0.5 for 1.5 s), a heavy burst within
+100 m (0.6 for 4 s), a hit (0.5 for 3 s), damage (2 x its share of lost hit points), a fresh deputy (0.6).
+Bomb and rocket errors scale with 1 + rattle. `t.attack` is true on the attack run (the alerts and the crews'
+priorities read it). Aircraft on their way home or straggling do not hold the raid open, nor does chaff.
+New THREATS fields: `plane`, `role`, `name`, `fast`, `turn`, `alt`, `guns`, `passes`, `bombs`, `bomb`
+([damage, radius] per game bomb), `rockets`, `vis`, `ghost`, `chaff`, `fall`, `life`, `c`, `burn`; a threat
+may carry its own `warhead` (the bombs: their aircraft's), which `Sim.arrive` uses.
+
+| THREATS | Speed (m/s), height | hp | Weapons (game) | Sources |
+|---|---|---|---|---|
+| `b17` B-17G | 98 on the run, 7,150 to 7,600 m | 6 | 4 bombs [55, 40], Window | refs/ww2/b17: 95 to 100 m/s true at 6,400 to 7,620 m, 12-ship squadron boxes, 38 x 100 lb or 12 x 500 lb |
+| `a26` A-26B/C | 120, 2,700 to 3,500 m | 5 | 3 bombs [45, 35] | refs/ww2/a26: about 120 m/s at 2,650 to 4,100 m, boxes of three flights |
+| `p47` P-47D | 150, dive 190; roll-in 2,000 to 2,500 m | 2.5 | 2 bombs [70, 30], guns 7/s, 1 pass | refs/ww2/p47: 45 to 60 degree dive, release 610 to 915 m |
+| `p51` P-51D | 160, strafing 178, low | 1.6 | guns 6/s, 1 or 2 passes | refs/ww2/p51 |
+| `typhoon` Typhoon IB | 165, attack 180; 1,070 to 2,440 m | 2.2 | 8 RP-3 [55, 20], guns 6/s | refs/ww2/typhoon: 60 degrees from 2,440 m, all eight at 1,220 m |
+| `tempest` Tempest V | 175, dive 230; patrol 2,700 m | 2 | guns 7/s, 2 passes | refs/ww2/tempest |
+| `recon` Spitfire PR.XI | 177, 9,300 m | 1.5 | none | refs/ww2/recon: 7.3 to 9.8 km, near the top of the 8.8 cm's reach |
+| `gpbomb` | from its aircraft, drag c 0.00005 | | its aircraft's | |
+| `rp3` | +400 for 1.2 s | | [55, 20] | sources give 230 to 490 m/s |
+| `window` | drifts, falls 4 m/s, 100 s | | radar size 0.6 | refs/ww2/battery 3.5 |
+
+Visual sizes (`vis`): B-17 1, A-26 0.6, recon 0.55 (contrails), the fighters 0.4 to 0.45; radar sizes as
+the modern table's scale. Classes: 'bomber', 'fighter', 'recon', 'bomb', 'rocket', 'window'.
+
+**Waves** (eras/ww2.js, refs/ww2 README section 6, game counts scaled by `difficulty.enemy`; later waves
+come from a wider arc as in modern): 1 a high reconnaissance aircraft, then two flights of P-51 strafing the
+light flak and the bays; 2 four flights of P-47 dive-bombing the flak, the bays, the fuel and flight control
+(glide-bombing at 30 degrees) and the runway; 3 Typhoon rockets on the flak and the hangar, Tempests diving
+from patrol, Typhoons on the light flak; 4 P-47 ahead of two A-26 boxes (runway, command post) with a Window
+flight and a flak flight on the heavy battery; 5 three B-17 squadrons a minute apart (runway, bays, command
+post) at 7.15 to 7.45 km with Window, an escort that strafes after they have bombed, P-51s strafing behind
+them; 6 (24 March) Typhoons and P-47s on the flak and the heavy battery, an A-26 box and two B-17 squadrons
+(runway, command post), Tempests and P-51s strafing. New group fields: `alt`, `agl` (a low flyer), `role`,
+`passes`, `dive`, `release`, `box`, `window`, `escort`, `bombs`, `bomb`, `lb`; new targets: 'asset:<kind>[,...]',
+'runway', 'flak', 'light', 'heavy' (Sim.pickTarget).
+
+**Events** (all optional; main.js is not wired for them yet):
+
+| Event | When | Payload |
+|---|---|---|
+| `muzzle(unit, part, pos, dir, shell)` | a heavy gun fires a round; a light gun firing (at most every 0.05 s per gun) | the gun part's index, the muzzle point and the bore (world), the shell kind |
+| `salvo(unit, guns, fuze)` | the heavy battery fires together (also a barrage round or several) | guns that fired, the predictor's fuze (s; 0 for barrage) |
+| `burst(pos, kind, hits, unitId)` | a time-fuzed shell bursts (its fuze ran out, or a direct hit) | the burst point, '88mm', aircraft damaged, the firing unit |
+| `feed(unit, part, what, barrel)` | a loader finished: 'magazine' (2 cm, which barrel), 'clip' (3.7 cm), 'round' (8.8 cm, its fuze set) | |
+| `strafe(threat, point, victim)` | an aircraft's gun burst hits the ground (every 0.2 s on a gun run) | the strike point, the most damaged victim or null |
+| `straggle(threat)` | a damaged bomber falls out of its formation | |
+| `threatLaunch(t, from)` (existing) | each bomb and rocket released | `t.type` 'gpbomb' or 'rp3' |
+| `impact(t, pos, victim)` (existing) | a bomb or rocket hits the ground (or a wreck) | |
+| `detonate(pos, kind, true)`, `shellExpire(pos, kind)`, `shellGround` (existing) | a 3.7 or 2 cm contact hit, self-destruct, ground | |
+
+**What the render and the consoles read** (per part, `unit.parts[i]`):
+
+- every gun: `turret { az, el }`, `gun { shell, rounds (in the pit), firing (this step), recoil (s since its
+  last shot, -1 none), shots, target, aim, aimOk, locked, laid, tof, hold, err, cover }`; `name`, and the
+  heavy guns' `letter` 'A' to 'F'.
+- the 3.7 cm: `gun.table` (rounds on the loading table, 0 to 16), `gun.clip` (rounds in the clip the loader
+  is laying), `gun.load` (s left on it).
+- the 2 cm: `gun.barrels[k] { mag (rounds in its magazine), change (s left on its change), next }`, one per
+  barrel (the Vierling's four: 0, 1 upper, 2, 3 lower; diagonal pairs as the pedals).
+- the 8.8 cm: `gun.loaded` (a round in the breech), `gun.load` (s left on the drill), `gun.fuze` (s set on
+  the round in the breech or fired last), `gun.order { az, el, fuze }` (the predictor's data at this gun,
+  turret-relative like `turret`).
+- the aircraft (for the models, eras/ww2/aircraft.js): `bombs` and `rockets` still carried (counted down as
+  each leaves), `doors` (0..1: a level bomber's bomb doors open over 4 s on the last 20 km of its run and
+  close after its stick), `tanks` (an escort's drop tanks, dropped when it goes down to strafe), `slotI` (its
+  place in a box), `lb` on each `gpbomb` (100 to 1,000: THREATS `lb` per type, a group's `lb`; the B-17 lead
+  squadrons' 500 lb, the high and low squadrons' and the A-26s' 100 lb), `attack`, `phase`, `role`.
+- the battery: `u.predictor { target, state ('idle' | 'acquiring' | 'tracking' | 'solution' | 'barrage'),
+  ranging, source, quality, t, range, tof, fuze, aim, point, valid, window, sigma, hold ('no predictor' | 'no
+  target' | 'not held' | 'out of reach' | 'settling' | null), salvos, lastSalvo, barrage }`; the `kdo40` and
+  `wurzburg` parts' `turret { az, el }` follow its target; `radar.track` is the Wuerzburg emitting.
+- the unit: `u.weapons.gun` (summary), `u.concentrate`, `u.nextGun` (= `sim.nextLauncher(u).part`: the
+  battery's first standing gun in letter order; a platoon's gun that is firing, else one with a solution, kept
+  for 2 s at least), `u.alerts` with the era's keys (ATTACK, BOMBERS, WINDOW, BARRAGE, LOW AMMO, DAMAGED, GUN
+  DOWN, PREDICTOR DOWN, RADAR DOWN, RADAR OFF, NO LINK).
+
+**Commands** (mounts units; Mounts.command):
+
+| Command | Units | Args |
+|---|---|---|
+| `mode` | all | auto, manual, hold (hold clears every target and the barrage) |
+| `select` | all | `{ trackId }`: the platoon's target (in manual every gun takes it, in auto it comes first for a gun that would take it) or the predictor's (in auto when the crew would take it) |
+| `trigger` | all | `{ down }`: in manual, the platoon's guns fire on their solutions, the battery fires its salvos |
+| `fire` | battery, manual | `{}` one salvo now from the guns loaded and laid |
+| `cease` | all | `{ trackId }` (and the barrage off) |
+| `radar` / `track` | battery | `{ on }` the Wuerzburg |
+| `ranging` | battery | `{ source: 'radar' \| 'optical' }` |
+| `barrage` | battery | `{ on, trackId?, point? }` (in manual it fires while the trigger is held) |
+| `concentrate` | platoons | `{ on }` |
+
+**Difficulty.** DIFFICULTY gains `aim` (Easy 0.85, Normal 1, Hard 1.5): it scales the WW2 crews' and
+predictor's aiming errors (the modern code does not read it); the aircraft groups scale with `enemy`, the
+gun damage with `hit`.
+
+**Balance** (`node tools/simtest.mjs <seeds> --era ww2 --all`; games won by the all-auto crews / the
+scripted heavy battery / the scripted battery with the platoons; tools/simtest.mjs `heavyPlayer`,
+`platoonPlayer`):
+
+| Difficulty | Seeds | Won | Kills per game, all auto (88, 37A, 37B, VIER, 20, B20) |
+|---|---|---|---|
+| Normal | 1 to 72 | 16 / 54 / 52 | 13.0, 26.1, 21.2, 16.7, 10.6, 6.0 (the scripted battery: 11.0, 28.5, 22.3, 16.4, 10.5, 7.2) |
+| Easy | 1 to 48 | 48 / 48 / 48 | 21.5, 23.3, 17.0, 10.6, 5.4, 6.9 |
+| Hard | 1 to 48 | 3 / 7 / 8 | 4.3, 22.6, 24.3, 17.9, 14.4, 3.5 |
+
+Columns: the heavy battery's 8.8 cm (88), the 3.7 cm in the Flak lane (37A) and by the bays (37B), the
+Vierlinge, the 2 cm platoon, the battery's own 2 cm (B20); on Normal each scores in 56 to 97 % of the waves.
+Nearly every loss is in wave 6 (a few in wave 5). The 8.8 cm fires about 1,150 to 1,360 rounds a game, about
+100 per kill, and works mostly by turning bombers back: with the scripted battery 19 bombers a game fall out
+of their boxes and 4 more are shot down (all auto 7 and 7, many of those after they have bombed); 31 % of its
+bursts damage something (22 % all auto). The light guns do most of the killing (low attackers), the heavy
+battery is the only answer to the B-17 boxes (wave 5's damage: 780 all auto, 620 scripted). The scripted
+battery picks the box nearest its release (its leader), tracks it from 16 km so the solution has settled when
+it comes into reach, ranges by the rangefinder while Window spoils the radar (the AI crew only after 60 s),
+and lets a box go once it has bombed; the AI predictor's error is also 1.3 times larger. The platoons' own
+crews already spread their fire, which pays (three aircraft under fire bomb worse than one under three), so
+the scripted platoon player only points them at a dive-bomber or rocket aircraft diving on its position. Step
+cost: 0.32 to 0.36 ms a step on average (the modern era 0.16), the worst steps 12 to 20 ms in the parallel
+runs (11 ms alone).
+
+What set the balance (game values; each measured on whole battles, or on one box flown past the battery
+in a scratch script): the solution's error (once 15 m + 0.6 % of the range and 2.5 times larger unsettled, with
+a 40 m burst: under 1 % of bursts near the aimed bomber), the burst radius 55 m; the 8.8 cm's drag falling with
+height (with constant drag the shells took 27 s to bomber height and the predictor found no solution inside
+the 29.5 s fuze); the optical range nearly as good as a clean radar range (by day the rangefinder was the
+answer to Window; at 0.011 per m it was not worth switching to); the lead bombardier's error 120 m (1945
+accuracy: a third to a half of the bombs within 300 m) and a near miss shaking a crew only within 100 m (at
+220 m any burst in the box shook the leader, so the AI did as well as the player); the battery beside the
+axis line (on it the boxes released right over the battery, beyond its 85 degrees); the squadrons a minute
+apart (30 s left the third box to arrive before the predictor had settled on it); the runway 900 hp with 25 %
+repaired between raids (one unbroken box levelled 700); four Thunderbolts at the battery in wave 6 (six took
+out its guns before the bombers came); the fighters weaving inbound (straight and level they lost 7 a wave to
+the 8.8 cm); Hard's `aim` 1.5 (at 1.3 the scripted battery still won 21 of 48).
+
 ### UI (`src/ui/`, UI agent)
 
 ```js
@@ -1077,3 +1377,8 @@ Reuse the maxgfx engine core (distance delay, air absorption, voice stealing, re
 - Sim: engagement rate cap `SYSTEMS[kind].targetGap` (Pantsir 6, Tor 4, Tunguska 8 s, see "Engagement rate cap"), `FireUnits.targetWait(u, id)`, unit fields `fired` (Map of target id to the time of its first round) and `nextTarget`, engagement field `wait` (s until its first round may leave). UI: `statusLine` shows NEXT TARGET IN N s while an engagement waits; `inGunRange` also checks `maxAlt`; the Shilka's LEAD readout has four digits (over 1 km on a fast target near the shells' reach).
 - Tutorials: the Pantsir, Tunguska and Shilka gun steps quote the new ranges and the trigger's OUT OF RANGE / LONG RANGE: FEW HITS faces, their gun drones start at 3.5 km (were 2.6), and the Pantsir, Tunguska and Tor lessons mention the rate cap. Balance in "Balance" (the gun range pass).
 - Eras: `src/eras/` (`index.js` registry `ERAS`, `DEFAULT_ERA`, `eraById`, `playableEra`, `loadEra`; `modern.js`; `ww2.js` a placeholder with `available: false`; `ww2/content.js` its empty lazy content). The modern era's layout (`THREAT_AXIS`, `ASSETS`, the sites), slots (with the picker's `label`/`info` and the slot classes that were main's `OPTION_INFO`/`SLOT_CLASS`), `WAVES` (were in director.js), the consoles' `ALERTS` (were in ui/consoles/common.js) and its text moved into `eras/modern.js`. deploy.js holds the era in play: `ERA`, `setEra(id)`, and `THREAT_AXIS`, `ASSETS`, `SLOT_OPTIONS`, `DEFAULT_LOADOUT`, `WAVES` are live bindings now (director.js re-exports `WAVES`); `sim.newGame({ era })`, `sim.era`; director's loss check reads `ERA.layout.vital`, its lull line `ERA.text.lull`; terrainHeight.js makes the pads again when the era changes, `terrain.relayout(camera)` rebuilds the meshes; `views.reset(sim)` also rebuilds the asset models when the assets changed. Registries for lazily loaded eras: `registerVehicles`, `registerAssets`, `registerFlyers` (+ `entities.sync()`), `registerMarkingSet`/`MARKING_SETS` (markings.js now paints per set; `applyMarkings(rig, kind, set = ERA.markings)`), `registerConsole`; `Panel.setTheme(theme)`. Main: the era toggle (`#era-box`), `setEra`, `__iads.setEra`/`era`/`eras`, `?era=`, local storage `echelon.era` and `echelon.loadout.<era>` (the old `echelon.loadout` moves to `echelon.loadout.modern`); the HUD compass shows every asset with a `label`. `simtest.mjs --era <id>`; `/models.html?era=<id>`. See "Eras".
+- Sim (WW2 era, see "WW2 era"): `src/eras/ww2.js` filled in (layout, the five slot defaults, six waves, text, alerts, `markings: 'ww2'`); new `src/sim/mounts.js` (gun units of several mounts: `SYSTEMS[kind].mounts`, `core`, `roles`, `guns`, `predictor`, `radar`, `search.optical`) hooked from units.js only for such units; new `src/sim/planes.js` (THREATS with `plane`, ordnance `gpbomb`, `rp3`, chaff `window`) hooked from threats.js only for those types; SYSTEMS `flak88`, `flak43`, `flakvierling`, `flak38`, PART_ROLE for their parts, THREATS `b17` to `window`; DIFFICULTY `aim`.
+- Sim/ballistics (WW2): SHELLS `88mm` (time fuze: `burst`, `H`), `37mm`, `20mm` (`lifeVar`, `burn`); `Ballistics.fire(..., { fuze })`; `ctx.burst(point, kind, owner, dmg, unit)` for time-fuzed shells (Sim.flakBurst); targets with `ghost` are never hit; `solveLead(..., warm)` (and its lever gain for shells with `H`). The modern shells' paths are unchanged (byte-identical simtest).
+- Sim (WW2): events `muzzle`, `salvo`, `burst`, `feed`, `strafe`, `straggle` (payloads in "WW2 era"); `sim.nextLauncher` gives the next gun of a battery or platoon; `sim.strafe(t, point, dmg)`; `Sim.pickTarget` kinds 'flak', 'light', 'heavy', 'runway', 'asset:<kind>[,...]'; asset `weight`; `layout.plot` (the reporting service, `sim.linkUp` through its post) and `layout.repair` (director.js); a wave's `radio`; Sensors' optical observers and the plot; a threat's own `warhead` (Sim.arrive); the director does not hold a raid open for planes going home or straggling, nor for chaff.
+- Sim (WW2) for the models: aircraft `doors`, `tanks`, `bombs`/`rockets` counted down as each leaves, `slotI`; `gpbomb.lb` (THREATS `lb`, a group's `lb`); heavy guns `gun.order { az, el, fuze }` (the predictor's data, the render's `setOrder`).
+- Tools: `simtest.mjs --era ww2`: the WW2 scripted players (`heavyPlayer` for 's400'/'area', `platoonPlayer` with it for 'full') and columns per slot with the battery's own 2 cm apart (B20); the modern players and output unchanged.
