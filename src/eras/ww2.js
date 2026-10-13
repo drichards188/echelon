@@ -268,8 +268,8 @@ export default {
     'NO LINK': ['KEINE VERBINDUNG', 'NO LINE TO THE FLAK COMMAND POST', 3],
   },
 
-  // the lessons on the Tutorials list (tutorial.js): the heavy battery, then one per platoon kind
-  tutorials: ['flak88', 'flak43', 'flakvierling', 'flak38'],
+  // the lessons on the Tutorials list (tutorial.js): the heavy battery, the flak tower, then one per platoon kind
+  tutorials: ['flak88', 'flakturm', 'flak43', 'flakvierling', 'flak38'],
 
   // its models, consoles and reload scenes, fetched only when the era is picked (eras/index.js loadEra)
   content: () => import('./ww2/content.js'),

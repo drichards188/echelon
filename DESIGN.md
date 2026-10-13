@@ -1300,7 +1300,11 @@ its pit behind (`rig.emplacement` removed), the tower is never culled (`WHOLE`),
 (`mountBattery(ctx, { heavyOnly, title, cal })`) and two platoon pages (`mountPlatoon(ctx, kind, { keep, guns,
 title })`) under a gun selector (GESCHÜTZWAHL; W cycles); each page has its own memo, the sight canvas moves to
 the page shown, and the sight pose is whichever part that page put in `VIEW`. Sound: `shot('128mm')`, the 88's
-bank pitched down. The Flak 38 lesson starts with the old loadout (its `loadout`).
+bank pitched down. The Flak 38 lesson starts with the old loadout (its `loadout`); the tower has its own lesson
+(`flakturm`: the selector, twin salvos, the light guns in hand while the twins fight on). Balance with the
+tower (Normal, seeds 1 to 72, `--era ww2 --all`): all auto 21, the scripted heavy battery 57, the scripted
+battery with the platoons 55 of 72 (was 16 / 54 / 52 with the 2 cm platoon); the tower scores about 41 to 43
+kills a game and in 96 to 100 % of the waves.
 
 **Difficulty.** DIFFICULTY gains `aim` (Easy 0.85, Normal 1, Hard 1.5): it scales the WW2 light and medium
 crews' aiming errors, and the predictor's unless `heavyAim` is given (Hard 1.25); `bombAim` (Hard 0.9, 1 when
