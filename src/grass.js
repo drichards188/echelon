@@ -2,11 +2,14 @@ import * as THREE from 'three';
 import { mulberry32 } from './noise.js';
 import { patchMaterial, noiseGLSL } from './shaderlib.js';
 import { fieldGLSL } from './terrainField.js';
+import { ERA } from './deploy.js';
 
 // GPU grass. Tufts live in a square tile that wraps around the viewer, so a fixed pool of
 // instances always carpets the ground near the camera. Placement on the ground (from the finest
 // terrain level's height texture), the crop type (the same field function as the ground shader),
-// height, wind and fade all run in the vertex shader.
+// height, wind and fade all run in the vertex shader. An era with a terrain style (eras/<id>.js `terrain`)
+// brings its own cover function and blade heights and colours (style.glsl(layout).grass): setStyle swaps the
+// material, the steppe's stays as it is.
 
 function tuftGeometry() {
   const pos = [], uv = [], idx = [];
@@ -170,6 +173,125 @@ export class Grass {
     this.mesh.castShadow = false;
     this.mesh.name = 'grass';
     this.count = 0;
+  }
+
+  /** The grass of an era's terrain style S (its cover, blade heights and colours), or the steppe's with null. */
+  setStyle(S) {
+    const id = S ? S.id : null;
+    if (id === this.styleId) return;
+    this.styleId = id;
+    if (!S) {
+      this.mesh.material = this.material;
+      return;
+    }
+    this.styleMats ??= {};
+    this.mesh.material = this.styleMats[id] ??= this.styleMaterial(S, S.glsl(ERA.layout));
+  }
+
+  styleMaterial(S, G) {
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, side: THREE.DoubleSide });
+    mat.defines = { SKIP_WET: '' };
+    patchMaterial(mat, `grass-${S.id}`, (shader) => {
+      Object.assign(shader.uniforms, this.uniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          '#include <common>',
+          /* glsl */ `
+          #include <common>
+          attribute vec4 aBlade;
+          uniform sampler2D uNearTex;
+          uniform vec4 uNear;
+          uniform vec3 uCamPos;
+          uniform float uTileSize;
+          uniform float uTime;
+          uniform float uWindStrength;
+          varying float vBladeY;
+          varying float vVariant;
+          varying vec3 vWPos;
+          varying vec3 vGrassCol;
+          ${noiseGLSL}
+          ${G.cover}
+          vec2 nearAt(ivec2 i) { return texelFetch(uNearTex, clamp(i, ivec2(0), ivec2(int(uNear.w) - 1)), 0).rg; }
+          vec3 groundAt(vec2 xz, out float pad) {
+            vec2 g = (xz - uNear.xy) / uNear.z;
+            ivec2 i = ivec2(floor(g));
+            vec2 f = fract(g);
+            vec2 a = nearAt(i), b = nearAt(i + ivec2(1, 0)), c = nearAt(i + ivec2(0, 1)), d = nearAt(i + ivec2(1, 1));
+            vec2 m = mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+            pad = m.y;
+            vec2 e = vec2(mix(b.x - a.x, d.x - c.x, f.y), mix(c.x - a.x, d.x - b.x, f.x)) / uNear.z;
+            return vec3(m.x, e);
+          }
+          mat3 rotY(float a) { float c = cos(a), s = sin(a); return mat3(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c); }
+          `
+        )
+        .replace(
+          '#include <beginnormal_vertex>',
+          /* glsl */ `
+          vec3 objectNormal = normalize(mix(rotY(aBlade.z) * normal, vec3(0.0, 1.0, 0.0), 0.6));
+          #ifdef USE_TANGENT
+            vec3 objectTangent = vec3(tangent.xyz);
+          #endif
+          `
+        )
+        .replace(
+          '#include <begin_vertex>',
+          /* glsl */ `
+          vec2 wxz = aBlade.xy + uTileSize * floor((uCamPos.xz - aBlade.xy) / uTileSize + 0.5);
+          float pad;
+          vec3 gh = groundAt(wxz, pad);
+          float groundH = gh.x;
+          float hgt = 0.0, mask = 1.0;
+          vec3 gcol = vec3(0.1);
+          ${G.grass}
+          mask *= 1.0 - smoothstep(0.3, 0.7, pad);
+          mask *= 1.0 - smoothstep(0.2, 0.3, 1.0 - normalize(vec3(-gh.y, 1.0, -gh.z)).y);
+          float patchS = fbm2(wxz * 0.035);
+          float camDist = length(wxz - uCamPos.xz);
+          float fade = 1.0 - smoothstep(uTileSize * 0.3, uTileSize * 0.49, camDist);
+          float scale = aBlade.w * mask * fade * hgt * (0.75 + patchS * 0.6);
+          vBladeY = position.y;
+          vVariant = fract(aBlade.x * 12.9898 + aBlade.y * 78.233);
+          vGrassCol = gcol * (1.0 + 0.5 * (vVariant - 0.5)) * 1.35;
+
+          vec3 p = rotY(aBlade.z) * position;
+          float wide = 1.0 + camDist * 0.03;
+          p *= vec3((1.0 + scale * 0.2) * wide, scale, (1.0 + scale * 0.2) * wide);
+
+          vec2 windDir = normalize(vec2(1.0, 0.35));
+          float gust = fbm2(wxz * 0.018 - windDir * uTime * (0.35 + uWindStrength * 0.25));
+          float flutter = sin(uTime * (3.2 + uWindStrength) + wxz.x * 0.9 + wxz.y * 0.7 + vVariant * 6.28) * 0.1;
+          float bend = ((gust * 1.25 - 0.2) * uWindStrength + flutter * sqrt(uWindStrength)) * position.y * position.y;
+          p.xz += windDir * bend * (0.15 + scale * 0.5);
+          p.y -= abs(bend) * scale * 0.2;
+
+          vec3 world = vec3(wxz.x, groundH - 0.03, wxz.y) + p;
+          vWPos = world;
+          vec3 transformed = world;
+          `
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying float vBladeY;\nvarying float vVariant;\nvarying vec3 vWPos;\nvarying vec3 vGrassCol;')
+        .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = normalize(vNormal);')
+        .replace(
+          '#include <color_fragment>',
+          /* glsl */ `
+          #include <color_fragment>
+          diffuseColor.rgb *= mix(vGrassCol * 0.28, vGrassCol, smoothstep(0.0, 0.9, vBladeY));
+          `
+        )
+        .replace(
+          '#include <emissivemap_fragment>',
+          /* glsl */ `
+          #include <emissivemap_fragment>
+          vec3 viewDirW = normalize(vWPos - cameraPosition);
+          float trans = pow(max(dot(viewDirW, uSunDirW), 0.0), 6.0) * vBladeY * worldShadowFactor(vWPos);
+          totalEmissiveRadiance += uSunColorN * vGrassCol * 0.35 * trans;
+          diffuseColor.rgb *= mix(0.4, 1.0, smoothstep(0.0, 0.45, vBladeY));
+          `
+        );
+    });
+    return mat;
   }
 
   setCount(count, radius = this.radius) {
