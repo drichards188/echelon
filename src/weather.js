@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { globalUniforms } from './shaderlib.js';
 import { mulberry32 } from './noise.js';
+import { ERA } from './deploy.js';
 
 export const WEATHER = {
   Clear: { cover: 0.35, rain: 0, wind: 1.0, storm: 0, fog: 1.0 },
@@ -10,7 +11,9 @@ export const WEATHER = {
 };
 
 // Rain streaks, lightning and the weather state that drives sky, fog, wind,
-// wetness and water.
+// wetness and water. An era's terrain style may bring its own presets under the same names
+// (eras/<id>.js `terrain.weather`): the weather picked stays picked, and takes the era's version of it
+// when the era changes.
 export class Weather {
   constructor(scene, audio) {
     this.scene = scene;
@@ -102,7 +105,8 @@ export class Weather {
 
   set(name) {
     this.name = name;
-    this.target = { ...WEATHER[name] };
+    this.era = ERA;
+    this.target = { ...(ERA.terrain?.weather?.[name] ?? WEATHER[name]) };
   }
 
   buildBolt(camPos) {
@@ -149,6 +153,7 @@ export class Weather {
   }
 
   update(dt, t, camera, atmosphere) {
+    if (this.era !== ERA && this.name) this.set(this.name);
     const s = this.state, g = this.target;
     const k = 1 - Math.exp(-dt * 0.25);
     for (const key of Object.keys(s)) s[key] += (g[key] - s[key]) * k;

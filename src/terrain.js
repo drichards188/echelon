@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { heightAt, heightLod, normalAt, padMask, los, riverCenterZ, riverLevel, RIVER } from './terrainHeight.js';
+import { heightAt, heightLod, normalAt, padMask, los, riverCenterZ, riverLevel, RIVER, terrainStyle } from './terrainHeight.js';
+import { ERA } from './deploy.js';
 import { fieldGLSL } from './terrainField.js';
 import { patchMaterial, noiseGLSL, globalUniforms } from './shaderlib.js';
 import { makeTileableNormalMap } from './noise.js';
@@ -8,7 +9,10 @@ import { Grass } from './grass.js';
 
 export { heightAt, normalAt, los, riverCenterZ, riverLevel, RIVER };
 
-// Camera-centred geometry clipmap built on the CPU from the same pure heightAt the sim uses.
+// Camera-centred geometry clipmap built on the CPU from the same pure heightAt the sim uses. An era with a
+// terrain style (eras/<id>.js `terrain`; terrainHeight.js) gets its own ground material (the style's GLSL
+// cover and colours), water bodies, trees and grass (applyStyle, on relayout); the steppe's are kept as they
+// are and come back when that era is left.
 // Level k is an (N+1)^2 grid with cell 2.5 * 2^k metres whose vertices sit on the world grid; the
 // level above it is drawn with the quads under the finer one left out. Cracks between levels are
 // hidden by skirts. Levels re-centre in steps of two cells and reuse the heights they already have.
@@ -84,6 +88,7 @@ class Level {
 
     const pos = this.pos, nrm = this.nrm, info = this.info;
     const detail = this.k <= 3;
+    const S = terrainStyle();
     const skirt = c * 0.55 + 0.5;
     for (let j = 0; j <= N; j++) {
       for (let i = 0; i <= N; i++) {
@@ -102,8 +107,11 @@ class Level {
         nrm[idx * 3 + 2] = dz * inv;
         let pm = 0, rv = 0;
         if (detail) pm = padMask(x, z);
-        const dr = Math.abs(z - riverCenterZ(x));
-        if (dr < 120) rv = 1 - Math.min(1, Math.max(0, (dr - 14) / 80));
+        if (S) rv = S.bankAt(x, z);
+        else {
+          const dr = Math.abs(z - riverCenterZ(x));
+          if (dr < 120) rv = 1 - Math.min(1, Math.max(0, (dr - 14) / 80));
+        }
         info[idx * 2] = pm;
         info[idx * 2 + 1] = rv;
       }
@@ -185,6 +193,8 @@ export class Terrain {
     this.group.add(this.trees.group, this.grass.mesh);
     this.setQuality(quality);
     this._v = new THREE.Vector3();
+    this.styleId = 'steppe';
+    this.applyStyle();
     this.update({ position: new THREE.Vector3(0, 10, 0) }, true);
   }
 
@@ -210,9 +220,11 @@ export class Terrain {
 
   /**
    * The ground changed under the geometry: another era levels other pads (deploy.js setEra,
-   * terrainHeight.js). Every level and the trees are built again around the camera.
+   * terrainHeight.js) and may bring its own landscape. Every level and the trees are built again around
+   * the camera.
    */
   relayout(camera) {
+    this.applyStyle();
     for (const lv of this.levels) {
       lv.valid = false;
       lv.cx = lv.cz = 1e9;
@@ -262,6 +274,156 @@ export class Terrain {
     }
     this.nearTex.needsUpdate = true;
     this.nearInfo.set((lv.gx0 + 1) * lv.cell, (lv.gz0 + 1) * lv.cell, lv.cell, N + 1);
+  }
+
+  /**
+   * Takes the era in play's terrain style (terrainHeight.js terrainStyle): its ground material, waters,
+   * trees and grass, built the first time; the steppe's with none.
+   */
+  applyStyle() {
+    const S = terrainStyle();
+    const id = S ? S.id : 'steppe';
+    if (id === this.styleId) return;
+    this.styleId = id;
+    this.styleMats ??= {};
+    this.styleWaters ??= {};
+    const mat = S ? (this.styleMats[id] ??= this.buildStyleMaterial(S)) : this.material;
+    for (const m of this.meshes) m.material = mat;
+    this.water.visible = !S;
+    for (const [k, w] of Object.entries(this.styleWaters)) w.visible = k === id;
+    if (S && !this.styleWaters[id]) this.styleWaters[id] = this.buildStyleWater(S);
+    this.trees.setStyle(S);
+    this.grass.setStyle(S);
+  }
+
+  // the ground of a terrain style: its cover and colours (S.glsl) in the steppe material's frame
+  buildStyleMaterial(S) {
+    const G = S.glsl(ERA.layout);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0 });
+    const detailN = this.detailN;
+    patchMaterial(mat, `terrain-${S.id}`, (shader) => {
+      shader.uniforms.uDetailN = { value: detailN };
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute vec2 aInfo;\nvarying vec3 vWPos;\nvarying vec3 vWNormal;\nvarying vec2 vInfo;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = position;\nvWNormal = normal;\nvInfo = aInfo;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          `#include <common>
+          varying vec3 vWPos;
+          varying vec3 vWNormal;
+          varying vec2 vInfo;
+          uniform sampler2D uDetailN;
+          ${noiseGLSL}
+          ${G.cover}
+          float tDist;
+          vec3 tWN;
+          vec2 tBump;
+          float tDetail;
+          float tGloss;`
+        )
+        .replace(
+          '#include <color_fragment>',
+          /* glsl */ `
+          #include <color_fragment>
+          vec3 wp = vWPos;
+          tDist = length(wp - cameraPosition);
+          tWN = normalize(vWNormal);
+          vec2 q = wp.xz;
+          tBump = vec2(0.0);
+          vec3 col = vec3(0.1);
+          ${G.ground}
+          diffuseColor.rgb *= col;
+          `
+        )
+        .replace(
+          '#include <roughnessmap_fragment>',
+          /* glsl */ `
+          #include <roughnessmap_fragment>
+          roughnessFactor = mix(roughnessFactor, 0.12, tGloss);
+          `
+        )
+        .replace(
+          '#include <normal_fragment_maps>',
+          /* glsl */ `
+          #include <normal_fragment_maps>
+          {
+            float dk = (1.0 - smoothstep(30.0, 260.0, tDist)) * tDetail;
+            mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
+            float bl = smoothstep(0.3, 0.7, vnoise(q * 0.05));
+            vec2 d1 = mix(texture2D(uDetailN, q * 0.3).xy, texture2D(uDetailN, rot * q * 0.23 + 0.41).xy, bl) * 2.0 - 1.0;
+            vec2 d2 = mix(texture2D(uDetailN, q * 1.9 + 0.37).xy, texture2D(uDetailN, rot * q * 1.55 + 0.11).xy, 1.0 - bl) * 2.0 - 1.0;
+            vec3 nW = normalize(tWN + vec3(d1.x * 0.9 + d2.x * 0.5, 0.0, d1.y * 0.9 + d2.y * 0.5) * dk * (1.0 - tGloss * 0.8) + vec3(tBump.x, 0.0, tBump.y) * (1.0 - smoothstep(60.0, 400.0, tDist)));
+            normal = normalize(mat3(viewMatrix) * nW);
+          }
+          `
+        );
+    });
+    return mat;
+  }
+
+  // a terrain style's canals, rivers and lakes (S.waterBodies), with the steppe river's material
+  buildStyleWater(S) {
+    const group = new THREE.Group();
+    group.name = `water-${S.id}`;
+    const { ribbons, lakes } = S.waterBodies();
+    const pos = [], edge = [], idx = [];
+    const vert = (x, y, z, e) => {
+      pos.push(x, y, z);
+      edge.push(e);
+      return pos.length / 3 - 1;
+    };
+    for (const r of ribbons) {
+      const P = r.pts, hw = r.w / 2 - 1.5;
+      if (r.step) {
+        // a canal: each stretch flat at its pound's level, lengthened a little so the joints close
+        for (let k = 1; k < P.length; k++) {
+          const [ax, az, y] = P[k - 1], [bx, bz] = P[k];
+          const len = Math.hypot(bx - ax, bz - az);
+          if (len < 0.5) continue;
+          const tx = (bx - ax) / len, tz = (bz - az) / len, nx = -tz, nz = tx, ext = hw * 0.6 + 2;
+          const x0 = ax - tx * ext, z0 = az - tz * ext, x1 = bx + tx * ext, z1 = bz + tz * ext;
+          const a = vert(x0 + nx * hw, y, z0 + nz * hw, 1), b = vert(x0, y, z0, 0), c = vert(x0 - nx * hw, y, z0 - nz * hw, 1);
+          const d = vert(x1 + nx * hw, y, z1 + nz * hw, 1), e = vert(x1, y, z1, 0), f = vert(x1 - nx * hw, y, z1 - nz * hw, 1);
+          idx.push(a, d, b, b, d, e, b, e, c, c, e, f);
+        }
+      } else {
+        // a river: one strip, its level falling along it
+        let prev = null;
+        for (let k = 0; k < P.length; k++) {
+          const [x, z, y] = P[k];
+          const [px, pz] = P[Math.max(k - 1, 0)], [qx, qz] = P[Math.min(k + 1, P.length - 1)];
+          const l = Math.hypot(qx - px, qz - pz) || 1, nx = -(qz - pz) / l, nz = (qx - px) / l;
+          const cur = [vert(x + nx * hw, y, z + nz * hw, 1), vert(x, y, z, 0), vert(x - nx * hw, y, z - nz * hw, 1)];
+          if (prev) idx.push(prev[0], cur[0], prev[1], prev[1], cur[0], cur[1], prev[1], cur[1], prev[2], prev[2], cur[1], cur[2]);
+          prev = cur;
+        }
+      }
+    }
+    for (const l of lakes) {
+      const contour = l.pts.map(([x, z]) => new THREE.Vector2(x, z));
+      const tris = THREE.ShapeUtils.triangulateShape(contour, []);
+      const base = l.pts.map(([x, z]) => vert(x, l.level, z, 0.35));
+      for (const [a, b, c] of tris) {
+        // wound to face up whichever way the shore runs
+        const [ax, az] = l.pts[a], [bx, bz] = l.pts[b], [cx, cz] = l.pts[c];
+        if ((bz - az) * (cx - ax) - (bx - ax) * (cz - az) > 0) idx.push(base[a], base[b], base[c]);
+        else idx.push(base[a], base[c], base[b]);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('aEdge', new THREE.Float32BufferAttribute(edge, 1));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
+    const mesh = new THREE.Mesh(geo, this.waterMat);
+    mesh.frustumCulled = false;
+    mesh.receiveShadow = true;
+    mesh.name = 'waters';
+    group.add(mesh);
+    this.group.add(group);
+    return group;
   }
 
   // ---------------------------------------------------------------- materials

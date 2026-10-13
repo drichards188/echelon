@@ -5,6 +5,7 @@
 // game values are in sim/systems.js (SYSTEMS flak88, flak43, flakvierling, flak38; THREATS b17 to window);
 // its models, consoles and markings come from its lazily loaded `content`. In development until its render
 // and consoles exist (`available: false`).
+import ww2Terrain from './ww2/terrain.js';
 
 // The raids come out of the west-south-west: Rheine, KG 51's second field, lies 12 km out on about 241, and
 // the Allied fields (Volkel, the Tempest wing's) beyond it. Hopsten's main runway lay about 085/265; the
@@ -27,6 +28,7 @@ export default {
   available: false,
   theme: 'ww2',
   markings: 'ww2',
+  terrain: ww2Terrain, // Hopsten's landscape in late winter: relief, waters, cover, trees, sky (eras/ww2/terrain.js)
 
   text: {
     sub: 'Flak at a jet airfield',

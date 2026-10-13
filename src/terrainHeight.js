@@ -4,7 +4,21 @@
 // Rolling steppe with long swells, a meandering river valley, a few long low ridges 9 to 18 km out
 // (up to ~150 m, placed where they mask low flyers from the radars) and the flattened pads of the era
 // in play from deploy.js. Everything is deterministic value noise from an integer hash.
+//
+// An era may bring its own landscape: its `terrain` style (eras/<id>.js; the WW2 era's is
+// eras/ww2/terrain.js) replaces the natural ground and its waters with style.height(x, z, fine), and the
+// pads are levelled on that. Without one (the modern era) the steppe below is used, unchanged.
 import { flatPads, ERA } from './deploy.js';
+
+// the era in play's terrain style, or null for the steppe
+let STYLE = null, styleEra = null;
+export function terrainStyle() {
+  if (styleEra !== ERA) {
+    styleEra = ERA;
+    STYLE = ERA.terrain ?? null;
+  }
+  return STYLE;
+}
 
 const smooth = (a, b, x) => {
   const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
@@ -119,7 +133,8 @@ function pads() {
     x: p.x, z: p.z, rx: p.rx, rz: p.rz, c: Math.cos(p.heading), s: Math.sin(p.heading), blend: p.blend,
     reach: Math.hypot(p.rx, p.rz) + p.blend, h: 0, small: p.rx <= 22,
   }));
-  for (const p of PADS) p.h = withRiver(p.x, p.z, natural0(p.x, p.z, true));
+  const S = terrainStyle();
+  for (const p of PADS) p.h = S ? S.height(p.x, p.z, true) : withRiver(p.x, p.z, natural0(p.x, p.z, true));
   return PADS;
 }
 
@@ -145,7 +160,8 @@ export function padMask(x, z) {
 
 /** Ground height at any point; pure and cheap enough for per-tick terrain following. */
 export function heightAt(x, z) {
-  let h = withRiver(x, z, natural0(x, z, true));
+  const S = terrainStyle();
+  let h = S ? S.height(x, z, true) : withRiver(x, z, natural0(x, z, true));
   for (const p of pads()) {
     const w = padWeight(p, x, z);
     if (w > 0) h += (p.h - h) * w;
@@ -156,7 +172,8 @@ export function heightAt(x, z) {
 /** Same surface with the small octaves dropped, for the coarse mesh levels (cell is the grid spacing, metres). */
 export function heightLod(x, z, cell) {
   if (cell < 60) return heightAt(x, z);
-  let h = withRiver(x, z, natural0(x, z, false));
+  const S = terrainStyle();
+  let h = S ? S.height(x, z, false) : withRiver(x, z, natural0(x, z, false));
   if (cell < 700) for (const p of pads()) {
     const w = padWeight(p, x, z);
     if (w > 0) h += (p.h - h) * w;
