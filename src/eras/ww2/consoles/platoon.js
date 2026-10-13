@@ -44,7 +44,7 @@ export const PLATOON = {
 // a gun's name on the console
 export const gunName = (p, i) => (p.kind === 'flakvierling-tower' ? ['TURM', 'TOWER GUN'] : [`GESCHÜTZ ${i + 1}`, `GUN ${i + 1}`]);
 const SHELL = { '37mm': '3.7 cm', '20mm': '2 cm' };
-const HOLD = { 'out of reach': ['ZU WEIT', 'OUT OF REACH'], 'no lock': ['NICHT IM VISIER', 'NOT IN SIGHT'], 'target lost': ['ZIEL VERLOREN', 'TARGET LOST'] };
+const HOLD = { masked: ['VERDECKT', 'MASKED BY THE TOWER'], 'out of reach': ['ZU WEIT', 'OUT OF REACH'], 'no lock': ['NICHT IM VISIER', 'NOT IN SIGHT'], 'target lost': ['ZIEL VERLOREN', 'TARGET LOST'] };
 
 // the gun whose sight the console shows: the one picked, else the gun in action (the camera's, u.nextGun)
 export const sightGun = (u, pick) => (pick >= 0 && u.parts[pick]?.gun ? pick : u.nextGun ?? 0);

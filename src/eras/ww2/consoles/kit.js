@@ -488,7 +488,7 @@ export function reach44(u, t) {
     // a gun on it knows (its solution's hold); one whose layer cannot see it yet goes by the straight-line
     // reach, a little short of it (a target at the very edge is seldom one the shells can catch)
     const most = reachOf(SHELLS[def.shell]);
-    const out = g.target === t.id && g.hold != null ? g.hold === 'out of reach' || (g.hold === 'no lock' && d > most * 0.92) : d > most;
+    const out = g.target === t.id && g.hold != null ? g.hold === 'out of reach' || g.hold === 'masked' || (g.hold === 'no lock' && d > most * 0.92) : d > most;
     if (out) continue;
     reach = true;
     if (d < def.range && !(t.alt > def.maxAlt)) inside = true;

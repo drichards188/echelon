@@ -40,6 +40,8 @@ const _u = new THREE.Vector3();
 const _p = new THREE.Vector3();
 const _q = new THREE.Vector3();
 const _bore = new THREE.Vector3();
+const _m0 = new THREE.Vector3();
+const _m1 = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
 
 const bearingOfDir = (d) => (Math.atan2(d.x, -d.z) + TAU) % TAU;
@@ -50,6 +52,9 @@ const gauss = (rng) => (rng() + rng() + rng() - 1.5) * 2;
 
 // gun.hold reasons (as units.js's)
 const OUT_OF_REACH = 'out of reach';
+const MASKED = 'masked';
+// how far along its line of fire a gun's masking is looked for (m: past the tower from any deck)
+const MASK_LEN = 90;
 // the fire control's smoothed velocity lags the target by about this (s; units.js GUN_LAG)
 const GUN_LAG = 0.6;
 // the AI fires only while the bore is within this many metres of the lead at its range (units.js GUN_LAID)
@@ -117,6 +122,10 @@ export function initMounts(u) {
   u.heavyShell = first.gun.shell;
   // the group of guns the player commands (null: the heavy guns, or the platoon's)
   u.group = sys.groups ? sys.groups[0] : null;
+  // a structure the guns stand on (the flak tower): its boxes and the frame they are in (the site's ground
+  // at the tower part, the unit's heading), for the light guns' masked arcs
+  const base = sys.structure ? u.parts.find((p) => p.role === 'tower') : null;
+  u.structure = base ? { x: base.pos.x, y: base.pos.y, z: base.pos.z, c: Math.cos(base.heading), s: Math.sin(base.heading), boxes: sys.structure } : null;
   // the unit's summary of its guns (the modern consoles' and the bookkeeping's `weapons.gun`): totals, and
   // the fire control of the gun the camera rides (u.nextGun) or the predictor's
   u.weapons.gun = {
@@ -177,6 +186,35 @@ export class Mounts {
   // the group the player commands is a light one (the flak tower's 3.7 cm or 2 cm)
   lightGroup(u) {
     return !!u.group && u.group !== u.heavyKind;
+  }
+
+  // Does the unit's structure (the flak tower's concrete) stand in gun i's line of fire toward world direction
+  // `d` (any length), within MASK_LEN of its trunnion? The segment in the structure's frame against each box
+  // (slabs). False for a unit without one.
+  masked(u, i, d) {
+    const S = u.structure;
+    if (!S) return false;
+    const from = this.mountPos(u, i, _m0);
+    const len = d.length() || 1;
+    const X = from.x - S.x, Z = from.z - S.z;
+    const o = [X * S.c - Z * S.s, from.y - S.y, X * S.s + Z * S.c];
+    const k = MASK_LEN / len;
+    const v = [(d.x * S.c - d.z * S.s) * k, d.y * k, (d.x * S.s + d.z * S.c) * k];
+    for (const b of S.boxes) {
+      let t0 = 0, t1 = 1;
+      for (let a = 0; a < 3 && t0 <= t1; a++) {
+        if (Math.abs(v[a]) < 1e-9) {
+          if (o[a] < b[a] || o[a] > b[a + 3]) t1 = -1;
+          continue;
+        }
+        let ta = (b[a] - o[a]) / v[a], tb = (b[a + 3] - o[a]) / v[a];
+        if (ta > tb) [ta, tb] = [tb, ta];
+        t0 = Math.max(t0, ta);
+        t1 = Math.min(t1, tb);
+      }
+      if (t0 <= t1) return true;
+    }
+    return false;
   }
 
   // where a gun's bore is (its trunnion), into `out`
@@ -480,6 +518,12 @@ export class Mounts {
     // the crew's aim wanders; it shrinks once they have watched their tracer a while
     this.wander(g, def.err * (0.55 + 0.45 * Math.exp(-g.lockT / 4)) * (sim.difficulty.aim ?? 1), dt);
     // lay on the lead (with that error), else on the target's track to bring it into the sight
+    // the tower's concrete in the way: the crew does not lay into it and holds (MASKED)
+    const masked = !!u.structure && !!tr && this.masked(u, i, _m1.subVectors(g.aimOk ? g.aim : tr.pos, from));
+    if (masked && (g.hold == null || g.hold === 'no lock')) {
+      g.hold = MASKED;
+      g.aimOk = false;
+    }
     let aim = null;
     if (g.aimOk) {
       aim = _d.subVectors(g.aim, from);
@@ -487,7 +531,7 @@ export class Mounts {
       _r.crossVectors(aim, UP).normalize();
       _u.crossVectors(_r, aim).normalize();
       aim.addScaledVector(_r, g.err.x * len).addScaledVector(_u, g.err.y * len);
-    } else if (tr) aim = _d.subVectors(tr.pos, from);
+    } else if (tr && !masked) aim = _d.subVectors(tr.pos, from);
     if (aim) this.slew(u, p.turret, aim, def, dt);
     const bore = this.boreDir(u, p.turret, _s);
     g.laid = !!aim && g.aimOk && bore.dot(aim) > aim.length() * Math.cos(clamp(LAID_M / aim.length(), LAID_MIN, LAID_MAX));
@@ -505,7 +549,7 @@ export class Mounts {
       }
     } else if (manual && u.weapons.gun.trigger && g.target != null) {
       // the trigger is the platoon leader's permission: each layer fires once his gun is on the lead
-      want = g.hold !== OUT_OF_REACH && g.hold !== 'target lost' && g.laid;
+      want = g.hold !== OUT_OF_REACH && g.hold !== MASKED && g.hold !== 'target lost' && g.laid;
     }
     // a strafing pass across the pit: the crew ducks for a moment (Sim.strafe)
     if (sim.time < (g.cover ?? 0)) want = false;
@@ -649,6 +693,7 @@ export class Mounts {
       if (d > def.range * 1.3) continue;
       if (tr.pos.y - sim.heightAt(tr.pos.x, tr.pos.z) > def.maxAlt * 1.1) continue;
       if (!this.gunSees(u, i, t)) continue;
+      if (u.structure && this.masked(u, i, _m1.subVectors(tr.pos, from))) continue;
       // closing: how soon it is nearest to this gun
       _v.subVectors(tr.pos, from);
       const closing = -_v.dot(tr.vel) / Math.max(d, 1);
