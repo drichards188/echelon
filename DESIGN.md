@@ -243,10 +243,9 @@ The S-400 alone must not be able to win: tune so every layer matters and the pla
 
 ### Eras (`src/eras/`, `src/deploy.js`)
 
-One game holds several eras ("AA through the ages"). The modern era is the one described everywhere
-else in this file and the only playable one; a late-war WW2 era (German flak at a jet airfield, February
-to March 1945) is registered and plays in the headless sim, but stays `available: false` until its
-models, consoles and render wiring exist (see "WW2 era"). The era toggle is the main menu's top control;
+One game holds several eras ("AA through the ages"). Modern and late-war WW2 (German flak at a jet
+airfield, February to March 1945) are playable in the browser and the headless sim (see "WW2 era").
+The era toggle is the main menu's top control;
 an era with `available: false` shows on it greyed out and marked "In development", and cannot be picked.
 
 **An era is a plain data module**, `src/eras/<id>.js` (default export; Node-safe, `tools/simtest.mjs`
@@ -285,8 +284,22 @@ setting lives in it:
                                 // rank] for every alert the sim raises (ui/consoles/common.js Header)
   tutorials: ['basics', 's400', ...],       // the tutorial.js TUTORIALS ids its Tutorials list offers
   content: () => import('./ww2/content.js'),  // optional: its heavy browser modules (below)
+  terrain: ww2Terrain,          // optional: its landscape (below); without one the modern steppe
 }
 ```
+
+**An era's landscape** (`terrain`, optional; the WW2 era's is `src/eras/ww2/terrain.js`, plain data and pure
+functions, Node-safe, imported statically by the era since the sim needs its heights). terrainHeight.js
+`terrainStyle()` returns the era in play's (null for the steppe): `height(x, z, fine)` replaces the natural
+ground and its waters (the sim's `heightAt` and `los` follow it, and the pads are levelled on it), and the
+renderer takes the rest from it: `bankAt`, `waterBodies`, `setLayout`, `coverAt` and `glsl(layout)` (the
+ground's and the grass's cover in their shaders, terrain.js and grass.js), `trees` (vegetation.js: the species
+with their caps, the far rows' style and colours, `plant`), `weather` (weather.js: the era's versions of the
+presets under the same names; the preset picked stays picked and takes the era's version when the era
+changes) and `sky` (`{ elevation, sunBearing, weather }`: main.js sets the sun and the weather from it at start
+and on every switch of era, the modern era's 38 degrees on 215 in clear weather when an era has none, except
+for any of them the player has changed in the settings). The WW2 era's highest ground is about 180 m (the
+modern steppe's about 145 m), still under the 200 m above which `sim.los` takes rays as clear.
 
 `eras/index.js` derives `defaultLoadout` (every slot's option 0, frozen), `slotOptions` (deploy.js
 `SLOT_OPTIONS`) and `kinds` (the unit kinds its slots offer), and exports `ERAS`, `DEFAULT_ERA`
@@ -329,6 +342,10 @@ loadout kept before there were eras (`echelon.loadout`) moves to `echelon.loadou
 existing per-era key wins). `?era=<id>` starts in that era without keeping it (one in development, or a
 kept one, falls back to the default); `?loadout=` applies to the era the page starts in. `__iads.era`
 is the era in play, `__iads.eras` the registry.
+
+**Development override.** `?dev=1` lets a future era with `available: false` be played through `?era=<id>`
+or `__iads.setEra(id)`. The menu still shows that era as in development, and an unavailable era is never kept
+in `echelon.era`.
 
 **Theme hook.** The class `era-<theme>` sits on `<body>` and on the console panel's root
 (`Panel.setTheme`), so an era restyles its title screen and consoles in CSS under it.
@@ -944,8 +961,9 @@ German flak defends Fliegerhorst Hopsten (Rheine-Hopsten), the Me 262 base of KG
 Germany, against the Allied day raids of February and March 1945. The research is in
 `refs/ww2/README.md` (the setting, the order of battle, the waves, the sources) with one sheet per system
 and aircraft; the game values below cite them. It plays in the headless sim with the slot defaults only
-(`node tools/simtest.mjs --era ww2`); the alternatives in refs/ww2 section 3 come later. The render,
-consoles, fx and audio for it are other agents' work: everything here is plain sim state and events.
+(`node tools/simtest.mjs --era ww2`); the alternatives in refs/ww2 section 3 come later. The sim's state
+and events are bound to the models, fx and sound in "Render, fx and audio" below. Its battery and platoon
+consoles have live 3D sight pictures. Play it in the browser with `/?era=ww2`.
 
 **Layout** (`layout` in eras/ww2.js). Threat axis 250: Rheine, KG 51's second field, lies 12 km out on
 about 241 with the Allied fields beyond. The defended Fliegerhorst, as Hopsten's layout allows (its main
@@ -1132,7 +1150,7 @@ them; 6 (24 March) Typhoons and P-47s on the flak and the heavy battery, an A-26
 `passes`, `dive`, `release`, `box`, `window`, `escort`, `bombs`, `bomb`, `lb`; new targets: 'asset:<kind>[,...]',
 'runway', 'flak', 'light', 'heavy' (Sim.pickTarget).
 
-**Events** (all optional; main.js is not wired for them yet):
+**Events** (all optional; main.js wires them, see "Render, fx and audio" for what each does):
 
 | Event | When | Payload |
 |---|---|---|
@@ -1172,6 +1190,78 @@ them; 6 (24 March) Typhoons and P-47s on the flak and the heavy battery, an A-26
   for 2 s at least), `u.alerts` with the era's keys (ATTACK, BOMBERS, WINDOW, BARRAGE, LOW AMMO, DAMAGED, GUN
   DOWN, PREDICTOR DOWN, RADAR DOWN, RADAR OFF, NO LINK).
 
+**Render, fx and audio** (render/units.js `mounts()`, fx.js, audio.js, main.js). Played in the browser with
+`/?era=ww2`.
+
+- Rigs (render/units.js, for every unit with SYSTEMS `mounts`): each part from its own state. Turret and
+  elevation from `part.turret` (clamped to each model's limits); the Kommandogeraet's and the Wuerzburg's
+  follow the predictor's target the same way, the Wuerzburg's dipole spins (`rig.spin(t)`, kept as
+  `rig.quirl` because `rig.spin` is UnitViews' antenna state) while `radar.track`, the predictor's dials show
+  its fuze (`setData`). Recoil and run-out from `gun.recoil` (s since the last shot): the stroke in a few
+  hundredths of a second, the run-out eased (`RECOIL`: the 8.8 cm `recoilLength(el)` back in 0.06 s, out over
+  0.9 s; the 3.7 cm 0.127 m inside its 0.24 s cycle; the 2 cm 0.053 m, the Vierling's 0.085 m a gun, each
+  barrel on its own from its magazine's count). The 8.8 cm's wedge drops open at the end of the run-out
+  (throwing the case, `fx.brass`) and closes on the next round (`gun.loaded`); its follow-the-pointer dials
+  take `gun.order` (`setOrder`, ten times a second). The 3.7 cm's table `setRounds(gun.table)`; the 2 cm's
+  `setMagazine` off while a barrel's magazine is changed (the Vierling's sim barrels 0 to 3 are the model's
+  guns 0, 1, 3, 2) and the racks `setRack` from the full magazines in the pit (one fewer for each loader with
+  one in his hands). Letters from `part.letter`, Dunkelgelb on guns B and E (`YELLOW_GUNS`), the rest grey;
+  kill rings: the battery's 8.8 cm kills this battle (`sim.stats` waves, `<unit>:88mm`) on every standing
+  heavy gun. A knocked-out gun is knocked askew in its pit, barrel down, and burns (not the whole pit sagging,
+  as a vehicle does). Gun positions further than 4.5 km from the camera are not drawn (`RIG_FAR`).
+- The battery's data cables: one ribbon mesh on the ground (`heightAt` + 3 cm, a little slack) from the
+  Kommandogeraet's `anchors.cable` to a junction outside the ring of guns and on to each gun's, and from the
+  Wuerzburg's to the predictor.
+- Crews: `src/eras/ww2/models/crew44.js`, fetched with a dynamic import the first time a mounts unit is built
+  (its own chunk: the modern game never loads it); `crews.place(rig, kind)` for every rig with crew spots,
+  `setStance('easy')` outside a raid, `setTarget` the gun's (or the predictor's) target, hidden when the part is
+  knocked out (back at a new game), `crews.update(dt, camera)` after the rigs every frame.
+- The camera rides `sim.nextLauncher` (the battery's first standing gun in letter order, a platoon's gun that
+  fires): main's `launcherFor`, unchanged; every rig has `anchors.eye`.
+- The flashes and cases are spawned in UnitViews from the shots each gun (each 2 cm barrel) fired since the
+  last frame: `fx.cannon(muzzle, bore, pit)` for the 8.8 cm (a ball of flame along the bore, cordite smoke,
+  the pit's dust, thicker with the barrel low), `fx.muzzle` for the 3.7 cm (0.75) and each 2 cm barrel (0.42);
+  the light guns' cases only within 70 m of the camera.
+
+Events to fx and sound (main.js; sounds travel at 343 m/s, the WW2 ones up to 60 s, `MAX_DELAY_WW2`):
+
+| Event | fx | audio |
+|---|---|---|
+| `muzzle` (88mm, 37mm) | (UnitViews, above) | `shot('88mm' \| '37mm', pos)`: near, mid or far rendering |
+| a 2 cm gun firing (`gun.recoil` under 0.2 s) | (UnitViews) | `rattle(id, on, pos, '20mm-flak38' \| '20mm-vierling')`: its loop switched when the sound arrives |
+| `burst` | `fx.flak(p)`: flash, black ball (`SMOKE.BURST`, at once), lobes, fragments, a grey haze for most of a minute (`SMOKE.HANG`); drawn larger far off (up to 6 times at 15 km) | `flak(pos)`: a crack close by, a crump from the ground |
+| `salvo` | | |
+| `feed` | | `feed('magazine' \| 'clip' \| 'round', pos)` within 45 m |
+| `strafe` | `fx.strafe(point, from, vel)`: dust spurts walked along the path, sparks, tracers down from the aircraft | `strafe(pos, type)`: .50 cal volleys, or 20 mm for Typhoons and Tempests |
+| `straggle` | (the damaged aircraft's smoke trail, entities.js) | |
+| `threatLaunch` | rp3: `fx.rocketOff`; gpbomb: remembered | rp3: `launch('rp3')`; a bomb falling within 2 km of the camera: `whistle(pos, s)` for its last 4 s |
+| `impact` gpbomb | `fx.bomb(p, size by lb)`, `fx.crater(p, 8 x size)`, `fx.burnSite` on a victim | `explosion(pos, 0.5 + size)` |
+| `impact` rp3 | `fx.bomb(p, 0.5)`, a small explosion, a 4 m crater, fire on a victim | `explosion(pos, 0.9)` |
+| `impact` an aircraft (a wreck) | explosion, earth, crater, a fire for 40 to 80 s | `explosion` |
+| `detonate` 37mm / 20mm (a hit) | sparks, the 3.7 cm's puff | |
+| `shellExpire` | 37mm `fx.puff`; 20mm a small one (a third of them, pool room allowing) | 37mm `pop(pos)` |
+| `shellGround` | `fx.spurt` | |
+| `threatKilled` | as modern (aircraft fall burning, entities.js `fx.wreck`) | as modern; the kill toast names the type and the gun (`KILL_NAME`, `WEAPON_NAME`) |
+| `partDestroyed` | as modern | as modern |
+
+Audio banks (audio.js `ww2Tasks`, rendered only while the era is in play: `audio.setEra(id)`, main calls it at
+start and on every switch): 'g88' (8.8 cm), 'g37' (3.7 cm), 'g20' and 'g20v' (the 2 cm loops: the Flak 38 at
+7.5 rounds/s, the Vierling's four guns), 'flak', 'pop', 'mg50' and 'mg20' (strafing), 'launch_rp3', and the
+engines 'merlin' (P-51, the reconnaissance Spitfire), 'r2800' (P-47), 'sabre' (Typhoon, Tempest), 'twin'
+(A-26: two R-2800 a cycle apart in the loop, so they beat), 'four' (B-17: four Cyclones). A bomber stream's
+aircraft past the eight engine voices drone on as one bed (`THREATS[type].drone`). Recordings (RECORDINGS with
+`era: 'ww2'`, public/audio/CREDITS.md): the cannon shot and Yle's 76 mm shots replace the 8.8 cm's synthesis,
+the period automatic gun is laid over the 3.7 cm's, the .50 cal over the 2 cm's rounds, three .50 cal bursts out
+of step and a machine gun's bursts are the strafing, the distant explosions the bursts' far crump. A gun
+position's idle (`vehicle(kind)`): the battery's generator far off, the platoons only the wind.
+
+Text (eras/ww2.js `text`): `loading` (the loading screen's lines), `spent` (the end screen's rounds line),
+`strip` (the console panel's status strip in German, ui/panel.js), `radio` (sim.js: the raid call as the
+reporting service plots it, a kill, an asset destroyed). The HUD's compass and bracket name the WW2 classes
+(main's `CLS_SHORT`: BMR, FTR, RCN, RKT, WIN), the kill toasts the aircraft (`KILL_NAME`) and the gun
+(`WEAPON_NAME`). render/entities.js casts a flyer type's shadows only while one of its aircraft is within 3 km
+of the camera (`SHADOW_NEAR`; the shadow map covers the view's surroundings only).
+
 **Commands** (mounts units; Mounts.command):
 
 | Command | Units | Args |
@@ -1186,9 +1276,13 @@ them; 6 (24 March) Typhoons and P-47s on the flak and the heavy battery, an A-26
 | `barrage` | battery | `{ on, trackId?, point? }` (in manual it fires while the trigger is held) |
 | `concentrate` | platoons | `{ on }` |
 
-**Difficulty.** DIFFICULTY gains `aim` (Easy 0.85, Normal 1, Hard 1.5): it scales the WW2 crews' and
-predictor's aiming errors (the modern code does not read it); the aircraft groups scale with `enemy`, the
-gun damage with `hit`.
+**Difficulty.** DIFFICULTY gains `aim` (Easy 0.85, Normal 1, Hard 1.5): it scales the WW2 light and medium
+crews' aiming errors, and the predictor's unless `heavyAim` is given (Hard 1.25); `bombAim` (Hard 0.9, 1 when
+missing) scales the WW2 aircraft's aiming errors with their bombs, rockets and guns (sim/planes.js). The
+modern code reads none of them. The aircraft groups scale with `enemy`, the gun damage with `hit`. Hard's
+`heavyAim` and `bombAim` came with the integration's balance pass (below): at `aim` 1.5 for everything the
+8.8 cm got 3 to 5 kills a game on Hard; with its predictor held to 1.25 it gets 5 to 7, and the aircraft
+aiming better takes back the wins that gave.
 
 **Balance** (`node tools/simtest.mjs <seeds> --era ww2 --all`; games won by the all-auto crews / the
 scripted heavy battery / the scripted battery with the platoons; tools/simtest.mjs `heavyPlayer`,
@@ -1270,6 +1364,13 @@ audio.explosion(pos, size); audio.airburst(pos); audio.impact(pos, size);
 audio.seeker(level, locked);          // Strela seeker tone (0 = silent)
 audio.ui(name);                       // 'click' | 'switch' | 'button' | 'alarm' | 'warning' | 'lock'
 audio.setVolume(v); audio.setMusicVolume(v); audio.toggleMute();
+// the WW2 era ("WW2 era", Render, fx and audio): its banks are rendered and its recordings fetched once it is set
+audio.setEra(id);                     // main.js at start and on every switch of era
+audio.shot(kind, pos);                // '88mm' | '37mm': one round, heard late with its distance
+audio.rattle(id, on, pos, shell);     // a 2 cm gun ('20mm-flak38' | '20mm-vierling'), on and off as the sound arrives
+audio.stopRattles();                  // every 2 cm loop off (a new battle)
+audio.flak(pos); audio.pop(pos);      // an 8.8 cm burst; a 3.7 cm round's self-destruct
+audio.strafe(pos, type); audio.whistle(pos, seconds); audio.feed(what, pos);   // 'magazine' | 'clip' | 'round'
 ```
 
 Reuse the maxgfx engine core (distance delay, air absorption, voice stealing, reverb, recordings in
@@ -1382,3 +1483,10 @@ Reuse the maxgfx engine core (distance delay, air absorption, voice stealing, re
 - Sim (WW2): events `muzzle`, `salvo`, `burst`, `feed`, `strafe`, `straggle` (payloads in "WW2 era"); `sim.nextLauncher` gives the next gun of a battery or platoon; `sim.strafe(t, point, dmg)`; `Sim.pickTarget` kinds 'flak', 'light', 'heavy', 'runway', 'asset:<kind>[,...]'; asset `weight`; `layout.plot` (the reporting service, `sim.linkUp` through its post) and `layout.repair` (director.js); a wave's `radio`; Sensors' optical observers and the plot; a threat's own `warhead` (Sim.arrive); the director does not hold a raid open for planes going home or straggling, nor for chaff.
 - Sim (WW2) for the models: aircraft `doors`, `tanks`, `bombs`/`rockets` counted down as each leaves, `slotI`; `gpbomb.lb` (THREATS `lb`, a group's `lb`); heavy guns `gun.order { az, el, fuze }` (the predictor's data, the render's `setOrder`).
 - Tools: `simtest.mjs --era ww2`: the WW2 scripted players (`heavyPlayer` for 's400'/'area', `platoonPlayer` with it for 'full') and columns per slot with the battery's own 2 cm apart (B20); the modern players and output unchanged.
+- Eras: `?dev=1` plays an era still in development (`/?era=ww2&dev=1`, and `__iads.setEra`), never kept in storage; an era's optional `terrain` (its landscape, `sky` applied by main at start and on a switch unless the player set the sun or the weather).
+- Integration (WW2): render/units.js `mounts()` binds every gun unit of several mounts (turrets, recoil and run-out, the 8.8 cm's breech, dials, letters, paint and kill rings, the 3.7 cm's table, the 2 cm's magazines and racks, the Kommandogeraet and the Wuerzburg), the battery's data cables, the crews (crew44.js by dynamic import), muzzle flashes and cases, far gun positions culled; main.js wires `muzzle`, `burst`, `feed`, `strafe`, `threatLaunch`, `shellExpire`, `shellGround` and the WW2 branches of `detonate` and `impact` (table in "WW2 era", Render, fx and audio); `views.update(dt, rawDt, sim, fx, camera)`.
+- Framework (fx.js): `flak(p)`, `cannon(p, dir, base, size)`, `bomb(p, size)`, `crater(p, r)` (an instanced decal pool made with the first crater, cleared by `clearLitter`), `strafe(p, from, vel)`, `puff(p, size)`, `spurt(p, size)`, `rocketOff(p, dir)`; `SMOKE.BURST` (fades in at once). render/entities.js: a flyer type casts shadows only while one of its aircraft is within 3 km of the camera.
+- Audio: `setEra`, `shot`, `rattle`, `stopRattles`, `flak`, `pop`, `strafe`, `whistle`, `feed`; `ww2Tasks` (exported; `tools/audiotest.mjs --era ww2`), WW2 engine loops with a drone bed, `GUN_VOICES` 12, `enqueue(..., maxDelay)`; four recordings for the WW2 era (`era: 'ww2'`, fetched only then), `useEraRecordings`, `recTools`.
+- Sim (WW2 balance and pacing): wave 1 opens closer (the reconnaissance aircraft 15 km out, the Mustangs from 15 km after 20 and 35 s: the first shot at about 45 s, was 186); DIFFICULTY `heavyAim` (the predictor's, Hard 1.25) and `bombAim` (the WW2 aircraft's aim, Hard 0.9); `ERA.text.radio` templates in sim.js (raid call, kill, asset destroyed). Modern simtest byte-identical.
+- UI: ui/panel.js takes the status strip from `ERA.text.strip` when the era has one (the WW2 era's German).
+- WW2 release: `available: true` exposes Hopsten through the normal era toggle and `?era=ww2`. The battery and platoon consoles register through `ww2/content.js`; `registerSightPose` supplies their gun and predictor poses, `main.js` sends them to `SightRenderer`, and `UnitViews.sightPos` accepts a part index so each picture begins at its own eyepiece. Four gun tutorials are available from the title screen. The 2 cm loop banks' silent start buffers are intentional and excluded from `audiotest.mjs` silence warnings.

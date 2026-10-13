@@ -1,13 +1,14 @@
 // Renders every synthesized sound bank offline and reports duration, peak, RMS and problems.
-//   node tools/audiotest.mjs
-import { bankTasks } from '../src/audio.js';
+//   node tools/audiotest.mjs        (--era ww2 adds the WW2 era's banks)
+import { bankTasks, ww2Tasks } from '../src/audio.js';
 
 const make = (chans, sr) => ({ chans, sr });
 const rows = [];
 const keep = {}; // first buffer of every bank, for the analysis below
 let bad = 0;
 const t0 = performance.now();
-for (const task of bankTasks(48000, make)) {
+const tasks = [...bankTasks(48000, make), ...(process.argv.includes('ww2') ? ww2Tasks(48000, make) : [])];
+for (const task of tasks) {
   if (!task) continue;
   const [group, key, fn] = task;
   const t = performance.now();
@@ -25,7 +26,9 @@ for (const task of bankTasks(48000, make)) {
       }
     }
     const rms = Math.sqrt(sum / Math.max(n, 1));
-    const issue = nan ? `NaN x${nan}` : peak < 0.05 ? 'SILENT' : peak > 1.0001 ? 'CLIPS' : '';
+    // The WW2 2 cm loops start on a round; their 10 ms "up" buffers are deliberately silent.
+    const silentStart = (group === 'g20' || group === 'g20v') && key === 'up';
+    const issue = nan ? `NaN x${nan}` : peak < 0.05 && !silentStart ? 'SILENT' : peak > 1.0001 ? 'CLIPS' : '';
     if (issue) bad++;
     if (i === 0) keep[group + '.' + key] = b;
     if (i === 0 || issue) rows.push(`${(group + '.' + key + '[' + i + ']').padEnd(22)} ${(b.chans[0].length / b.sr).toFixed(2).padStart(6)} s  peak ${peak.toFixed(2)}  rms ${rms.toFixed(3)}  ${ms.toFixed(0).padStart(5)} ms ${issue}`);

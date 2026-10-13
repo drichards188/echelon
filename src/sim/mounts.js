@@ -861,7 +861,7 @@ export class Mounts {
     const [a, b] = P.err[pr.source === 'optical' ? 'optical' : 'radar'];
     let sigma = (a + b * pr.range) * (1 + 1.5 * (1 - pr.quality));
     if (pr.source === 'radar') sigma += pr.window * P.err.window;
-    sigma *= (u.mode === 'auto' ? 1.3 : 1) * (sim.difficulty.aim ?? 1);
+    sigma *= (u.mode === 'auto' ? 1.3 : 1) * (sim.difficulty.heavyAim ?? sim.difficulty.aim ?? 1);
     pr.sigma = sigma;
     if ((pr.errT -= dt) <= 0) {
       pr.errT = 1.5 + sim.rng() * 1.5;

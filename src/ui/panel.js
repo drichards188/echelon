@@ -36,6 +36,9 @@ export function registerConsole(kind, { mount, label = kind, sight = false }) {
 const kindOf = (id) => UNITS.find((u) => u.id === id)?.kind;
 const STATE_RU = { brief: 'ИНСТРУКТАЖ', raid: 'НАЛЁТ', wave: 'НАЛЁТ', lull: 'ПАУЗА', victory: 'ПОБЕДА', defeat: 'ПОРАЖЕНИЕ' };
 const STATE_EN = { brief: 'BRIEFING', raid: 'RAID', wave: 'RAID', lull: 'LULL, RELOAD NOW', victory: 'VICTORY', defeat: 'DEFEAT' };
+// the status strip in the era's own language: ERA.text.strip { state: { [state]: [caption, English] }, wave,
+// score: [caption, English] } when the era has one (the WW2 era's German), else the cabin's Russian above
+const strip = () => ERA.text.strip ?? null;
 const TAB_HINT = { emit: 'Radar emitting (visible to anti-radar missiles)', eng: 'Engaging a target', alert: 'Alert: open this console' };
 
 function ammoFrac(u) {
@@ -232,7 +235,8 @@ export class Panel {
     this.stScore = el('span', 'sscore');
     this.stState = el('i', 'sstate');
     this.stEn = el('i', 'sen');
-    this.status.append(this.stState, this.stEn, this.stWave, label('ОЧКИ', 'SCORE', 'cap'), this.stScore);
+    const S = strip();
+    this.status.append(this.stState, this.stEn, this.stWave, label(S?.score?.[0] ?? 'ОЧКИ', S?.score?.[1] ?? 'SCORE', 'cap'), this.stScore);
     this.tabsEl.append(this.status);
   }
 
@@ -274,12 +278,13 @@ export class Panel {
       setCls(t.el, 'dead', dead);
       setCls(t.el, 'warn', !!(u.alerts && u.alerts.length));
     }
-    const w = data.wave;
-    setText(this.stWave, w == null ? '' : typeof w === 'object' ? `ВОЛНА ${w.n != null ? w.n : w.index != null ? w.index : ''}` : `ВОЛНА ${w}`);
+    const w = data.wave, S = strip(), W = S?.wave ?? 'ВОЛНА';
+    setText(this.stWave, w == null ? '' : typeof w === 'object' ? `${W} ${w.n != null ? w.n : w.index != null ? w.index : ''}` : `${W} ${w}`);
     const sc = data.score;
     setText(this.stScore, sc == null ? '0' : typeof sc === 'object' ? String(sc.score != null ? sc.score : sc.points != null ? sc.points : sc.total != null ? sc.total : 0) : String(Math.round(sc)));
-    setText(this.stState, data.state ? (STATE_RU[data.state] || String(data.state).toUpperCase()) : '');
-    setText(this.stEn, data.state ? (STATE_EN[data.state] || '') : '');
+    const SS = S?.state?.[data.state];
+    setText(this.stState, data.state ? (SS?.[0] ?? (STATE_RU[data.state] || String(data.state).toUpperCase())) : '');
+    setText(this.stEn, data.state ? (SS?.[1] ?? (STATE_EN[data.state] || '')) : '');
 
     const sel = units.find((u) => u.id === data.selectedId) || units[0];
     if (!this.mounted || this.mounted.id !== sel.id) {

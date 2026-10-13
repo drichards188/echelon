@@ -7,6 +7,17 @@ import * as THREE from 'three';
 
 const W = 320, H = 200;
 
+// Sight poses for units whose sim state has no `sight` of their own (the WW2 era's gun sights and the
+// predictor's telescope): an era's consoles register pose(unit) -> { az, el, fov, part } by unit kind
+// (compass radians, the horizontal field of view, the part whose rig's sight anchor the picture is taken
+// from), or null for no picture. sightPose(u) is the unit's own `sight` when it has one, else its kind's
+// pose; main passes it to update() with that part's anchor position.
+const POSES = {};
+export function registerSightPose(kind, pose) {
+  POSES[kind] = pose;
+}
+export const sightPose = (u) => u?.sight ?? POSES[u?.kind]?.(u) ?? null;
+
 export class SightRenderer {
   constructor(renderer, scene) {
     this.renderer = renderer;
@@ -26,13 +37,15 @@ export class SightRenderer {
 
   /**
    * unit: the sim unit (sight az/el/fov), pos: the sight's world position, canvas: the panel's sight
-   * canvas, mono: TV picture. Throttled to ~15 Hz.
+   * canvas, mono: TV picture, pose: { az, el, fov } instead of unit.sight (sightPose). Throttled to ~15 Hz.
    */
-  update(rawDt, unit, pos, canvas, mono, entities = null) {
+  update(rawDt, unit, pos, canvas, mono, entities = null, pose = null) {
     this.timer -= rawDt;
-    if (this.timer > 0 || !unit?.sight || !canvas || !pos) return;
+    const s = pose ?? unit?.sight;
+    if (this.timer > 0 || !s || !canvas || !pos) return;
     this.timer = this.rate;
-    const s = unit.sight;
+    // when this picture was taken, so a console can tell whether its sight is fed
+    canvas._fedAt = performance.now();
     const cam = this.cam;
     const hfov = Math.max(0.01, s.fov ?? 0.12);
     cam.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(hfov / 2) / (W / H)));

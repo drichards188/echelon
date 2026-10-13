@@ -3,8 +3,7 @@
 // the setting, the order of battle, the waves; one sheet per system and aircraft). Plain data, importable in
 // Node (tools/simtest.mjs); the shape of an era is in eras/index.js and DESIGN.md ("Eras", "WW2 era"). Its
 // game values are in sim/systems.js (SYSTEMS flak88, flak43, flakvierling, flak38; THREATS b17 to window);
-// its models, consoles and markings come from its lazily loaded `content`. In development until its render
-// and consoles exist (`available: false`).
+// its models, consoles and markings come from its lazily loaded `content`.
 import ww2Terrain from './ww2/terrain.js';
 
 // The raids come out of the west-south-west: Rheine, KG 51's second field, lies 12 km out on about 241, and
@@ -25,7 +24,7 @@ export default {
   id: 'ww2',
   name: 'WW2',
   years: '1944 to 1945',
-  available: false,
+  available: true,
   theme: 'ww2',
   markings: 'ww2',
   terrain: ww2Terrain, // Hopsten's landscape in late winter: relief, waters, cover, trees, sky (eras/ww2/terrain.js)
@@ -38,6 +37,26 @@ export default {
     lull: 'Flak command: raid over. Ammunition is coming up, stand by.',
     victory: 'Airfield held',
     defeat: 'Airfield lost',
+    // the loading screen (main.js, in its order), the end screen's rounds line (guns cost nothing)
+    loading: ['Painting the sky', 'Surveying the Muensterland', 'Digging the gun pits', 'Laying the telephone lines', 'Compiling shaders'],
+    spent: 'Rounds fired',
+    // the console panel's status strip (ui/panel.js): the state, the wave and the score, in German with
+    // the English under it
+    strip: {
+      state: {
+        brief: ['LAGE', 'BRIEFING'], wave: ['FLIEGERALARM', 'AIR RAID'], raid: ['FLIEGERALARM', 'AIR RAID'],
+        lull: ['FEUERPAUSE', 'LULL, AMMUNITION COMING UP'], victory: ['ABWEHR ERFOLGREICH', 'RAIDS BEATEN OFF'], defeat: ['PLATZ VERLOREN', 'AIRFIELD LOST'],
+      },
+      wave: 'ANGRIFF',
+      score: ['PUNKTE', 'SCORE'],
+    },
+    // the sim's radio where the modern era's is a radar battalion's (sim.js): the reporting service plots
+    // aircraft, not tracks; a gun crew's kill; a building of the airfield destroyed
+    radio: {
+      raid: (n, brg, km, height) => `Flak command: ${n} aircraft, bearing ${brg}, ${km} km, ${height}`,
+      kill: (name) => `${name} shot down`,
+      assetDown: (name) => `Airfield: ${name} destroyed.`,
+    },
   },
 
   layout: {
@@ -145,10 +164,13 @@ export default {
     {
       title: 'Wave 1: reconnaissance and a sweep', sub: 'A photo aircraft at height, then Mustangs strafing the light flak and the dispersal',
       radio: 'Flak command: a single aircraft very high from the west, Mustangs behind it, low. Stand by.',
+      // (pacing: the battle opens with the reconnaissance aircraft already 15 km out, so the 8.8 cm opens
+      // fire on it within about a minute, and the Mustangs close behind it: from 40 km and 22 km the first
+      // shot came 3 minutes in)
       groups: [
-        { type: 'recon', count: 1, bearing: 5, range: 40000, spread: 2, delay: 0, alt: 9300, target: 'runway' },
-        { type: 'p51', count: 4, bearing: -10, range: 22000, spread: 8, delay: 70, agl: 70, target: 'light', passes: 1 },
-        { type: 'p51', count: 4, bearing: 15, range: 22000, spread: 8, delay: 85, agl: 70, target: 'asset:revetment', passes: 1 },
+        { type: 'recon', count: 1, bearing: 5, range: 15000, spread: 2, delay: 0, alt: 9300, target: 'runway' },
+        { type: 'p51', count: 4, bearing: -10, range: 15000, spread: 8, delay: 20, agl: 70, target: 'light', passes: 1 },
+        { type: 'p51', count: 4, bearing: 15, range: 15000, spread: 8, delay: 35, agl: 70, target: 'asset:revetment', passes: 1 },
       ],
     },
     {
@@ -225,8 +247,8 @@ export default {
     'NO LINK': ['KEINE VERBINDUNG', 'NO LINE TO THE FLAK COMMAND POST', 3],
   },
 
-  // the lessons on the Tutorials list (none yet)
-  tutorials: [],
+  // the lessons on the Tutorials list (tutorial.js): the heavy battery, then one per platoon kind
+  tutorials: ['flak88', 'flak43', 'flakvierling', 'flak38'],
 
   // its models, consoles and reload scenes, fetched only when the era is picked (eras/index.js loadEra)
   content: () => import('./ww2/content.js'),

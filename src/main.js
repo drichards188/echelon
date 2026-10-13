@@ -19,7 +19,7 @@ import { SYSTEMS, THREATS, MISSILES } from './sim/systems.js';
 import { buildInterceptor } from './models/threats.js';
 import { UnitViews } from './render/units.js';
 import { Entities } from './render/entities.js';
-import { SightRenderer } from './sight.js';
+import { SightRenderer, sightPose } from './sight.js';
 import { Panel } from './ui/panel.js';
 import { AudioEngine } from './audio.js';
 import { Tutorials } from './tutorial.js';
@@ -39,9 +39,18 @@ const step = async (p, msg) => {
   await tick();
 };
 const query = new URLSearchParams(location.search);
+// Development override: with ?dev=1 an era still in development (`available: false`) can be played, from
+// ?era=<id> or __iads.setEra(id); the menu still shows it greyed out and it is never kept in storage.
+const DEV = query.get('dev') === '1';
+const canPlay = (era) => !!era && (era.available || DEV);
 
 const KILL_NAME = { fighter: 'fighter', decoy: 'decoy', cruise: 'cruise missile', drone: 'drone', arm: 'ARM', glide: 'glide bomb', helo: 'helicopter', atgm: 'ATGM', tbm: 'ballistic missile' };
 const CLS_SHORT = { aircraft: 'AC', cruise: 'CM', drone: 'UAV', arm: 'ARM', tbm: 'TBM', helo: 'HELO', bomb: 'BOMB', decoy: 'DCY', atgm: 'ATGM', unknown: '?' };
+// the WW2 era's aircraft (the kill toasts) and track classes (the compass and the bracket), and its guns'
+// shells as the kill toasts name them
+Object.assign(KILL_NAME, { p51: 'Mustang', p47: 'Thunderbolt', typhoon: 'Typhoon', tempest: 'Tempest', a26: 'Invader', b17: 'Fortress', recon: 'Spitfire PR', gpbomb: 'bomb', rp3: 'rocket' });
+Object.assign(CLS_SHORT, { bomber: 'BMR', fighter: 'FTR', recon: 'RCN', rocket: 'RKT', window: 'WIN' });
+const WEAPON_NAME = { '88mm': '8.8 cm', '37mm': '3.7 cm', '20mm': '2 cm' };
 // fx and sound sizes of interceptor warheads and of enemy warheads arriving
 const MSIZE = { '48N6': 1.4, '9M96': 1, '57E6': 0.6, '9M33': 0.8, '9M37': 0.5, '9M317': 1.1, '9M338': 0.7, '9M311': 0.55 };
 const COLD = { '48N6': 1.5, '9M96': 1.0, '9M338': 0.7 }; // cold-launched rounds: fx size
@@ -125,7 +134,11 @@ const applyEraLook = () => {
   for (const c of [...document.body.classList]) if (c.startsWith('era-')) document.body.classList.remove(c);
   document.body.classList.add(`era-${ERA.theme}`);
 };
-const WSIZE = { cruise: 1.6, drone: 0.8, arm: 1, glide: 1.8, atgm: 0.6, tbm: 2.6, fighter: 1.2, helo: 1.2, decoy: 0.5 };
+const WSIZE = { cruise: 1.6, drone: 0.8, arm: 1, glide: 1.8, atgm: 0.6, tbm: 2.6, fighter: 1.2, helo: 1.2, decoy: 0.5, p51: 1, p47: 1.1, typhoon: 1.1, tempest: 1, a26: 1.5, b17: 2, recon: 0.9 };
+// the WW2 era's bombs by their size (lb, the models' `lb`): the fx size of the burst (1 for 500 lb)
+const BOMB_SIZE = { 100: 0.55, 250: 0.8, 500: 1, 1000: 1.4 };
+// the loading screen's lines (an era may bring its own, `text.loading`)
+const LOADING = ['Painting the sky', 'Surveying the steppe', 'Laying out the airbase', 'Preparing the lens', 'Compiling shaders'];
 const _p = new THREE.Vector3();
 
 async function init() {
@@ -133,7 +146,8 @@ async function init() {
   // to the default. Its own modules load first (none for the modern era, whose modules the registries
   // import statically) and its layout is in place before the terrain levels its pads.
   migrateLoadout();
-  const startEra = playableEra(query.get('era') ?? stored(ERA_KEY));
+  const asked = eraById(query.get('era'));
+  const startEra = DEV && asked ? asked.id : playableEra(query.get('era') ?? stored(ERA_KEY));
   await loadEra(startEra);
   deployEra(startEra);
   applyEraLook();
@@ -158,14 +172,15 @@ async function init() {
 
   const startQuality = QUALITY[query.get('quality')] ? query.get('quality') : 'Medium';
 
-  await step(0.05, 'Painting the sky');
+  const loading = ERA.text.loading ?? LOADING;
+  await step(0.05, loading[0]);
   const atmosphere = new Atmosphere(renderer, scene);
 
-  await step(0.15, 'Surveying the steppe');
+  await step(0.15, loading[1]);
   const terrain = new Terrain(scene, { quality: startQuality });
   const clouds = new Clouds(scene);
 
-  await step(0.45, 'Laying out the airbase');
+  await step(0.45, loading[2]);
   const fx = new FX(scene, { maxSmoke: QUALITY[startQuality].maxSmoke });
   fx.ground = terrain.heightAt;
   const weather = new Weather(scene, null);
@@ -189,11 +204,12 @@ async function init() {
 
   patchSceneFog(scene);
 
-  await step(0.72, 'Preparing the lens');
+  await step(0.72, loading[3]);
   const post = new PostFX(renderer, scene, camera);
   const chase = new ChaseCamera(camera, canvas, { ground: terrain.heightAt });
   const sight = new SightRenderer(renderer, scene);
   const audio = new AudioEngine();
+  audio.setEra(ERA.id);
   const panelEl = document.getElementById('panel');
   panelEl.replaceChildren();
   const panel = new Panel(panelEl, {
@@ -240,6 +256,19 @@ async function init() {
     grass: true,
     trees: true,
   };
+  // The sun and the weather follow the era (its terrain's `sky`; the modern era's 38 degrees on 215, clear)
+  // unless the player has set them in the settings: at start and on every switch of era.
+  const SKY = { elevation: 38, sunBearing: 215, weather: 'Clear' };
+  const skySet = new Set();
+  const applySky = () => {
+    const sky = { ...SKY, ...(ERA.terrain?.sky ?? {}) };
+    for (const k of ['elevation', 'sunBearing']) if (!skySet.has(k)) params[k] = sky[k];
+    if (!skySet.has('weather') && params.weather !== sky.weather) {
+      params.weather = sky.weather;
+      weather.set(sky.weather);
+    }
+  };
+  applySky();
   let resScale = 1;
   let state = 'title'; // title | playing | ended | tutorial
   let freeCam = false;
@@ -289,9 +318,12 @@ async function init() {
   fPlay.add(params, 'timeScale', TIME_SCALES).name('Time compression ([ ])').listen().onChange((v) => hud.setTimeScale(v));
   fPlay.add(params, 'fov', 30, 80, 1).name('Field of view');
   const fWorld = gui.addFolder('Time & weather');
-  fWorld.add(params, 'elevation', -15, 80, 0.1).name('Sun elevation').listen();
-  fWorld.add(params, 'sunBearing', 0, 360, 0.5).name('Sun bearing');
-  fWorld.add(params, 'weather', Object.keys(WEATHER)).name('Weather').onChange((v) => weather.set(v)).listen();
+  fWorld.add(params, 'elevation', -15, 80, 0.1).name('Sun elevation').listen().onChange(() => skySet.add('elevation'));
+  fWorld.add(params, 'sunBearing', 0, 360, 0.5).name('Sun bearing').listen().onChange(() => skySet.add('sunBearing'));
+  fWorld.add(params, 'weather', Object.keys(WEATHER)).name('Weather').onChange((v) => {
+    skySet.add('weather');
+    weather.set(v);
+  }).listen();
   fWorld.close();
   const fLand = gui.addFolder('Landscape');
   fLand.add(params, 'grass').name('Grass').onChange((v) => (terrain.grass.mesh.visible = v));
@@ -414,6 +446,8 @@ async function init() {
   // caller selects a unit afterwards, which puts the camera on the new rigs.
   const newBattle = (opts) => {
     for (const u of sim.units) if (u.weapons.gun) audio.gun(u.id, false, u.pos);
+    audio.stopRattles?.();
+    falling.length = 0;
     // the thrown lids hold the old rigs' geometry, and nothing of the last battle should lie about
     fx.clearLitter();
     sim.newGame(opts);
@@ -555,14 +589,16 @@ async function init() {
   let eraAsk = 0;
   const setEra = async (id, { save = true } = {}) => {
     const era = eraById(id);
-    if (!era?.available || state === 'tutorial') return false;
+    if (!canPlay(era) || state === 'tutorial') return false;
     const ask = ++eraAsk;
     await loadEra(era.id);
     // a later pick overtook this one while its modules loaded
     if (ask !== eraAsk || state === 'tutorial') return false;
-    if (save) store(ERA_KEY, era.id);
+    if (save && era.available) store(ERA_KEY, era.id);
     if (era === ERA) return era.id;
     deployEra(era.id);
+    audio.setEra(era.id);
+    applySky();
     params.era = era.id;
     params.loadout = savedLoadout();
     applyEraLook();
@@ -813,6 +849,12 @@ async function init() {
     gunFlip ^= 1;
   };
   ev.detonate = (pos, kind, hit, ground) => {
+    if (kind === '37mm' || kind === '20mm') {
+      // a WW2 light flak round bursting on an airframe: its high-explosive's flash and sparks
+      fx.sparks(pos, kind === '37mm' ? 8 : 5, 25);
+      if (kind === '37mm') fx.puff(pos, 0.5);
+      return;
+    }
     if (SHELL.has(kind)) {
       if (hit) fx.sparks(pos, 5, 25);
       return;
@@ -833,10 +875,14 @@ async function init() {
     audio.explosion(t.pos, size);
     if (sim.attract) return;
     const u = sim.unitById.get(by.unitId);
-    hud.kill(`${u?.callsign ?? by.unitId}: ${KILL_NAME[t.type]}, ${by.weapon}`, THREATS[t.type].points, by.unitId !== UNITS[selected].id);
+    hud.kill(`${u?.callsign ?? by.unitId}: ${KILL_NAME[t.type]}, ${WEAPON_NAME[by.weapon] ?? by.weapon}`, THREATS[t.type].points, by.unitId !== UNITS[selected].id);
     hud.setScore(sim.score.points);
   };
   ev.impact = (t, pos, victim) => {
+    if (THREATS[t.type].plane || t.type === 'gpbomb' || t.type === 'rp3') {
+      ww2Impact(t, pos, victim);
+      return;
+    }
     const w = THREATS[t.type].warhead;
     const size = w ? Math.min(3, 0.5 + w[0] / 90) : 0.8;
     fx.dust(pos, size);
@@ -874,6 +920,98 @@ async function init() {
     audio.mood(s);
     if ((s === 'victory' || s === 'defeat') && !sim.attract && state === 'playing') endGame(s);
   };
+  // ---------------------------------------------------------------- the WW2 era's flak and air attack
+  // (sim/mounts.js, sim/planes.js; DESIGN.md "WW2 era", Events). The guns' flashes, the 8.8 cm's blast and
+  // the spent cases are UnitViews' (the rigs' muzzles); here the bursts, bombs, rockets and strafing and the
+  // sound of all of it. The 8.8 cm and 3.7 cm report shot by shot (`muzzle`: every heavy round, every 3.7
+  // cm round), the 2 cm's rattle is a loop per gun (ww2Sound), every sound arriving late with its distance.
+  ev.muzzle = (u, i, pos, dir, shell) => {
+    if (shell === '88mm' || shell === '37mm') audio.shot(shell, pos);
+  };
+  // a time-fuzed 8.8 cm shell bursting: the black puff and, long after it at that height, its crump
+  ev.burst = (pos) => {
+    fx.flak(pos);
+    audio.flak(pos);
+  };
+  ev.feed = (u, i, what) => audio.feed(what, u.parts[i].pos);
+  ev.strafe = (t, point) => {
+    fx.strafe(point, t.pos, t.vel);
+    audio.strafe(t.pos, t.type);
+  };
+  // bombs falling (their whistle near the camera, ww2Sound) and rockets leaving their rails
+  const falling = [];
+  const whistled = new WeakSet();
+  ev.threatLaunch = (t) => {
+    if (t.type === 'gpbomb') falling.push(t);
+    else if (t.type === 'rp3') {
+      fx.rocketOff(t.pos, t.fwd);
+      audio.launch('rp3', t.pos);
+    }
+  };
+  // a 3.7 cm round's self-destruct at the end of its tracer, a light round striking the ground
+  ev.shellExpire = (p, kind) => {
+    if (kind === '37mm') {
+      fx.puff(p);
+      audio.pop(p);
+    } else if (kind === '20mm' && fx.cheap() && Math.random() < 0.35) fx.puff(p, 0.45);
+  };
+  ev.shellGround = (p, kind) => {
+    if (kind === '37mm' || kind === '20mm' || kind === '88mm') fx.spurt(p, kind === '88mm' ? 1.5 : kind === '37mm' ? 0.6 : 0.35);
+  };
+  // a bomb, a rocket or an aircraft coming down: the earth thrown up, its crater, fire where it hit
+  // something, the bang
+  const ww2Impact = (t, pos, victim) => {
+    let s;
+    if (t.type === 'gpbomb') {
+      s = BOMB_SIZE[t.lb] ?? 1;
+      fx.bomb(pos, s);
+      fx.crater(pos, 8 * s);
+      audio.explosion(pos, 0.5 + s);
+    } else if (t.type === 'rp3') {
+      s = 0.5;
+      fx.bomb(pos, s);
+      fx.explosion(pos, 0.45, { debris: false });
+      fx.crater(pos, 4);
+      audio.explosion(pos, 0.9);
+    } else {
+      // a wreck: its fuel goes up where it hits
+      s = WSIZE[t.type] ?? 1;
+      fx.explosion(pos, s, { debris: true });
+      fx.bomb(pos, s * 0.6);
+      fx.crater(pos, 5 + 2 * s);
+      fx.burnSite(pos, s, 40 + 20 * s);
+      audio.explosion(pos, s * 1.2);
+    }
+    if (victim && (t.type === 'gpbomb' || t.type === 'rp3')) fx.burnSite(pos, s, 25 + 20 * s);
+    if (victim && !sim.attract) hud.setScore(sim.score.points);
+  };
+  // every frame: each 2 cm gun's rattle while it fires (a loop per gun, on and off when the sound gets
+  // here), and a falling bomb's whistle for its last seconds when it comes down near the camera
+  const ww2Sound = (dt) => {
+    for (const u of sim.units) {
+      if (!SYSTEMS[u.kind].mounts) continue;
+      u.parts.forEach((part, i) => {
+        const g = part.gun;
+        if (!g || g.shell !== '20mm') return;
+        const on = part.alive && dt > 0 && g.recoil >= 0 && g.recoil < 0.2;
+        audio.rattle(`${u.id}/${i}`, on, _p.copy(part.pos).setY(part.pos.y + (part.kind === 'flakvierling-tower' ? 10 : 1.2)), part.kind === 'flak38' ? '20mm-flak38' : '20mm-vierling');
+      });
+    }
+    for (let i = falling.length - 1; i >= 0; i--) {
+      const b = falling[i];
+      if (!b.alive || b.dead) {
+        falling.splice(i, 1);
+        continue;
+      }
+      if (whistled.has(b)) continue;
+      const left = (b.pos.y - heightAt(b.pos.x, b.pos.z)) / Math.max(30, -b.vel.y);
+      if (left < 4 && camera.position.distanceTo(b.pos) < 2000) {
+        whistled.add(b);
+        audio.whistle(b.pos, left);
+      }
+    }
+  };
+
   // every wave's rounds (stats.fired restarts each wave; the running wave's are still in stats.fired)
   const spent = () => {
     let n = 0;
@@ -892,7 +1030,7 @@ async function init() {
           ['Score', sc.points.toLocaleString('en-US')],
           ['Kills', sc.kills],
           ['Leakers', sc.leaks],
-          ['Missiles spent', spent(), `cost ${sc.cost}`],
+          ERA.text.spent ? [ERA.text.spent, spent()] : ['Missiles spent', spent(), `cost ${sc.cost}`],
           ['Damage taken', Math.round(sc.damage)],
           ['Units standing', `${sim.units.filter((u) => u.alive).length} / ${sim.units.length}`],
         ],
@@ -902,7 +1040,7 @@ async function init() {
   };
 
   // ---------------------------------------------------------------- warm up
-  await step(0.85, 'Compiling shaders');
+  await step(0.85, loading[4]);
   applyQuality(startQuality);
   weather.set(params.weather);
   const azimuthOf = () => 180 - params.sunBearing;
@@ -964,7 +1102,7 @@ async function init() {
     // the battle (dt is already time-compressed), then everything drawn from it
     if (dt > 0) sim.update(dt);
     tutorial.update(rawDt);
-    views.update(dt, rawDt, sim, fx);
+    views.update(dt, rawDt, sim, fx, camera);
     syncCovers();
     entities.update(sim, t, fx, dt, camera.position);
     sim.ballistics.render();
@@ -1044,14 +1182,16 @@ async function init() {
     // the console and its sight picture, then the sound
     const su = sim.units[selected];
     panel.update(rawDt, { time: sim.time, units: sim.units, picture: sim.picture, selectedId: su.id, state: sim.state, wave: sim.wave, score: sim.score.points, assets: sim.assets });
-    if (draw && su.sight) {
+    const pose = draw && sightPose(su);
+    if (pose) {
       const cv = panel.sightCanvas(su.id);
-      if (cv) sight.update(rawDt, su, views.sightPos(su.id), cv, MONO_SIGHT.has(su.kind), entities);
+      if (cv) sight.update(rawDt, su, views.sightPos(su.id, _p, pose.part ?? 0), cv, MONO_SIGHT.has(su.kind), entities, pose);
     }
     for (const u of sim.units) {
       const g = u.weapons.gun;
-      if (g) audio.gun(u.id, u.alive && g.firing && dt > 0, _p.copy(u.pos).setY(u.pos.y + 3), GUN_VOICE[u.kind] ?? g.shell);
+      if (g && !SYSTEMS[u.kind].mounts) audio.gun(u.id, u.alive && g.firing && dt > 0, _p.copy(u.pos).setY(u.pos.y + 3), GUN_VOICE[u.kind] ?? g.shell);
     }
+    ww2Sound(dt);
     audio.update(rawDt, camera, { threats: sim.threats, timeScale: params.timeScale });
 
     // dynamic resolution: keep frame time near 60 fps

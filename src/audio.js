@@ -20,12 +20,13 @@ const MAX_DELAY = 20; // a launch 7 km away is heard 20 s late
 const MAX_VOICES = 64; // positional one-shots (buffer playback is cheap)
 const DIRECT_VOICES = 24; // UI cues and ambience one-shots
 const ENGINE_VOICES = 8; // looping threat engines, nearest first
-const GUN_VOICES = 8; // continuous gun loops (every unit with guns)
+const GUN_VOICES = 12; // continuous gun loops (every unit with guns; the WW2 era's every 2 cm gun)
+const MAX_DELAY_WW2 = 60; // the WW2 era's sounds: an 8.8 cm burst 12 km up is heard 35 s after its flash
 const AUDIBLE = 0.002;
 
 // per-frame caps and minimum spacing (s) for queued world events; close events get triple caps
-const CAPS = { launch: 3, burst: 4, explosion: 3, impact: 3, crack: 2, casing: 2 };
-const GAPS = { launch: 0.05, burst: 0.04, explosion: 0, impact: 0.03, crack: 0.1, casing: 0.08 };
+const CAPS = { launch: 3, burst: 4, explosion: 3, impact: 3, crack: 2, casing: 2, heavy: 3, g37: 3, flak: 4, pop: 2, mg: 2 };
+const GAPS = { launch: 0.05, burst: 0.04, explosion: 0, impact: 0.03, crack: 0.1, casing: 0.08, heavy: 0, g37: 0.02, flak: 0.03, pop: 0.05, mg: 0.04 };
 
 // Real recordings in public/audio, cut into slices [start, length] (seconds, found by onset
 // analysis) that replace or layer into the synthesized banks once both are ready; anything
@@ -35,6 +36,15 @@ const RECORDINGS = {
   distant: { file: 'distant-explosions-438693.mp3', slices: [[1.35, 2.4], [6.2, 2.6], [14.1, 2.6], [29.0, 2.6], [34.35, 2.6], [48.1, 2.6], [53.6, 2.6], [72.4, 2.6], [76.15, 2.6], [87.4, 2.6]] }, // (CC0)
   cannon: { file: 'cannon-shot-187767.mp3', slices: [[0.1, 2.4], [6.36, 2.4]] }, // a gun's crack, laid under the 57E6 booster
   brass: { file: 'shell-casings-318964.mp3', slices: [[8.49, 0.4], [13.04, 0.25], [16.8, 0.2], [18.95, 0.5], [20.92, 0.25], [23.17, 0.5], [25.9, 0.3], [27.83, 0.5], [39.2, 0.5]] }, // (CC0)
+  // the WW2 era's, fetched only while it is in play (slices as maxgfx cut them, the machine gun's by its
+  // envelope): a 76 mm gun's shots for the 8.8 cm with the cannon above, a period automatic gun for the
+  // 3.7 cm, a .50 cal for the 2 cm and, three guns out of step, the fighters' Brownings, and a machine gun's
+  // bursts for them too
+  gun76: { file: 'gun76-shots-332935.mp3', era: 'ww2', slices: [[0.68, 1.4], [6.67, 1.4], [19.15, 1.4]] }, // Yle archive (CC BY 4.0)
+  bofors: { file: 'bofors-burst-486028.mp3', era: 'ww2', slices: [[0.92, 0.56], [1.51, 0.6], [2.145, 0.6], [2.76, 0.6], [3.375, 0.56], [3.965, 0.6]] }, // (CC0)
+  avenger: { file: 'avenger50-160355.mp3', era: 'ww2', slices: [[0.615, 0.18], [0.81, 0.15], [0.955, 0.3], [3.28, 0.35]] }, // US Army .50 cal (CC0)
+  avengerBurst: { file: 'avenger50-160355.mp3', era: 'ww2', slices: [[1.03, 0.3], [1.33, 0.3], [1.63, 0.3], [1.93, 0.3]] },
+  rapidfire: { file: 'rapidfire-486053.mp3', era: 'ww2', slices: [[7.3, 0.32], [9.75, 0.32], [10.55, 0.32], [12.55, 0.32], [12.87, 0.32], [13.19, 0.32]] }, // (CC0)
 };
 
 const LEVELS_GUN = 0.9;
@@ -51,11 +61,16 @@ const LAUNCH = {
   '9M317': { ref: 200, level: 1.15, reverb: 0.25, near: 450, mid: 2200, close: 350 }, // Buk: hot launch off the rails
   '9M338': { ref: 130, level: 1.0, reverb: 0.25, near: 400, mid: 2000, close: 250 }, // Tor: cold vertical launch
   '9M311': { ref: 100, level: 0.95, reverb: 0.2, near: 300, mid: 1500, close: 180 }, // Tunguska: short booster burn
+  rp3: { ref: 60, level: 0.8, reverb: 0.15, near: 300, mid: 1500, close: 0 }, // WW2: an RP-3 off a Typhoon's rail
 };
 
 // Gun loops by shell type (the sim gives every gun a `shell`): bank group, distance at full level, level.
 // '30mm-tunguska' is the 2A38M of the Tunguska (a slower, deeper rendering of the Pantsir's 30 mm).
 const GUNS = {
+  // the WW2 era's 2 cm, a loop per gun (AudioEngine.rattle): the Flak 38 at 450 rounds a minute, the
+  // Flakvierling's four
+  '20mm-flak38': { bank: 'g20', ref: 40, level: LEVELS_GUN * 0.8, casing: [0.12, 0.1, 1.3, 0.15] },
+  '20mm-vierling': { bank: 'g20v', ref: 55, level: LEVELS_GUN * 0.95, casing: [0.05, 0.06, 1.3, 0.18] },
   '30mm': { bank: 'gun', ref: 90, level: LEVELS_GUN, casing: [0.09, 0.1, 0.9, 0.25] },
   '30mm-tunguska': { bank: 'gun_30t', ref: 90, level: LEVELS_GUN, casing: [0.1, 0.1, 0.85, 0.25] },
   '23mm': { bank: 'gun_23', ref: 70, level: LEVELS_GUN * 0.85, casing: [0.05, 0.06, 1.2, 0.18] },
@@ -72,6 +87,23 @@ const THREATS = {
   tbm: { loop: 'tbm', ref: 500, level: 1.1, rate: 1, shriek: true },
   glide: { loop: 'whoosh', ref: 60, level: 0.5, rate: 1 },
   atgm: { loop: 'whoosh', ref: 40, level: 0.4, rate: 1.3 },
+  // the WW2 era's aircraft (the reconnaissance Spitfire's Merlin, the Tempest's Sabre a little faster than
+  // the Typhoon's); `drone`: the rest of a bomber stream past the voices drones on as one bed
+  p51: { loop: 'merlin', ref: 260, level: 1.0, rate: 1 },
+  recon: { loop: 'merlin', ref: 220, level: 0.8, rate: 1.04 },
+  p47: { loop: 'r2800', ref: 280, level: 1.05, rate: 1 },
+  typhoon: { loop: 'sabre', ref: 280, level: 1.05, rate: 1 },
+  tempest: { loop: 'sabre', ref: 280, level: 1.05, rate: 1.05 },
+  a26: { loop: 'twin', ref: 380, level: 1.1, rate: 1, drone: true },
+  b17: { loop: 'four', ref: 520, level: 1.2, rate: 1, drone: true },
+  rp3: { loop: 'whoosh', ref: 50, level: 0.5, rate: 1.4 },
+};
+
+// The WW2 era's guns shot by shot (AudioEngine.shot): bank, queue kind, ref and level, reverb, the near and
+// mid bands' distances, and inside which distance a round ducks the mix.
+const SHOTS = {
+  '88mm': { bank: 'g88', kind: 'heavy', ref: 200, level: 1.25, reverb: 0.3, near: 500, mid: 3000, close: 150 },
+  '37mm': { bank: 'g37', kind: 'g37', ref: 60, level: 0.95, reverb: 0.12, near: 250, mid: 1500, close: 35 },
 };
 
 // Loudness of the non-bank sounds (the banks are normalized, these scale them in the mix).
@@ -831,6 +863,259 @@ function crackRecipe(sr, r) {
  * essentials at once and spread the rest over a few frames. `make(channels, sampleRate)`
  * turns sample arrays into an AudioBuffer. Distances: 'near' / 'mid' / 'far'.
  */
+// ================================================================== the WW2 era (eras/ww2.js)
+// The German flak and the Allied aircraft, after maxgfx's 1944 naval battle (its recipes for the 5in, the
+// 40 mm Bofors, the 20 mm Oerlikon, the 5in burst, strafing and its radial engines): the 8.8 cm's report
+// and the 3.7 cm's thump shot by shot, the 2 cm's rattle as loops at its cyclic rate (the Flak 38's 450
+// rounds a minute, the Vierling's four guns a little out of step), the 8.8 cm's burst heard as a crump long
+// after the flash, the aircraft engines (the Merlin, the P-47's R-2800, the Sabre, the A-26's two R-2800s and
+// the B-17's four Cyclones beating against each other), strafing volleys, the RP-3's whoosh. Rendered only
+// while the era is in play (AudioEngine.setEra); its recordings (RECORDINGS with `era: 'ww2'`) are laid over
+// them once decoded.
+
+/** 8.8 cm Flak 37: the slam of a high-velocity gun's blast and the shell's crack, a thump, a long rumble. */
+function flak88Shot(sr, r, band) {
+  const x = new Float32Array(Math.ceil((band === 'far' ? 1.2 : 2.2) * sr));
+  const T = (band === 'far' ? 0.016 : band === 'mid' ? 0.011 : 0.007) * (0.9 + 0.2 * r());
+  blast(x, sr, 0, 1, T, 1.5, band === 'far' ? 0.0025 : band === 'mid' ? 0.0006 : 0.00008);
+  if (band !== 'far') nWave(x, sr, 0.0004, 0.45, 0.0005);
+  thump(x, sr, 0, 70, 26, 0.07, 0.9, 0.3);
+  thump(x, sr, 0, 280, 140, 0.035, 0.45, 0.08);
+  mixInto(x, layer(sr, r, { dur: 0.9, attack: 0.002, decay: 0.2, f: 340 }), 0, 0.8, sr);
+  mixInto(x, layer(sr, r, { dur: 0.35, decay: 0.06, type: 'bp', f: 900, q: 0.6 }), 0, 0.5, sr);
+  if (band !== 'far') mixInto(x, layer(sr, r, { dur: 0.06, attack: 0.0002, decay: 0.01, type: 'hp', f: 2800 }), 0, 0.35, sr);
+  if (band === 'near') {
+    // the recoiling mass slamming back and the run-out's clank, the rumble off the pit and the field
+    modes(x, sr, 0.06, [[420 + 30 * r(), 0.08, 0.12], [980 + 60 * r(), 0.06, 0.08], [2150 + 100 * r(), 0.04, 0.05]], r);
+    mixInto(x, layer(sr, r, { dur: 2, attack: 0.05, decay: 0.6, f: 170 }), 0.03, 0.45, sr);
+    roll(x, x.slice(0, Math.round(0.4 * sr)), sr, r, { count: 12, t0: 0.2, t1: 1.8, gain: 0.28, f: 500 });
+  }
+  return x;
+}
+
+/** 3.7 cm Flak 43: maxgfx's Bofors, a touch higher: the deep "pom", the recoil and the loader's clank close up. */
+function flak37Shot(sr, r, band) {
+  const len = band === 'far' ? 0.5 : 0.62;
+  const x = new Float32Array(Math.ceil(len * sr));
+  const near = band === 'near';
+  const T = (band === 'far' ? 0.0058 : band === 'mid' ? 0.0039 : 0.0026) * (0.9 + 0.2 * r());
+  blast(x, sr, 0, 1, T, 1.6, band === 'far' ? 0.0011 : band === 'mid' ? 0.0003 : 0.00005);
+  if (band !== 'far') nWave(x, sr, 0.0003, 0.3, 0.0004);
+  thump(x, sr, 0, 190 * (0.92 + 0.16 * r()), 104, 0.04, 0.8, 0.07);
+  thump(x, sr, 0, 380, 205, 0.03, 0.36, 0.042);
+  thump(x, sr, 0, 98, 50, 0.045, 0.22, 0.075);
+  mixInto(x, layer(sr, r, { dur: 0.15, attack: 0.002, decay: 0.035, f: 120 }), 0, 0.45, sr);
+  mixInto(x, layer(sr, r, { dur: 0.25, decay: 0.045, type: 'bp', f: 560, q: 0.8 }), 0, 0.55, sr);
+  mixInto(x, layer(sr, r, { dur: 0.15, decay: 0.03, type: 'bp', f: 1400, q: 0.9 }), 0, 0.25, sr);
+  if (band !== 'far') mixInto(x, layer(sr, r, { dur: 0.05, attack: 0.0002, decay: 0.009, type: 'hp', f: 3000 }), 0, 0.3, sr);
+  if (near) {
+    const t1 = 0.05 + 0.012 * r();
+    mixInto(x, layer(sr, r, { dur: 0.06, attack: 0.0004, decay: 0.012, type: 'bp', f: 500, q: 1.4 }), t1, 0.2, sr);
+    modes(x, sr, t1, [[640 + 60 * r(), 0.09, 0.07], [1520 + 90 * r(), 0.06, 0.05], [2800 + 140 * r(), 0.04, 0.035]], r);
+  }
+  return x;
+}
+
+/** 2 cm Flak 38: maxgfx's Oerlikon, a sharper, lighter "bap" and the bolt slamming home close up. */
+function flak20Shot(sr, r, band) {
+  const x = new Float32Array(Math.ceil(0.24 * sr));
+  const near = band === 'near';
+  const T = (band === 'far' ? 0.0032 : band === 'mid' ? 0.0019 : 0.0012) * (0.9 + 0.2 * r());
+  blast(x, sr, 0, 1, T, 1.7, band === 'far' ? 0.0008 : band === 'mid' ? 0.0002 : 0.00004);
+  if (band !== 'far') nWave(x, sr, 0.0002, 0.45, 0.0003);
+  thump(x, sr, 0, 230 * (0.9 + 0.2 * r()), 90, 0.015, 0.45, 0.035);
+  mixInto(x, layer(sr, r, { dur: 0.06, decay: 0.02, type: 'bp', f: 1500, q: 0.8 }), 0, 0.35, sr);
+  if (band !== 'far') mixInto(x, layer(sr, r, { dur: 0.03, attack: 0.0001, decay: 0.006, type: 'hp', f: 4000 }), 0, 0.35, sr);
+  if (near) {
+    const t1 = 0.03 + 0.01 * r();
+    mixInto(x, layer(sr, r, { dur: 0.03, attack: 0.0002, decay: 0.005, type: 'hp', f: 1500 }), t1, 0.16, sr);
+    modes(x, sr, t1, [[1850 + 120 * r(), 0.07, 0.03], [3100 + 200 * r(), 0.05, 0.025]], r);
+  }
+  if (band === 'far') biquad(x, sr, 'lp', 900);
+  return x;
+}
+
+/**
+ * A loop of a 2 cm gun's fire at its cyclic rate: `rate` rounds a second a barrel, `barrels` guns a little
+ * out of step, `spb` rounds a barrel per loop; shot(k) renders round k. Every round's tail wraps round, so
+ * it loops without a seam.
+ */
+function rattleLoop(sr, r, { rate, barrels = 1, spb = 8, shot }) {
+  const n = Math.round((spb / rate) * sr);
+  const x = new Float32Array(n);
+  const phase = [0, 0.37, 0.61, 0.83];
+  for (let b = 0; b < barrels; b++) {
+    for (let k = 0; k < spb; k++) {
+      const s = shot(b * spb + k);
+      const i0 = Math.round(((k + phase[b] + (r() - 0.5) * 0.06) / rate) * sr);
+      const g = 0.85 + 0.3 * r();
+      for (let i = 0; i < s.length; i++) x[(i0 + i) % n] += s[i] * g;
+    }
+  }
+  return normalize(x, 0.9);
+}
+
+/** 8.8 cm burst at height: maxgfx's 5in burst, a hard crack near, a hollow "whump" further off, fragments whirring. */
+function flakBurst(sr, r) {
+  const x = new Float32Array(Math.ceil(0.7 * sr));
+  blast(x, sr, 0, 1, 0.004 * (0.9 + 0.2 * r()), 1.5, 0.00006);
+  nWave(x, sr, 0.0002, 0.35, 0.0004);
+  thump(x, sr, 0, 140, 58, 0.045, 0.36, 0.16);
+  mixInto(x, layer(sr, r, { dur: 0.55, decay: 0.09, type: 'bp', f: 560, q: 0.7 }), 0, 0.45, sr);
+  mixInto(x, layer(sr, r, { dur: 0.08, attack: 0.0002, decay: 0.015, type: 'hp', f: 2500 }), 0, 0.3, sr);
+  for (let i = 0; i < 5; i++) {
+    const t = 0.03 + r() * 0.3, f0 = 1800 + r() * 2500;
+    mixInto(x, layer(sr, r, { dur: 0.25, attack: 0.02, decay: 0.06, sweep: (tt) => f0 * Math.exp(-tt * 4) + 300 }), t, 0.05 + 0.06 * r(), sr);
+  }
+  return x;
+}
+
+/** A 3.7 cm round's self-destruct: a small, sharp pop. */
+function pop37(sr, r) {
+  const x = new Float32Array(Math.ceil(0.35 * sr));
+  blast(x, sr, 0, 1, 0.0012 * (0.9 + 0.2 * r()), 1.6, 0.00004);
+  thump(x, sr, 0, 320, 140, 0.02, 0.3, 0.05);
+  mixInto(x, layer(sr, r, { dur: 0.25, decay: 0.04, type: 'bp', f: 900, q: 0.8 }), 0, 0.4, sr);
+  return x;
+}
+
+/** A fifth of a second of a strafing burst: six or eight .50 in Brownings out of step, or four 20 mm Hispanos. */
+function volley(sr, r, cannon) {
+  const x = new Float32Array(Math.ceil(0.32 * sr));
+  const n = cannon ? 8 : 18;
+  for (let i = 0; i < n; i++) {
+    const t = (i / n) * 0.2 + r() * 0.01;
+    if (cannon) {
+      blast(x, sr, t, 0.9 + 0.1 * r(), 0.0015, 1.6, 0.00005);
+      thump(x, sr, t, 170, 70, 0.02, 0.4, 0.05);
+    } else {
+      blast(x, sr, t, 0.5 + 0.3 * r(), 0.0007, 1.8, 0.00003);
+      thump(x, sr, t, 240, 110, 0.012, 0.18, 0.025);
+    }
+    mixInto(x, layer(sr, r, { dur: 0.02, attack: 0.0002, decay: 0.004, type: 'bp', f: cannon ? 1600 : 2600, q: 0.9 }), t, 0.2, sr);
+  }
+  return x;
+}
+
+/** RP-3 leaving its rail: the motor's bang and a short tearing roar (it burns 1.2 s). */
+function launchRP3(sr, r) {
+  const x = new Float32Array(Math.ceil(2 * sr));
+  blast(x, sr, 0, 0.5, 0.002, 1.6, 0.0002);
+  roar(x, sr, r, 0.01, 1.4, { attack: 0.03, decay: 0.7, f0: 6000, f1: 1500, rumble: 220, crackle: 0.5, level: 0.85 });
+  return x;
+}
+
+/**
+ * Piston engines, one loop (maxgfx's radial: exhaust pulses in firing order, the propeller's blade-pass
+ * harmonics, exhaust turbulence, all periodic in the loop). `counts`: the engine cycles of each engine in the
+ * loop; several engines with counts a cycle apart run a percent or two out of step and beat against each
+ * other, as a twin's or a four-engined bomber's do. cycleHz: engine cycles a second (rpm / 120); blades:
+ * blade passes per engine cycle (blades x the reduction gear x 2).
+ */
+function pistons(sr, r, { cyl, cycleHz, blades, rough = 0.35, counts = [12] }) {
+  const n = Math.round((sr / cycleHz) * counts[0]);
+  const loop = n / sr;
+  const x = new Float32Array(n);
+  const pulse = new Float32Array(Math.round(0.006 * sr));
+  for (let i = 0; i < pulse.length; i++) {
+    const t = i / sr;
+    pulse[i] = Math.exp(-t / 0.0013) * (Math.sin(TAU * 430 * t) * 0.8 + (1 - t / 0.0016) * 0.7);
+  }
+  const ge = 1 / Math.sqrt(counts.length);
+  for (const cycles of counts) {
+    const fireHz = (cyl * cycles) / loop;
+    const amps = Array.from({ length: cyl }, () => 1 + rough * (r() - 0.5) * 2);
+    for (let k = 0, total = cyl * cycles; k < total; k++) {
+      const i0 = Math.round(((k + (r() - 0.5) * 0.06) / fireHz) * sr);
+      const a = amps[k % cyl] * (0.85 + 0.3 * r()) * ge;
+      for (let i = 0; i < pulse.length; i++) x[(i0 + i + n) % n] += pulse[i] * a * 0.9;
+    }
+    const bpf = Math.round(blades * cycles) / loop;
+    for (let h = 1; h <= 9; h++) {
+      const a = (0.42 / Math.pow(h, 0.8)) * ge, ph = r() * TAU, w = (TAU * bpf * h) / sr;
+      for (let i = 0; i < n; i++) x[i] += a * Math.sin(ph + w * i);
+    }
+  }
+  const m = Math.round(0.02 * sr);
+  const turb = new Float32Array(n + m);
+  for (let i = 0; i < turb.length; i++) turb[i] = r() * 2 - 1;
+  biquad(turb, sr, 'lp', 1400);
+  for (let i = 0; i < m; i++) {
+    const w = i / m;
+    turb[i] = turb[i] * w + turb[n + i] * (1 - w);
+  }
+  normalize(turb, 0.35);
+  for (let i = 0; i < n; i++) x[i] += turb[i];
+  biquad(x, sr, 'hp', 25);
+  return normalize(x, 0.9);
+}
+// the engines (rpm, cylinders, propeller): the Merlin (V-12, 3,000 rpm, four blades at 0.479), the P-47's
+// R-2800 (18 cylinders, 2,700, four blades at 0.5), the Napier Sabre (H-24, 3,700, four blades at 0.274), the
+// A-26's two R-2800s (three blades at 0.45), the B-17's four Wright R-1820 Cyclones (nine cylinders, 2,300,
+// three blades at 0.5625)
+const ENGINES44 = {
+  merlin: { cyl: 12, cycleHz: 25, blades: 3.83, rough: 0.25 },
+  r2800: { cyl: 18, cycleHz: 22.5, blades: 4, rough: 0.3 },
+  sabre: { cyl: 24, cycleHz: 30.8, blades: 2.19, rough: 0.2 },
+  twin: { cyl: 18, cycleHz: 22, blades: 2.7, rough: 0.3, counts: [48, 49] },
+  four: { cyl: 9, cycleHz: 19.2, blades: 3.375, rough: 0.4, counts: [48, 49, 47, 50] },
+};
+
+/** The WW2 era's banks, [group, key, fn] as bankTasks'; the first `null` splits the essentials from the rest. */
+export function ww2Tasks(SR, make) {
+  const midSR = Math.min(SR, 32000), farSR = 16000, loopSR = Math.min(SR, 24000);
+  const set = (n, seed, fn) => () => Array.from({ length: n }, (_, i) => fn(mulberry(seed + i * 7919)));
+  const mono = (sr) => (x) => make([tail(normalize(x, 0.95), sr)], sr);
+  const small = { count: 14, t0: 0.12, t1: 1.6, gain: 0.45, f: 700 };
+  const big = { count: 18, t0: 0.25, t1: 3.2, gain: 0.55, f: 380 };
+  const far = (sr, recipe, len, rl) => (r) => make(distant(sr, r, recipe(r), 'far', { len, roll: rl }), sr);
+  const mid = (sr, recipe, len, rl) => (r) => make(distant(sr, r, recipe(r), 'mid', { len, roll: rl }), sr);
+  const eng = (spec, seed) => () => [make([pistons(22050, mulberry(seed), spec)], 22050)];
+  // the 2 cm loops per band: 'loop' the fire, 'up' a moment's silence (the loop starts with a round), 'down'
+  // the last round's echo
+  const rattle = (seed, rate, barrels) => ({
+    loop: () => ['near', 'mid', 'far'].map((band, i) => {
+      const sr = [loopSR, midSR, farSR][i], r = mulberry(seed + i * 31);
+      return make([rattleLoop(sr, r, { rate, barrels, shot: () => flak20Shot(sr, r, band) })], sr);
+    }),
+    up: () => [loopSR, midSR, farSR].map((sr) => make([new Float32Array(Math.round(0.01 * sr))], sr)),
+    down: () => ['near', 'mid', 'far'].map((band, i) => {
+      const sr = [loopSR, midSR, farSR][i], r = mulberry(seed + 7 + i * 31);
+      const [x] = distant(sr, r, flak20Shot(sr, r, band), band === 'far' ? 'far' : 'mid', { len: 1, roll: small });
+      for (let k = 0; k < x.length; k++) x[k] *= 0.6;
+      return make([x], sr);
+    }),
+  });
+  const r38 = rattle(601, 7.5, 1), rV = rattle(613, 7.5, 4);
+  return [
+    ['engine', 'merlin', eng(ENGINES44.merlin, 521)],
+    ['engine', 'r2800', eng(ENGINES44.r2800, 523)],
+    ['engine', 'sabre', eng(ENGINES44.sabre, 529)],
+    ['engine', 'twin', eng(ENGINES44.twin, 531)],
+    ['engine', 'four', eng(ENGINES44.four, 537)],
+    ['g88', 'near', set(3, 541, (r) => mono(midSR)(saturate(normalize(flak88Shot(midSR, r, 'near')), 1.3)))],
+    ['g37', 'near', set(4, 547, (r) => mono(SR)(saturate(normalize(flak37Shot(SR, r, 'near')), 1.3)))],
+    ['g20', 'loop', r38.loop], ['g20', 'up', r38.up], ['g20', 'down', r38.down],
+    ['g20v', 'loop', rV.loop], ['g20v', 'up', rV.up], ['g20v', 'down', rV.down],
+    null,
+    ['g88', 'mid', set(3, 551, mid(midSR, (r) => flak88Shot(midSR, r, 'mid'), 3.2, big))],
+    ['g88', 'far', set(3, 557, far(farSR, (r) => flak88Shot(farSR, r, 'far'), 4.5, { ...big, t1: 4 }))],
+    ['g37', 'mid', set(3, 563, mid(midSR, (r) => flak37Shot(midSR, r, 'mid'), 1.4, small))],
+    ['g37', 'far', set(3, 569, far(farSR, (r) => flak37Shot(farSR, r, 'far'), 2.4, big))],
+    ['flak', 'near', set(4, 571, (r) => mono(midSR)(flakBurst(midSR, r)))],
+    ['flak', 'far', set(4, 577, far(farSR, (r) => flakBurst(farSR, r), 2.6, small))],
+    ['pop', 'near', set(3, 587, (r) => mono(midSR)(pop37(midSR, r)))],
+    ['pop', 'far', set(2, 593, far(farSR, (r) => pop37(farSR, r), 1.2, small))],
+    ['mg50', 'near', set(4, 607, (r) => mono(midSR)(volley(midSR, r, false)))],
+    ['mg50', 'far', set(3, 617, mid(midSR, (r) => volley(midSR, r, false), 1, small))],
+    ['mg20', 'near', set(3, 619, (r) => mono(midSR)(volley(midSR, r, true)))],
+    ['mg20', 'far', set(3, 631, mid(midSR, (r) => volley(midSR, r, true), 1, small))],
+    ['launch_rp3', 'near', set(2, 641, (r) => mono(midSR)(launchRP3(midSR, r)))],
+    ['launch_rp3', 'mid', set(2, 643, mid(midSR, (r) => launchRP3(midSR, r), 2.6, small))],
+    ['launch_rp3', 'far', set(2, 647, far(farSR, (r) => launchRP3(farSR, r), 3, small))],
+  ];
+}
+
 export function bankTasks(SR, make) {
   const midSR = Math.min(SR, 32000), farSR = 16000, loopSR = Math.min(SR, 24000);
   const set = (n, seed, fn) => () => Array.from({ length: n }, (_, i) => fn(mulberry(seed + i * 7919)));
@@ -900,6 +1185,8 @@ export function bankTasks(SR, make) {
 // ================================================================== the engine
 
 const MIN_GAIN = { burst: 0.004, casing: 0.02 };
+// the WW2 era's gun positions (fieldIdle): only the battery has a generator, far off behind the pits
+const FIELD = { flak88: { idle: 'genset', level: 0.3 }, flak43: { level: 0 }, flakvierling: { level: 0 }, flak38: { level: 0 } };
 const IDLE = { s400: 'genset', pantsir: 'v8', osa: 'v8', strela: 'v8', buk: 'trk_buk', tor: 'trk_tor', tunguska: 'trk_tun', shilka: 'trk_shk' };
 // What the tracked vehicles add to the idle: the electronics hum, a gas turbine (the auxiliary
 // power unit) as [Hz, level], and the hydraulic pump cycling as [Hz, level, cycles a second].
@@ -932,6 +1219,11 @@ export class AudioEngine {
     this.throttle = {};
     this.engines = [];
     this.guns = new Map();
+    this.rattles = new Map(); // the WW2 era's 2 cm loops, switched when the sound gets to the listener
+    this.whistles = [];
+    this.drone = null;
+    this.era = 'modern';
+    this.eraBanks = new Set(); // the eras whose banks are rendered or queued
     this.idleKind = null;
     this.moodState = 'brief';
     this.nextPad = 0;
@@ -1029,6 +1321,8 @@ export class AudioEngine {
     const split = tasks.indexOf(null);
     for (const t of tasks.slice(0, split)) this.runTask(t);
     this.pending = tasks.slice(split + 1);
+    this.make = make;
+    this.eraTasks(this.era);
     if (this.given) while (this.pending.length) this.runTask(this.pending.shift());
     else {
       this.pump();
@@ -1046,6 +1340,31 @@ export class AudioEngine {
     (this.bank[group] ||= {})[key] = fn();
   }
 
+  /**
+   * The era in play (main.js, as it changes): an era's own banks (the WW2 era's, ww2Tasks) are rendered the
+   * first time it is set after start(), its essentials at once and the rest over the next frames, and its
+   * recordings fetched; nothing changes for the modern era.
+   */
+  setEra(id) {
+    this.era = id;
+    if (this.ctx) this.eraTasks(id);
+  }
+
+  eraTasks(id) {
+    if (id !== 'ww2' || this.eraBanks.has(id)) return;
+    this.eraBanks.add(id);
+    const tasks = ww2Tasks(this.ctx.sampleRate, this.make);
+    const split = tasks.indexOf(null);
+    for (const t of tasks.slice(0, split)) this.runTask(t);
+    const idle = !this.pending.length;
+    this.pending.push(...tasks.slice(split + 1));
+    if (this.given) while (this.pending.length) this.runTask(this.pending.shift());
+    else {
+      if (idle) this.pump();
+      this.loadRecordings(id);
+    }
+  }
+
   // one bank per tick so the first seconds never stall
   pump() {
     if (!this.pending.length) return;
@@ -1055,12 +1374,13 @@ export class AudioEngine {
 
   // Real recordings: fetched and decoded in the background; once the synthesized banks are done
   // as well they are cut up and take their places (see RECORDINGS).
-  async loadRecordings() {
+  async loadRecordings(era = null) {
     const ctx = this.ctx;
     const base = import.meta.env?.BASE_URL ?? '/';
-    const rec = {};
+    // one map for every era's recordings (the modern ones and an era's load side by side)
+    const rec = (this.rec ??= {});
     await Promise.all(
-      Object.entries(RECORDINGS).map(async ([key, spec]) => {
+      Object.entries(RECORDINGS).filter(([, spec]) => (spec.era ?? null) === era).map(async ([key, spec]) => {
         try {
           const res = await fetch(`${base}audio/${spec.file}`);
           if (res.ok) rec[key] = await ctx.decodeAudioData(await res.arrayBuffer());
@@ -1069,13 +1389,14 @@ export class AudioEngine {
         }
       })
     );
-    this.rec = rec;
-    const apply = () => (this.pending.length ? setTimeout(apply, 100) : this.useRecordings());
+    // (an era's recordings wait for the modern ones' to be laid in: they share `rec`)
+    const apply = () => (this.pending.length || (era && !this.recordingsInUse) ? setTimeout(apply, 100) : era ? this.useEraRecordings(era) : this.useRecordings());
     apply();
   }
 
-  useRecordings() {
-    const ctx = this.ctx, SR = ctx.sampleRate, R = this.rec, B = this.bank;
+  // the recordings' tools (useRecordings, useEraRecordings): buffers, slices, resampling, blending
+  recTools() {
+    const ctx = this.ctx, SR = ctx.sampleRate, R = this.rec;
     const make = (chans) => {
       const b = ctx.createBuffer(chans.length, chans[0].length, SR);
       chans.forEach((c, i) => b.copyToChannel(c, i));
@@ -1120,6 +1441,12 @@ export class AudioEngine {
       for (let i = 0; i < x.length; i++) o[i] += x[i] * g;
       return make([normalize(o, 0.95)]);
     };
+    return { make, cut, pitch, blend };
+  }
+
+  useRecordings() {
+    const SR = this.ctx.sampleRate, B = this.bank;
+    const { make, cut, pitch, blend } = this.recTools();
     const rng = mulberry(4242);
     const ROLL = { count: 18, t0: 0.25, t1: 3.2, gain: 0.55, f: 380 };
     const ROLL_SMALL = { count: 14, t0: 0.12, t1: 1.6, gain: 0.45, f: 700 };
@@ -1141,7 +1468,67 @@ export class AudioEngine {
     if (cannon.length && B.launch_57E6?.near) B.launch_57E6.near = B.launch_57E6.near.map((b, i) => blend(b, cannon[i % cannon.length], 0.5));
     const brass = cut('brass');
     if (brass.length) (B.casing ||= {}).gun = brass.map((x) => make([normalize(pitch(x, 0.8), 0.9)]));
-    this.recordingsInUse = Object.keys(R);
+    this.recordingsInUse = Object.keys(this.rec);
+  }
+
+  /**
+   * The WW2 era's recordings over its banks: the cannon and the 76 mm's shots replace the 8.8 cm's synthesis
+   * close up and through distance (as maxgfx's 5in); the period automatic gun is laid over the 3.7 cm's
+   * synthesized "pom"; the .50 cal over the 2 cm's rounds in their loops; three .50 cal bursts out of step
+   * and the machine gun's bursts make the fighters' strafing near; the distant explosions make the 8.8 cm's
+   * bursts heard from far off.
+   */
+  useEraRecordings(era) {
+    if (era !== 'ww2') return;
+    const SR = this.ctx.sampleRate, B = this.bank;
+    const { make, cut, pitch, blend } = this.recTools();
+    const rng = mulberry(4343);
+    const ROLL = { count: 18, t0: 0.25, t1: 3.2, gain: 0.55, f: 380 };
+    const ROLL_SMALL = { count: 14, t0: 0.12, t1: 1.6, gain: 0.45, f: 700 };
+    const heavy = [...cut('cannon'), ...cut('gun76')];
+    if (heavy.length && B.g88) {
+      B.g88.near = heavy.map((x) => make([Float32Array.from(x)]));
+      B.g88.mid = heavy.map((x) => make(distant(SR, rng, x, 'mid', { len: 3.2, roll: ROLL })));
+      B.g88.far = heavy.map((x) => make(distant(SR, rng, pitch(x, 0.92), 'far', { len: 4.5, roll: ROLL })));
+    }
+    const bof = cut('bofors');
+    if (bof.length && B.g37?.near) B.g37.near = B.g37.near.map((b, i) => blend(b, bof[i % bof.length], 0.55));
+    // the 2 cm loops, near: each round the synthesized one with a .50 cal's laid in (at the loop's rate)
+    const av = cut('avenger');
+    if (av.length) {
+      for (const [key, barrels, seed] of [['g20', 1, 701], ['g20v', 4, 709]]) {
+        const G = B[key];
+        if (!G?.loop) continue;
+        const lsr = G.loop[0].sampleRate, r = mulberry(seed);
+        const rec = av.map((x) => pitch(x, SR / lsr));
+        const shot = (k) => {
+          const a = flak20Shot(lsr, r, 'near'), b = rec[k % rec.length];
+          const o = new Float32Array(Math.max(a.length, b.length));
+          o.set(a);
+          for (let i = 0; i < b.length; i++) o[i] += b[i] * 0.5;
+          return o;
+        };
+        G.loop[0] = this.make([rattleLoop(lsr, r, { rate: 7.5, barrels, shot })], lsr);
+      }
+    }
+    // strafing: three .50 cal bursts out of step for six or eight guns, and the machine gun's
+    const burst = cut('avengerBurst'), mg = cut('rapidfire');
+    if ((burst.length || mg.length) && B.mg50) {
+      const three = burst.map((x, i) => {
+        const o = new Float32Array(x.length + Math.round(0.05 * SR));
+        for (const [d, g] of [[0, 1], [0.021, 0.8], [0.043, 0.7]]) {
+          const i0 = Math.round(d * SR);
+          for (let k = 0; k < x.length; k++) o[i0 + k] += x[(k + i * 997) % x.length] * g;
+        }
+        return normalize(o, 0.95);
+      });
+      const all = [...three, ...mg];
+      B.mg50.near = all.map((x) => make([Float32Array.from(x)]));
+      B.mg50.far = all.map((x) => make(distant(SR, rng, x, 'mid', { len: 1, roll: ROLL_SMALL })));
+    }
+    const dist = cut('distant');
+    if (dist.length && B.flak) B.flak.far = dist.map((x) => make(distant(SR, rng, x, 'far', { len: 2.8, roll: ROLL_SMALL })));
+    this.eraRecordings = era;
   }
 
   // ------------------------------------------------------------------ basics
@@ -1367,7 +1754,7 @@ export class AudioEngine {
 
   // a world sound: it travels to the listener at the speed of sound and only takes a voice when
   // it arrives; the loudest few per kind play each frame, the rest feed the battle rumble
-  enqueue(kind, pos, ref, level, play) {
+  enqueue(kind, pos, ref, level, play, maxDelay = MAX_DELAY) {
     if (!this.ctx) return;
     pos = here(pos);
     const d = this.dist(pos);
@@ -1377,7 +1764,7 @@ export class AudioEngine {
       return;
     }
     this.combat = Math.min(1, this.combat + g * 0.5);
-    const delay = Math.min(d / SOUND_SPEED, MAX_DELAY);
+    const delay = Math.min(d / SOUND_SPEED, maxDelay);
     if (delay > 0.08) {
       if (this.inFlight.length < 512) this.inFlight.push({ at: this.ctx.currentTime + delay, kind, pos, ref, level, play, g });
       else this.bedEnergy += g * 0.15;
@@ -1558,6 +1945,177 @@ export class AudioEngine {
     this.duck(0.25, 1.6, true);
   }
 
+  // ------------------------------------------------------------------ the WW2 era (ww2Tasks)
+
+  /** One round of a WW2 gun: '88mm' (the battery's guns) or '37mm'; its band by distance, heard late. */
+  shot(kind, pos) {
+    const S = SHOTS[kind];
+    if (!S || !this.bank[S.bank]) return;
+    this.enqueue(S.kind, pos, S.ref, S.level, (p) => {
+      const d = this.dist(p);
+      const r = this.route(p, { ref: S.ref, level: S.level, reverb: S.reverb, bus: d < S.close ? this.blastBus : this.sfx });
+      if (!r) return;
+      this.playBuf(r, this.variant(this.bank[S.bank], r.d, S.near, S.mid), { rate: 0.95 + Math.random() * 0.1 });
+      this.finish(r);
+      if (r.d < S.close) this.duck(0.45 + 0.4 * (r.d / S.close), 0.5, true);
+    }, MAX_DELAY_WW2);
+  }
+
+  /** An 8.8 cm shell bursting: a hard crack close by, from the ground a dull crump arriving long after the flash. */
+  flak(pos) {
+    if (!this.bank.flak) return;
+    this.enqueue('flak', pos, 160, 1, (p) => {
+      const r = this.route(p, { ref: 160, level: 1, reverb: 0.3 });
+      if (!r) return;
+      this.playBuf(r, this.variant(this.bank.flak, r.d, 1500, 1500), { rate: 0.9 + Math.random() * 0.2 });
+      this.finish(r);
+    }, MAX_DELAY_WW2);
+  }
+
+  /** A 3.7 cm round's self-destruct at the end of its tracer. */
+  pop(pos) {
+    if (!this.bank.pop) return;
+    this.enqueue('pop', pos, 35, 0.6, (p) => {
+      const r = this.route(p, { ref: 35, level: 0.6, reverb: 0.2 });
+      if (!r) return;
+      this.playBuf(r, this.variant(this.bank.pop, r.d, 1200, 1200), { rate: 0.9 + Math.random() * 0.25 });
+      this.finish(r);
+    }, MAX_DELAY_WW2);
+  }
+
+  /** A strafing burst from aircraft `type` at pos: the Mustangs' and Thunderbolts' .50s, or the Typhoons' and Tempests' 20 mm. */
+  strafe(pos, type) {
+    const set = this.bank[type === 'typhoon' || type === 'tempest' ? 'mg20' : 'mg50'];
+    if (!set) return;
+    this.enqueue('mg', pos, 60, 0.9, (p) => {
+      const r = this.route(p, { ref: 60, level: 0.9, reverb: 0.1 });
+      if (!r) return;
+      this.playBuf(r, this.variant(set, r.d, 500, 500), { rate: 0.95 + Math.random() * 0.1 });
+      this.finish(r);
+    }, MAX_DELAY_WW2);
+  }
+
+  /** A falling bomb's whistle for its last `dur` seconds (maxgfx's), heard from where it falls; three at once at most. */
+  whistle(pos, dur = 3) {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    this.whistles = this.whistles.filter((e) => e > now);
+    if (this.whistles.length >= 3) return;
+    const len = clamp(dur, 1, 7);
+    const r = this.route(here(pos), { ref: 220, level: 0.6 });
+    if (!r) return;
+    const ctx = this.ctx, t0 = r.t0;
+    // the bomb's fins and nose: a falling whistle with a second, rougher partial
+    for (const [mul, g0, type] of [[1, 0.35, 'sine'], [1.51, 0.08, 'triangle']]) {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.setValueAtTime((2100 + Math.random() * 300) * mul, t0);
+      o.frequency.exponentialRampToValueAtTime((620 + Math.random() * 120) * mul, t0 + len);
+      const vib = ctx.createOscillator();
+      vib.frequency.value = 6 + Math.random() * 2;
+      const vg = ctx.createGain();
+      vg.gain.value = 14 * mul;
+      vib.connect(vg).connect(o.frequency);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(g0 * 0.17, t0 + len * 0.3);
+      g.gain.exponentialRampToValueAtTime(g0, t0 + len * 0.97);
+      g.gain.linearRampToValueAtTime(0, t0 + len);
+      o.connect(g).connect(r.dest);
+      o.start(t0);
+      vib.start(t0);
+      o.stop(t0 + len + 0.05);
+      vib.stop(t0 + len + 0.05);
+      r.nodes.push(o, vib, vg, g);
+    }
+    this.noise(r, { dur: len, freq: 1500, q: 2.5, gain: 0.12, attack: len * 0.9 });
+    r.end = Math.max(r.end, t0 + len + 0.05);
+    this.whistles.push(r.end);
+    this.finish(r);
+  }
+
+  /**
+   * A loader's work close to the listener: 'magazine' (a 2 cm's magazine latched on), 'clip' (a 3.7 cm clip
+   * laid on the loading table), 'round' (an 8.8 cm round rammed and the wedge closing on it).
+   */
+  feed(what, pos) {
+    if (!this.ctx || this.dist(pos) > 45) return;
+    const r = this.route(here(pos), { ref: 6, level: what === 'round' ? 0.6 : 0.45, reverb: 0.05 });
+    if (!r) return;
+    if (what === 'magazine') {
+      this.noise(r, { dur: 0.03, freq: 2400, q: 2, gain: 0.4 });
+      this.tone(r, { at: 0.06, f0: 1450 + Math.random() * 150, dur: 0.12, gain: 0.08 });
+      this.noise(r, { at: 0.06, dur: 0.025, freq: 3600, type: 'highpass', gain: 0.35 });
+    } else if (what === 'clip') {
+      this.noise(r, { dur: 0.06, freq: 1800, q: 1.5, gain: 0.3 });
+      this.noise(r, { at: 0.07, dur: 0.07, freq: 260, type: 'lowpass', gain: 0.5 });
+      for (let i = 0; i < 3; i++) this.tone(r, { at: 0.07 + i * 0.012, f0: 1100 + Math.random() * 400, dur: 0.18, gain: 0.04 });
+    } else {
+      // the round slides in, the rammer's push, the wedge slams up
+      this.noise(r, { dur: 0.25, freq: 900, q: 0.8, gain: 0.18, attack: 0.05 });
+      this.noise(r, { at: 0.28, dur: 0.06, freq: 300, type: 'lowpass', gain: 0.7 });
+      this.tone(r, { at: 0.28, f0: 520 + Math.random() * 40, dur: 0.35, gain: 0.12 });
+      this.tone(r, { at: 0.28, f0: 1310 + Math.random() * 60, dur: 0.22, gain: 0.06 });
+    }
+    this.finish(r);
+  }
+
+  /**
+   * A 2 cm gun firing (its loop, as gun()), switched on and off when the sound of it reaches the listener:
+   * a gun 3 km off is heard to start and stop 9 s after its tracers do. `id` names the gun.
+   */
+  rattle(id, on, pos, shell) {
+    if (!this.ctx) return;
+    let v = this.rattles.get(id);
+    if (!v) this.rattles.set(id, (v = { want: false, q: [], pos: here(pos), shell }));
+    v.pos.x = pos.x;
+    v.pos.y = pos.y;
+    v.pos.z = pos.z;
+    if (on === v.want) return;
+    v.want = on;
+    v.q.push({ at: this.ctx.currentTime + Math.min(this.dist(pos) / SOUND_SPEED, MAX_DELAY_WW2), on });
+  }
+
+  updateRattles(now) {
+    for (const [id, v] of this.rattles) while (v.q.length && v.q[0].at <= now) this.gun('r/' + id, v.q.shift().on, v.pos, v.shell);
+  }
+
+  /** Every 2 cm loop off at once (a new battle). */
+  stopRattles() {
+    for (const id of this.rattles.keys()) this.dropGun('r/' + id);
+    this.rattles.clear();
+  }
+
+  // The rest of a bomber stream beyond the engine voices: one droning bed of the four-engined loop at a few
+  // rates (maxgfx's), made the first time it is needed.
+  buildDrone() {
+    const four = this.bank.engine?.four;
+    if (!four?.length) return;
+    const ctx = this.ctx;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 260;
+    const g = ctx.createGain();
+    g.gain.value = 0;
+    const am = ctx.createGain();
+    am.gain.value = 0.8;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 0.31;
+    const lg = ctx.createGain();
+    lg.gain.value = 0.2;
+    lfo.connect(lg).connect(am.gain);
+    lfo.start();
+    for (const rate of [0.94, 1, 1.05, 1.1]) {
+      const src = this.loop(four[0]);
+      src.playbackRate.value = rate;
+      const sg = ctx.createGain();
+      sg.gain.value = 0.3;
+      src.connect(sg).connect(lp);
+    }
+    lp.connect(am).connect(g).connect(this.engineBus);
+    this.drone = { lp, g };
+  }
+
   // ------------------------------------------------------------------ Pantsir guns
 
   /**
@@ -1718,6 +2276,19 @@ export class AudioEngine {
     }
     cand.sort((a, b) => b.g - a.g);
     const keep = cand.slice(0, ENGINE_VOICES);
+    // a bomber stream's aircraft past the voices drone on as one bed (the WW2 era's `drone` types)
+    let bed = 0, bedD = 0, bedN = 0;
+    for (let i = ENGINE_VOICES; i < cand.length; i++) {
+      if (!cand[i].def.drone) continue;
+      bed += cand[i].g;
+      bedD += cand[i].d;
+      bedN++;
+    }
+    if (bed > 0 && !this.drone) this.buildDrone();
+    if (this.drone) {
+      this.drone.g.gain.setTargetAtTime(Math.min(0.3, bed * 0.35), now, 0.6);
+      if (bedN) this.drone.lp.frequency.setTargetAtTime(this.absorb(bedD / bedN) * 0.8, now, 0.6);
+    }
     const ids = new Set(keep.map((c) => c.t.id));
     for (const v of this.engines) if (v.id && !ids.has(v.id)) {
       v.id = 0;
@@ -1784,6 +2355,8 @@ export class AudioEngine {
       old.g.gain.setTargetAtTime(0, now, 0.3);
       setTimeout(() => old.nodes.forEach((n) => (n.stop?.(), n.disconnect())), 2000);
     }
+    const field = FIELD[kind];
+    if (field) return this.fieldIdle(field);
     const buf = pick(this.bank.idle?.[IDLE[kind] ?? 'v8']);
     const g = ctx.createGain();
     g.gain.value = 0;
@@ -1860,6 +2433,28 @@ export class AudioEngine {
       nodes.push(pump, pf, pg, lfo, lg);
     }
     g.gain.setTargetAtTime(LEVELS.vehicle, now, 0.4);
+    this.idle = { g, nodes };
+  }
+
+  // a WW2 gun position: no engine, no cabin; the heavy battery's generator for its predictor and radar
+  // thudding away behind the pits, or nothing but the wind
+  fieldIdle(field) {
+    const ctx = this.ctx, now = ctx.currentTime;
+    const g = ctx.createGain();
+    g.gain.value = 0;
+    g.connect(this.amb);
+    const nodes = [g];
+    const buf = field.idle ? pick(this.bank.idle?.[field.idle]) : null;
+    if (buf) {
+      const s = this.loop(buf);
+      s.playbackRate.value = 0.9 + Math.random() * 0.1;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 420;
+      s.connect(lp).connect(g);
+      nodes.push(s, lp);
+    }
+    g.gain.setTargetAtTime(LEVELS.vehicle * field.level, now, 0.4);
     this.idle = { g, nodes };
   }
 
@@ -2012,6 +2607,7 @@ export class AudioEngine {
     this.land(now);
     this.flush(now);
     this.updateEngines(threats, now);
+    this.updateRattles(now);
     this.updateGuns(now);
     // wind gusts
     this.gustT -= dt;

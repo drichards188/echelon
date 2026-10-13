@@ -21,6 +21,10 @@ const HANG = { '48N6': 150, '9M96': 120 };
 // the centre)
 const THRUST = { '9M96': { at: [0.1, 0.3, 0.55, 0.85], z: -0.6 } };
 const MAX_BOOSTERS = 24;
+// a type's instances cast shadows only while one of them is this close to the camera: the shadow map
+// covers a couple of hundred metres round the view, so a stream of bombers kilometres off would only be
+// drawn into it for nothing (the WW2 era's raids are a hundred aircraft and more)
+const SHADOW_NEAR = 3000;
 
 const _m = new THREE.Matrix4();
 const _big = new THREE.Matrix4();
@@ -55,7 +59,7 @@ export class Entities {
         scene.add(mesh);
         const plain = new THREE.InstancedBufferAttribute(new Float32Array(cap * 16), 16);
         plain.setUsage(THREE.DynamicDrawUsage);
-        return { mesh, spin: pt.spin, pivot: pt.pivot, plain, scaled: null };
+        return { mesh, spin: pt.spin, pivot: pt.pivot, plain, scaled: null, shadow: mesh.castShadow };
       });
       let radius = 0.5;
       for (const pt of model.parts) {
@@ -165,6 +169,7 @@ export class Entities {
   place(key, pos, fwd, bank, t, spin = 0, grow = true) {
     const g = this.groups.get(key);
     if (!g || g.n >= g.cap) return null;
+    if (!g.near && this.cam.distanceToSquared(pos) < SHADOW_NEAR * SHADOW_NEAR) g.near = true;
     this.basis(fwd, bank, _r);
     _r.setPosition(pos);
     // far away a flyer is drawn up to a few pixels across (a glint, not a vanishing speck); the sight
@@ -203,7 +208,10 @@ export class Entities {
 
   update(sim, t, fx, dt, camPos = null) {
     if (camPos) this.cam.copy(camPos);
-    for (const g of this.groups.values()) g.n = 0;
+    for (const g of this.groups.values()) {
+      g.n = 0;
+      g.near = false;
+    }
     for (const th of sim.threats) {
       if (th.dead || (!th.alive && !th.falling)) continue;
       const M = this.place(th.type, th.pos, th.fwd, th.bank, t, th.id);
@@ -248,6 +256,7 @@ export class Entities {
       for (const p of g.parts) {
         p.mesh.count = g.n;
         if (g.n) p.mesh.instanceMatrix.needsUpdate = true;
+        p.mesh.castShadow = p.shadow && g.near;
       }
       if (g.state && g.n) g.state.needsUpdate = true;
     }

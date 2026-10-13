@@ -93,7 +93,9 @@ const quadGeo = (attrs, max) => {
 };
 
 // kinds (smoke system)
-export const SMOKE = { FLAK: 0, PUFF: 1, TRAIL: 2, BLACK: 3, CORDITE: 4, SPRAY: 5, MIST: 6, HAZE: 7, HANG: 8 };
+// BURST: an 8.8 cm shell's black ball, thrown out at once by the explosion (it fades in within a few frames,
+// where the other kinds take a twelfth of their life)
+export const SMOKE = { FLAK: 0, PUFF: 1, TRAIL: 2, BLACK: 3, CORDITE: 4, SPRAY: 5, MIST: 6, HAZE: 7, HANG: 8, BURST: 9 };
 // kinds (glow system)
 const FLAME = 0, FLASH = 1, SPARK = 2;
 
@@ -132,6 +134,50 @@ const CASE_COL = new THREE.Color(0xb59a62), LINK_COL = new THREE.Color(0x4a4944)
 // the lid pool: whole container lids blown off a launcher, tumbling down and lying where they land
 const MAX_LIDS = 16;
 const _lq = new THREE.Quaternion();
+
+// ---------------------------------------------------------------- bomb craters
+// A crater seen from above, on a unit square: the blackened, wet bottom, the lip of thrown-up raw earth
+// and its spray of clods in rays, fading into the ground round it (alpha). Drawn flat on the terrain.
+const MAX_CRATERS = 64;
+function craterTexture(size = 128) {
+  const data = new Uint8Array(size * size * 4);
+  const r = mulberry32(53);
+  const rays = Array.from({ length: 14 }, () => ({ a: r() * Math.PI * 2, w: 0.04 + r() * 0.08, l: 0.75 + r() * 0.25 }));
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = (x + 0.5) / size - 0.5, v = (y + 0.5) / size - 0.5;
+      const d = Math.hypot(u, v) * 2, a = Math.atan2(v, u);
+      const n = noise3(u * 9, v * 9, 1) * 0.5 + noise3(u * 23, v * 23, 4) * 0.25;
+      const rim = d + n * 0.12;
+      let ray = 0;
+      for (const q of rays) {
+        const da = Math.abs(((a - q.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+        if (da < q.w) ray = Math.max(ray, (1 - da / q.w) * Math.max(0, 1 - d / q.l));
+      }
+      // the bottom (dark), the lip (raw sandy earth), the spray beyond it
+      const bottom = 1 - Math.min(1, Math.max(0, (rim - 0.26) / 0.12));
+      const lip = Math.max(0, 1 - Math.abs(rim - 0.46) / 0.16);
+      const spray = Math.max(0, Math.min(1, ray * 1.4 + (n + 0.2) * Math.max(0, 1 - d) * 0.6));
+      let cr = 0.3, cg = 0.25, cb = 0.18;
+      cr += (0.07 - cr) * bottom; cg += (0.06 - cg) * bottom; cb += (0.05 - cb) * bottom;
+      const k = 0.9 + n * 0.3;
+      const alpha = Math.min(1, Math.max(bottom, lip * 0.95, spray * 0.8 * Math.max(0, 1 - d * 0.9))) * Math.max(0, Math.min(1, (1 - d) * 4));
+      const i = (y * size + x) * 4;
+      data[i] = Math.min(255, cr * k * 255);
+      data[i + 1] = Math.min(255, cg * k * 255);
+      data[i + 2] = Math.min(255, cb * k * 255);
+      data[i + 3] = alpha * 255;
+    }
+  }
+  const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+const _cn = new THREE.Vector3(), _cq = new THREE.Quaternion(), _cq2 = new THREE.Quaternion(), _cs = new THREE.Vector3(), _cm = new THREE.Matrix4(), _cu = new THREE.Vector3(0, 1, 0);
 
 export class FX {
   constructor(scene, { maxSmoke = 7000, maxGlow = 4000, maxDebris = 300, maxShards = 640, maxBrass = 1600, lights = 4 } = {}) {
@@ -359,6 +405,9 @@ export class FX {
 
     // whole lids in flight or on the ground: { obj, vel, axis, w, age, rest, life }
     this.lids = [];
+
+    // bomb craters: flat decals in a ring buffer, one instanced mesh made with the first crater (crater())
+    this.craters = { next: 0, n: 0, mesh: null };
 
     // a fixed pool of point lights for nearby blasts and muzzle flashes (never added/removed at runtime)
     this.lights = [];
@@ -761,6 +810,8 @@ export class FX {
     for (const l of this.lids) this.scene.remove(l.obj);
     this.lids.length = 0;
     this.cases.life.fill(0);
+    this.craters.n = this.craters.next = 0;
+    if (this.craters.mesh) this.craters.mesh.count = 0;
   }
 
   /**
@@ -863,6 +914,207 @@ export class FX {
     if (rand() < 0.15) this.addGlow(SPARK, p.x, p.y, p.z, vel.x * 0.1 + rr(-8, 8), vel.y * 0.1 + rr(-4, 8), vel.z * 0.1 + rr(-8, 8), rr(0.3, 0.8), 0.15, 0.08, 30, 14, 4, 1, { len: 0.05, drag: 0.8, buoy: -9.8 });
   }
 
+  // ---------------------------------------------------------------- the WW2 era: flak and air attack
+
+  /**
+   * An 8.8 cm shell bursting (maxgfx's 5in burst): a flash and a short fireball, a jet-black ball that is
+   * most of its size at once (the explosion throws it out), ragged lobes and fragment streaks round it,
+   * then the ball spreads and drifts with the wind for a quarter of a minute and leaves a faint grey haze
+   * that hangs for most of a minute, so a barrage smudges its patch of sky. The bursts are seen from 8 to
+   * 20 km (the bombers' height and range): thinned with distance and drawn a little larger far off, so
+   * each stays a few pixels across.
+   */
+  flak(p) {
+    const d = this._cam.distanceTo(p);
+    if (d > 26000) return;
+    const far = d > 9000 ? 0.5 : d > 3500 ? 0.7 : 1;
+    // drawn larger with the distance (as render/entities.js draws far aircraft), so a burst 10 km off is
+    // still a black dot a few pixels across beside the bombers
+    const g = Math.min(6, Math.max(1, d / 2500));
+    this.addGlow(FLASH, p.x, p.y, p.z, 0, 0, 0, 0.14, 9 * g, 17 * g, 46, 30, 14, 1);
+    this.addGlow(FLAME, p.x, p.y, p.z, 0, 0, 0, 0.45, 5 * g, 10 * g, 14, 5.5, 1.6, 1);
+    if (d < 900) this.light(p, 2500, 0.18, 0xffb070);
+    const k = Math.max(0.5, this.budget) * far;
+    // the core: dense and black
+    for (let i = 0, n = Math.max(2, Math.round(4 * k)); i < n; i++) {
+      tmpV.randomDirection().multiplyScalar(rr(0.5, 2.5) * g);
+      this.addSmoke(SMOKE.BURST, p.x + tmpV.x, p.y + tmpV.y, p.z + tmpV.z, tmpV.x * 2, tmpV.y * 2, tmpV.z * 2, rr(14, 20), rr(9, 12) * g, rr(24, 32) * g, 0.02, 0.019, 0.018, 1, { drag: 1.2 });
+    }
+    // ragged lobes thrown out and stopped by the air
+    for (let i = 0, n = Math.max(1, Math.round(5 * k)); i < n; i++) {
+      tmpV.randomDirection();
+      const v = rr(10, 18);
+      this.addSmoke(SMOKE.BURST, p.x + tmpV.x * 3 * g, p.y + tmpV.y * 3 * g, p.z + tmpV.z * 3 * g, tmpV.x * v, tmpV.y * v, tmpV.z * v, rr(10, 15), rr(4, 6) * g, rr(15, 21) * g, 0.042, 0.04, 0.038, 0.85, { drag: 2.4 });
+    }
+    // fragments: dark streaks of smoke and a spray of hot sparks
+    if (d < 2500) {
+      for (let i = 0, n = Math.round(4 * k); i < n; i++) {
+        const v = tmpV.randomDirection().multiplyScalar(rr(30, 45));
+        this.addSmoke(SMOKE.PUFF, p.x, p.y, p.z, v.x, v.y, v.z, rr(1.2, 2), 1.2, 3.5, 0.05, 0.05, 0.05, 0.55, { drag: 1.8 });
+      }
+    }
+    if (d < 8000) {
+      for (let i = 0; i < 10; i++) {
+        const v = tmpV.randomDirection().multiplyScalar(rr(50, 110));
+        this.addGlow(SPARK, p.x, p.y, p.z, v.x, v.y, v.z, rr(0.2, 0.45), 0.3, 0.12, 30, 16, 6, 1, { len: 0.05, drag: 1.5 });
+      }
+    }
+    // the haze it leaves: broad, faint and grey, fading in as the ball thins (long-lived: kept to a
+    // share of the pool, as the missiles' hanging trails are)
+    if (this.hangN < this.smoke.max * 0.35) {
+      for (let i = 0, n = rand() < 0.5 * this.budget ? 2 : 1; i < n; i++) {
+        tmpV.randomDirection().multiplyScalar(rr(4, 10) * g);
+        if (this.addSmoke(SMOKE.HANG, p.x + tmpV.x, p.y + tmpV.y, p.z + tmpV.z, tmpV.x * 0.3, tmpV.y * 0.2, tmpV.z * 0.3, rr(35, 55), 14 * g, rr(55, 75) * g, 0.2, 0.195, 0.19, 0.16, { drag: 0.6 }) !== undefined) this.hangN++;
+      }
+    }
+  }
+
+  /**
+   * A heavy gun firing (the 8.8 cm, no muzzle brake): a ball of flame thrown out along the bore and the
+   * cone of fire behind it, a cloud of brown-grey cordite smoke rolling out ahead and rising, and the
+   * blast's dust raised off the pit's floor and its earth walls round the gun at `base` (more with the
+   * barrel low). p: the muzzle, dir: the bore; size 1 for an 8.8 cm.
+   */
+  cannon(p, dir, base, size = 1) {
+    const s = size, b = this.budget;
+    this.addGlow(FLASH, p.x + dir.x * 2 * s, p.y + dir.y * 2 * s, p.z + dir.z * 2 * s, 0, 0, 0, 0.07, 2.4 * s, 5 * s, 44, 24, 7, 1);
+    this.addGlow(SPARK, p.x, p.y, p.z, dir.x, dir.y, dir.z, 0.06, 1 * s, 1.4 * s, 40, 20, 6, 1, { len: 4.5 * s, drag: 1e6 });
+    for (let i = 0; i < 3; i++) {
+      const v = rr(18, 36) * s;
+      this.addGlow(FLAME, p.x + dir.x * s, p.y + dir.y * s, p.z + dir.z * s, dir.x * v + rr(-3, 3), dir.y * v + rr(-3, 3), dir.z * v + rr(-3, 3), rr(0.08, 0.15), 1.2 * s, 2.8 * s, 14, 6, 1.5, 1, { drag: 6 });
+    }
+    this.light(p, 5000 * s * s, 0.14, 0xffb070);
+    const ns = Math.round(10 * s * b) + 4;
+    for (let i = 0; i < ns; i++) {
+      const f = rr(2, 10) * s, v = rr(8, 28) * s;
+      tmpV.randomDirection();
+      this.addSmoke(SMOKE.CORDITE, p.x + dir.x * f, p.y + dir.y * f, p.z + dir.z * f, dir.x * v + tmpV.x * 3, dir.y * v + tmpV.y * 3 + 1, dir.z * v + tmpV.z * 3, rr(5, 9), 1.5 * s, rr(6, 10) * s, 0.56, 0.52, 0.46, 0.5, { drag: 1.4, buoy: 0.6 });
+    }
+    // the blast's dust off the pit: a ring round the gun, thicker with the barrel low
+    const gy = this.ground(base.x, base.z);
+    const low = 1 - 0.6 * Math.min(1, Math.max(0, dir.y));
+    const nd = Math.round(16 * s * b * low) + 4;
+    for (let i = 0; i < nd; i++) {
+      const a = rand() * 6.283, r0 = rr(1.5, 5), v = rr(3, 10) * s * low;
+      this.addSmoke(SMOKE.PUFF, base.x + Math.cos(a) * r0, gy + rr(0.3, 1.6), base.z + Math.sin(a) * r0, Math.cos(a) * v + dir.x * 4, rr(0.5, 2.5), Math.sin(a) * v + dir.z * 4, rr(4, 8), 1.5 * s, rr(5, 9) * s, 0.5, 0.43, 0.33, 0.45, { drag: 0.8, buoy: 0.2 });
+    }
+  }
+
+  /**
+   * A bomb bursting on the ground (or a rocket's head): the flash and a short fireball, the column of earth
+   * thrown straight up (tens of metres for a 500 lb bomb) falling back as a brown curtain, the black smoke
+   * rising out of the crater, clods flung out, and the blast's dust ring rolling out over the ground.
+   * size: 1 for a 500 lb bomb (about 0.6 for 100 lb, 1.4 for 1,000 lb, 0.5 for an RP-3's 60 lb head).
+   */
+  bomb(p, size = 1) {
+    const s = size, b = this.budget;
+    const gy = this.ground(p.x, p.z);
+    this.addGlow(FLASH, p.x, gy + 2 * s, p.z, 0, 0, 0, 0.16, 6 * s, 16 * s, 60, 40, 20, 1);
+    for (let i = 0, n = Math.round(6 * s * b) + 3; i < n; i++) {
+      this.addGlow(FLAME, p.x + rr(-2, 2) * s, gy + rr(0.5, 3) * s, p.z + rr(-2, 2) * s, rr(-4, 4) * s, rr(6, 18) * s, rr(-4, 4) * s, rr(0.4, 0.8), 3 * s, 8 * s, 16, 6.5, 1.6, 1, { drag: 2, buoy: 1 });
+    }
+    this.light(tmpV.set(p.x, gy + 4, p.z), 6000 * s * s, 0.5, 0xff9a50);
+    // the earth column: thrown up, slowed by gravity (buoy < 0), falling back
+    // (a heavy raid drops a hundred bombs or more: kept lean, and the pool's spare room decides the rest)
+    const q = this.cheap() ? 1 : 0.5;
+    for (let i = 0, n = Math.round(18 * s * b * q) + 6; i < n; i++) {
+      const up = rr(10, 30) * s * (0.6 + 0.4 * rand());
+      this.addSmoke(SMOKE.BURST, p.x + rr(-1.5, 1.5) * s, gy + rr(0.5, 3), p.z + rr(-1.5, 1.5) * s, rr(-3, 3) * s, up, rr(-3, 3) * s, rr(4, 8), 2 * s, rr(6, 12) * s, 0.17, 0.135, 0.095, 0.9, { drag: 0.6, buoy: -6 });
+    }
+    for (let i = 0, n = Math.round(10 * s * b * q) + 4; i < n; i++) {
+      this.addSmoke(SMOKE.BLACK, p.x + rr(-2, 2) * s, gy + rr(1, 4) * s, p.z + rr(-2, 2) * s, rr(-1, 1), rr(3, 8) * s, rr(-1, 1), rr(12, 20), 3 * s, rr(14, 24) * s, 0.05, 0.045, 0.04, 0.85, { glow: 0.25, drag: 0.8, buoy: 0.6 });
+    }
+    for (let i = 0, n = Math.round(10 * s * b * q) + 4; i < n; i++) {
+      const a = rand() * 6.283, v = rr(6, 18) * s;
+      this.addSmoke(SMOKE.PUFF, p.x + Math.cos(a) * 2 * s, gy + rr(0.3, 1.5), p.z + Math.sin(a) * 2 * s, Math.cos(a) * v, rr(0.5, 3), Math.sin(a) * v, rr(4, 7), 2 * s, rr(7, 12) * s, 0.36, 0.3, 0.22, 0.45, { drag: 0.7, buoy: 0.15 });
+    }
+    this.sparks(tmpV.set(p.x, gy + 1, p.z), Math.round(10 * s) + 4, 26 * s + 10);
+    this.debrisBurst(tmpV.set(p.x, gy + 1, p.z), Math.round(10 * s) + 4, 14 + 16 * s, 0.25 + 0.3 * s);
+  }
+
+  /**
+   * A crater decal on the ground at p, r metres to the edge of its spray (the dark bottom is about a third
+   * of that across): laid on the terrain's slope, at most MAX_CRATERS, the oldest going first.
+   */
+  crater(p, r = 8) {
+    const C = this.craters;
+    if (!C.mesh) {
+      const mat = patchMaterial(new THREE.MeshStandardMaterial({ map: craterTexture(), roughness: 0.95, metalness: 0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }), 'fog');
+      C.mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), mat, MAX_CRATERS);
+      C.mesh.count = 0;
+      C.mesh.frustumCulled = false;
+      C.mesh.receiveShadow = true;
+      C.mesh.renderOrder = 1;
+      this.scene.add(C.mesh);
+    }
+    const e = Math.max(1, r * 0.5), x = p.x, z = p.z;
+    _cn.set(this.ground(x - e, z) - this.ground(x + e, z), 2 * e, this.ground(x, z - e) - this.ground(x, z + e)).normalize();
+    _cq.setFromUnitVectors(_cu, _cn).multiply(_cq2.setFromAxisAngle(_cu, rand() * 6.283));
+    _cm.compose(tmpV.set(x, this.ground(x, z) + 0.06, z), _cq, _cs.set(2 * r, 1, 2 * r));
+    C.mesh.setMatrixAt(C.next, _cm);
+    C.next = (C.next + 1) % MAX_CRATERS;
+    C.n = Math.min(C.n + 1, MAX_CRATERS);
+    C.mesh.count = C.n;
+    C.mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  /**
+   * A strafing burst striking the ground round p: dust spurts walked along the aircraft's path (its
+   * velocity `vel`; the guns' beaten zone, a few metres across and a couple of dozen long), a few sparks,
+   * and its tracers coming down into it from the aircraft at `from`.
+   */
+  strafe(p, from, vel) {
+    const h = Math.hypot(vel.x, vel.z) || 1, fx = vel.x / h, fz = vel.z / h;
+    for (let i = 0, n = 6 + Math.round(6 * this.budget); i < n; i++) {
+      const al = rr(-12, 12), sd = rr(-3, 3);
+      const x = p.x + fx * al - fz * sd, z = p.z + fz * al + fx * sd, gy = this.ground(x, z);
+      this.addSmoke(SMOKE.BURST, x, gy + 0.3, z, rr(-1, 1) + fx * 2, rr(3, 8), rr(-1, 1) + fz * 2, rr(1.5, 3), 0.4, rr(1.6, 2.8), 0.3, 0.25, 0.18, 0.75, { drag: 2, buoy: -3 });
+      if (rand() < 0.3) this.addGlow(FLASH, x, gy + 0.3, z, 0, 0, 0, 0.05, 0.3, 0.7, 30, 20, 8, 1);
+    }
+    this.sparks(tmpV.set(p.x, this.ground(p.x, p.z) + 0.5, p.z), 4, 12);
+    // the tracers (one round in five): streaks flying down from the aircraft into the burst
+    for (let i = 0; i < 3; i++) {
+      const tx = p.x + fx * rr(-12, 12), tz = p.z + fz * rr(-12, 12);
+      tmpV.set(tx - from.x, this.ground(tx, tz) - from.y, tz - from.z);
+      const dist = tmpV.length();
+      if (dist < 1) continue;
+      tmpV.multiplyScalar(870 / dist);
+      this.addGlow(SPARK, from.x, from.y, from.z, tmpV.x, tmpV.y, tmpV.z, dist / 870, 0.12, 0.1, 30, 9, 3, 1, { len: 0.018, drag: 0 });
+    }
+  }
+
+  /** A light flak round self-destructing (3.7 cm) at the end of its tracer: a sharp little flash and a tight dark puff that lingers. */
+  puff(p, size = 1) {
+    const d = this._cam.distanceTo(p);
+    if (d > 7000) return;
+    const s = size;
+    this.addGlow(FLASH, p.x, p.y, p.z, 0, 0, 0, 0.07, 2.2 * s, 4 * s, 40, 26, 11, 1);
+    this.addGlow(FLAME, p.x, p.y, p.z, 0, 0, 0, 0.18, 1 * s, 2.2 * s, 12, 5, 1.4, 1);
+    for (let i = 0, n = d < 2500 ? 2 : 1; i < n; i++) {
+      this.addSmoke(SMOKE.PUFF, p.x + rr(-0.6, 0.6), p.y + rr(-0.6, 0.6), p.z + rr(-0.6, 0.6), rr(-1, 1), rr(-1, 1), rr(-1, 1), rr(7, 10), rr(2, 2.6) * s, rr(5.5, 7) * s, 0.06, 0.058, 0.056, 0.9, { drag: 1.2 });
+    }
+  }
+
+  /** A shell striking the ground (a light flak round, size about 0.4): a spurt of dust and a few sparks. */
+  spurt(p, size = 0.5) {
+    if (this._cam.distanceTo(p) > 4000) return;
+    const gy = this.ground(p.x, p.z);
+    for (let i = 0; i < 2; i++) {
+      this.addSmoke(SMOKE.PUFF, p.x + rr(-0.5, 0.5), gy + 0.3, p.z + rr(-0.5, 0.5), rr(-1, 1), rr(2, 6) * size + 1, rr(-1, 1), rr(1.5, 3), 0.4 * size + 0.2, rr(1.5, 2.8) * size + 0.8, 0.46, 0.39, 0.29, 0.7, { drag: 2, buoy: -3 });
+    }
+    this.addGlow(FLASH, p.x, gy + 0.3, p.z, 0, 0, 0, 0.05, 0.4 * size, 1.2 * size, 30, 20, 8, 1);
+    if (rand() < 0.5) this.sparks(tmpV.set(p.x, gy + 0.3, p.z), 3, 10);
+  }
+
+  /** Rockets leaving an aircraft's rails: a flash and a puff of grey-white smoke at p along dir. */
+  rocketOff(p, dir) {
+    this.addGlow(FLASH, p.x, p.y, p.z, 0, 0, 0, 0.08, 1.5, 3.5, 50, 32, 14, 1);
+    for (let i = 0; i < 4; i++) {
+      tmpV.randomDirection();
+      this.addSmoke(SMOKE.PUFF, p.x + tmpV.x, p.y + tmpV.y, p.z + tmpV.z, dir.x * 20 + tmpV.x * 3, dir.y * 20 + tmpV.y * 3, dir.z * 20 + tmpV.z * 3, rr(3, 5), 1, rr(4, 6), 0.8, 0.8, 0.78, 0.6, { drag: 1.6, buoy: 0.2 });
+    }
+  }
+
   // ---------------------------------------------------------------- update
   update(dt, camera, { sunDir, sunColor, sunIntensity = 6.5, ambient, night = 0 }) {
     this.dt = dt > 0 ? dt : this.dt;
@@ -915,7 +1167,8 @@ export class FX {
       A[o + 2] = P.pz[i];
       A[o + 3] = P.s0[i] + (P.s1[i] - P.s0[i]) * grow;
       // a hanging trail holds its density longer and thins out late
-      const fade = P.kind[i] === SMOKE.HANG ? Math.min(1, t * 8) * (1 - t * t * t) : Math.min(1, t * 12) * (1 - t * t);
+      const kd = P.kind[i];
+      const fade = kd === SMOKE.HANG ? Math.min(1, t * 8) * (1 - t * t * t) : kd === SMOKE.BURST ? Math.min(1, t * 120) * (1 - t * t) : Math.min(1, t * 12) * (1 - t * t);
       B[o] = P.r[i];
       B[o + 1] = P.g[i];
       B[o + 2] = P.b[i];
