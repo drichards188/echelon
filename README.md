@@ -1,8 +1,8 @@
 # Echelon: layered air defense
 
-A three.js (WebGL2) game built on the MaxGFX framework (`../threejs-maxgfx`). One game holds several eras of air defense; the modern one is playable, a late-war WW2 era (German flak defending the jet airfield at Hopsten, February to March 1945) is in development: its battles run in the headless sim, its models and consoles are being built. In the modern era you command the air defense of an airbase on the steppe: an S-400 battalion for the long-range, high layer, two Pantsir-S1 for point defense, an Osa-AKM and a Strela-10M3 for the short-range layer, against seven escalating raids of drones, cruise missiles, fighters with radar-seeking missiles and glide bombs, decoys, attack helicopters and ballistic missiles.
+A three.js (WebGL2) game built on the MaxGFX framework (`../threejs-maxgfx`). It has two playable eras: modern layered air defense and late-war WW2 flak defending the jet airfield at Hopsten in February to March 1945. In the modern era you command the air defense of an airbase on the steppe: an S-400 battalion for the long-range, high layer, two Pantsir-S1 for point defense, an Osa-AKM and a Strela-10M3 for the short-range layer, against seven escalating raids of drones, cruise missiles, fighters with radar-seeking missiles and glide bombs, decoys, attack helicopters and ballistic missiles.
 
-The left half of the screen is a third-person view of the unit you have selected; the right half is that unit's console. The units you are not operating fight on their own, in whatever mode you left them. Everything is procedural (terrain, vehicles, aircraft, missiles, the consoles, almost all the sound); the only asset files are four CC0 recordings in `public/audio` (see `CREDITS.md` there).
+The left half of the screen is a third-person view of the unit you have selected; the right half is that unit's console. The units you are not operating fight on their own, in whatever mode you left them. The visuals are procedural; sound combines synthesis with recordings credited in `public/audio/CREDITS.md`.
 
 The simulation is a game, not a weapons model: the systems keep their names, look and their place in the layering, and the mechanics are game rules with gameplay values (see `DESIGN.md`, "Simulation fidelity").
 
@@ -16,7 +16,7 @@ npm run build    # production bundle in dist/
 
 Pick an era, a difficulty and a loadout and click **Take command**. A demonstration battle runs behind the title screen; its camera drifts slowly and cuts to another unit about every 26 s, and now and then to a missile launch.
 
-**Era.** The toggle at the top of the options picks the era: **Modern** (2020s), or **WW2** (1944 to 1945), shown greyed out and marked as in development until its content exists. The line under it gives the era's setting (point at the other era to read its own). An era brings its own map, units, raids and consoles; the loadout picker, the tutorials and the demonstration battle follow it. The era is kept in the browser for the next visit.
+**Era.** The toggle at the top of the options picks **Modern** (2020s) or **WW2** (1944 to 1945). The line under it gives the era's setting (point at the other era to read its own). An era brings its own map, units, raids and consoles; the loadout picker, the tutorials and the demonstration battle follow it. The era is kept in the browser for the next visit.
 
 **Loadout.** Under the difficulty the title screen lists the five slots (the number keys) with two options each, the default first; the line under a slot gives the chosen option's trade-off (point at the other option to read its own). Picking an option rebuilds the demonstration battle with it and cuts to that unit, so you see what you chose; **Take command** fights with it. The choice is kept in the browser for the next visit, one loadout per era. A tutorial runs on the default units with its own vehicle swapped in (the Buk, Tunguska, Tor and Shilka lessons) and puts your loadout back when it ends.
 
@@ -35,11 +35,13 @@ The search radars see high flyers far out and low flyers only close in and over 
 - **Osa-AKM**: one target at a time, salvoes of two, its tracking radar must hold the target until the missiles arrive.
 - **Strela-10M3**: no radar. Slew the optical sight onto the target (drag in the sight or arrow keys, the strip below it cues the bearings of the nearest threats from the battalion's picture), uncage the seeker (U), wait for the tone to steady and the LOCK lamp, then fire.
 
+In **WW2**, the six 8.8 cm guns share a predictor and fire salvos. Select a plotted aircraft, let the solution settle, then use **FEUER**; the battery console also has radar or optical ranging and aimed or barrage fire. Each 3.7 cm and 2 cm platoon has three guns with their own sights and ammunition feeds. Select a target and hold the trigger in manual mode, or leave the crews in auto. The four WW2 tutorials teach the battery and each platoon type.
+
 Between raids (40 s of quiet) a supply column refills the reserves; launchers still have to reload, which takes from half a minute to two minutes and keeps that launcher out of action, so start them as the raid ends.
 
 | Key | Action |
 |---|---|
-| Click an era | title screen: switch the era (Modern; WW2 is in development) |
+| Click an era | title screen: switch between Modern and WW2 |
 | Click a loadout option | title screen: swap that slot's unit for the next battle |
 | `1`-`5` | select a unit (or click its tab above the console) |
 | Drag, wheel | orbit and zoom the camera |
@@ -73,15 +75,17 @@ Between raids (40 s of quiet) a supply column refills the reserves; launchers st
 - **2S6M Tunguska** (replaces a Pantsir): holding the trigger and the fire control's lead, heat and ammunition, the optical-only missile channel and when to use it, the search radar, reloading.
 - **Tor-M2** (replaces the Osa): the tracking sector, a vertical cold launch, several targets at once on separate channels, a salvo, reloading.
 - **Shilka-M4** (replaces the Strela): radar tracking and the lock lamp, the lead mark in the sight, a very short range, bursts and heat, the optical fallback with the dish off, the radar as an anti-radar target.
+- **WW2 8.8 cm battery**: the predictor, gun reports, salvos, optical ranging when Window spoils the radar, and barrage fire.
+- **WW2 3.7 cm, Flakvierling and 2 cm platoons**: one lesson per gun type, covering the sight, ammunition feed, target selection and firing.
 
-`?tutorial=s400` (or `basics`, `pantsir`, `osa`, `strela`, `buk`, `tunguska`, `tor`, `shilka`) starts one at once.
+`?tutorial=s400` (or `basics`, `pantsir`, `osa`, `strela`, `buk`, `tunguska`, `tor`, `shilka`) starts a modern lesson at once. Select WW2 and choose its lessons from the Tutorials list.
 
 ## Development pages
 
 - `/models.html?kind=pantsir` (or `?all=vehicles|threats|interceptors|assets`, `&anim=1`, `&cam=az,el,dist`): the model viewer. `&ortho=right|left|front|rear|top` (with `kind`) gives an orthographic blueprint view with a 1 m grid (5 m lines darker) for checking proportions. `&era=ID` loads that era's lazily loaded models (and its markings and assets).
 - Vehicle model work: each vehicle is rebuilt against reference sheets in `refs/<group>/` (`README.md` with dimensions, profiles, a feature checklist and a photo index with licences, plus `photos/` from Wikimedia Commons). The folder is gitignored and only for local reference, not part of the game. The method: compare viewer renders with the photos from matching angles, check the blueprint views against the dimension tables, and iterate.
 - `/?loadout=buk,tunguska,pantsir,tor,shilka` (kinds in slot order, empty entries or anything a slot does not offer take the default; `alt` for every alternative) starts with that loadout without saving it; `window.__iads.setLoadout(kinds)` changes it from a test.
-- `/?era=modern` starts in that era without saving it (an era still in development falls back to modern); `window.__iads.setEra(id)` switches it from a test (`__iads.era` is the era in play). Local storage keeps `echelon.era` and the loadout per era in `echelon.loadout.<era>`.
+- `/?era=modern` or `/?era=ww2` starts in that era without saving it; `window.__iads.setEra(id)` switches it from a test (`__iads.era` is the era in play). Local storage keeps `echelon.era` and the loadout per era in `echelon.loadout.<era>`.
 - `/ui.html?unit=STR`: the consoles against a mock battle.
 - `/audio.html`: a live smoke test of the audio engine.
 - `node tools/simtest.mjs 1 2 3 --both --quiet`: whole battles headless, all-auto against a scripted S-400 player. With `--era ww2` the scripted players are the WW2 era's (a heavy battery player, and one who also runs the platoons) and the columns are its slots, with the heavy battery's own 2 cm guns apart (B20). `--all` adds a player who also runs both Pantsirs, `--difficulty Easy|Normal|Hard|all` picks the difficulty, `--era ID` the era (default `modern`), `--loadout KINDS|alt` the units, `--table` prints only the summary, `--log` the whole radio log, `--jobs N` sets the worker threads. Each game prints a per-wave summary.
@@ -96,7 +100,7 @@ src/
   eras/            one module per era: map layout, slots and options, raids, text, alert captions, theme
     index.js       the registry (ERAS), the derived default loadouts, loadEra (an era's lazily loaded content)
     modern.js      the modern era (the airbase on the steppe)
-    ww2.js         the WW2 era: Fliegerhorst Hopsten, February to March 1945, its flak, six day raids (in development; ww2/content.js: its lazy modules)
+    ww2.js         the WW2 era: Fliegerhorst Hopsten, February to March 1945, its flak, six day raids (ww2/content.js: its lazy modules)
   deploy.js        the era in play (setEra) and where everything sits (units, their vehicles, the assets), bearing helpers
   sim/             the battle, pure logic (runs in Node)
     sim.js         Sim: update order, events, damage, targets for the attackers, radio

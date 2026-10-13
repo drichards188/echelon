@@ -267,7 +267,7 @@ export class Planes {
     const sim = this.sim;
     if ((t.gunT = (t.gunT ?? 0) - dt) > 0) return;
     t.gunT = 0.2;
-    const s = (6 + slant * 0.008) * (1 + this.rattle(t));
+    const s = (6 + slant * 0.008) * (1 + this.rattle(t)) * (sim.difficulty.bombAim ?? 1);
     _q.set(aim.x + (sim.rng() - 0.5) * 2 * s, 0, aim.z + (sim.rng() - 0.5) * 2 * s);
     _q.y = sim.heightAt(_q.x, _q.z);
     sim.strafe(t, _q, (THREATS[t.type].guns ?? 4) * 0.2);
@@ -413,7 +413,7 @@ export class Planes {
       if (hit && along < 0 && hd < 12000) {
         // bombs away: the lead bombardier's error, worse when the flak has hit or shaken his aircraft
         t.released = true;
-        const s = 120 * (1 + this.rattle(t));
+        const s = 120 * (1 + this.rattle(t)) * (sim.difficulty.bombAim ?? 1);
         t.boxErr = new THREE.Vector3((sim.rng() - 0.5) * 2 * s, 0, (sim.rng() - 0.5) * 2 * s);
         this.dropStick(t, 0.25, 0, t.boxErr);
         // rally off to one side
@@ -538,7 +538,8 @@ export class Planes {
     t.stick = t.bombs;
     t.stickT = 0;
     t.stickGap = gap;
-    t.stickErr = new THREE.Vector3((this.sim.rng() - 0.5) * 2 * s * (1 + this.rattle(t)), 0, (this.sim.rng() - 0.5) * 2 * s * (1 + this.rattle(t)));
+    const k = this.sim.difficulty.bombAim ?? 1;
+    t.stickErr = new THREE.Vector3((this.sim.rng() - 0.5) * 2 * s * (1 + this.rattle(t)) * k, 0, (this.sim.rng() - 0.5) * 2 * s * (1 + this.rattle(t)) * k);
     if (boxErr) t.stickErr.add(boxErr);
   }
 
@@ -600,7 +601,7 @@ export class Planes {
     const sim = this.sim;
     if ((t.salvoT = (t.salvoT ?? 0) - dt) > 0) return;
     t.salvoT = 0.1;
-    const s = 0.008 * (1 + this.rattle(t));
+    const s = 0.008 * (1 + this.rattle(t)) * (sim.difficulty.bombAim ?? 1);
     for (let k = 0; k < 2 && t.salvo > 0; k++) {
       t.salvo--;
       t.rockets--;

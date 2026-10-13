@@ -1,4 +1,4 @@
-// The WW2 era's heavy modules: nothing yet. Its era definition imports this with a dynamic import
+// The WW2 era's heavy modules. Its era definition imports this with a dynamic import
 // (eras/ww2.js `content`), which main.js runs through eras/index.js loadEra only when the era is picked,
 // so its code stays out of the modern game's download.
 //

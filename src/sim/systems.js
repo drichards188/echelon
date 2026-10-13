@@ -493,9 +493,12 @@ Object.assign(THREATS, {
 
 // hit: interceptor hit chances, enemy: the size of drone, cruise missile, decoy and helicopter groups (and
 // of the WW2 era's aircraft groups), air: the size of fighter and ballistic missile groups, damage: what
-// leakers do, aim: the WW2 gun crews' and predictors' aiming errors (sim/mounts.js)
+// leakers do, aim: the WW2 light and medium gun crews' aiming errors, heavyAim: the WW2 heavy battery's
+// predictor's (sim/mounts.js; `aim` when missing), bombAim: the WW2 aircraft's aiming errors with their
+// bombs, rockets and guns (sim/planes.js). Hard's predictor is held to 1.25 so the 8.8 cm still brings
+// bombers down (at 1.5 it got about 4 a game), and Hard's aircraft aim better instead.
 export const DIFFICULTY = {
   Easy: { hit: 1.15, enemy: 0.9, air: 0.75, damage: 0.6, aim: 0.85 },
   Normal: { hit: 1, enemy: 1.15, air: 1, damage: 1, aim: 1 },
-  Hard: { hit: 0.9, enemy: 1.4, air: 1.2, damage: 1, aim: 1.5 },
+  Hard: { hit: 0.9, enemy: 1.4, air: 1.2, damage: 1, aim: 1.5, heavyAim: 1.25, bombAim: 0.9 },
 };

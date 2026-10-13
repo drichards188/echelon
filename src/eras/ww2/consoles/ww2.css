@@ -1,0 +1,301 @@
+/* The WW2 era's console theme (`.era-ww2` on the panel root, ui/panel.js setTheme): a 1945 German gun
+   position's command post instead of the modern cabin. Dark grey painted steel (Dunkelgrau), stencilled
+   cream lettering, engraved aluminium label plates under the instruments, black enamel dials, drum
+   counters, round signal lamps, Bakelite knobs and push buttons. Everything is scoped under .era-ww2, so
+   the modern consoles are untouched; the WW2 consoles' own parts carry the classes from consoles/kit.js. */
+
+.pn-root.era-ww2 {
+  background: #1a1b18;
+  color: #e7e2cc;
+  --paint: #4b4e48;
+  --paint-hi: #5f625b;
+  --paint-lo: #33352f;
+  --edge: #1a1b17;
+  --cream: #ebe5cd;
+  --muted: #aaa797;
+  --amber: #ffc45a;
+  --phos: #f4dc9a;
+  --plate: #c4c1b2;
+  --plate-ink: #1d1c18;
+  --stencil: 'DejaVu Sans Condensed', 'Liberation Sans Narrow', 'Arial Narrow', Arial, sans-serif;
+}
+
+.era-ww2 .pn-scale {
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.8 -0.3'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='520' height='520'><filter id='m'><feTurbulence type='fractalNoise' baseFrequency='0.012 0.018' numOctaves='3' seed='9' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.8  0 0 0 0 0.82  0 0 0 0 0.78  0 0 0 0.35 -0.12'/></filter><rect width='100%25' height='100%25' filter='url(%23m)'/></svg>"),
+    linear-gradient(180deg, #3d403b 0%, #33352f 100%);
+}
+
+/* ---------- unit tabs and the status strip ---------- */
+.era-ww2 .tab { background: linear-gradient(#2c2e2a, #1f201d); border-color: #0d0d0c; color: #8f8d80; }
+.era-ww2 .tab:hover { background: linear-gradient(#363833, #262723); }
+.era-ww2 .tab.sel { background: linear-gradient(#686b63, #4f524b); color: var(--cream); box-shadow: inset 0 0 0 2px #1b1c19, inset 0 0 0 3px rgba(255,250,225,.22), 0 0 8px rgba(255,210,120,.18); }
+.era-ww2 .tkey { background: #c9c4ab; color: #1b1b17; }
+.era-ww2 .tab.sel .tkey { background: #e9dfb5; box-shadow: 0 0 5px rgba(255,230,160,.6); }
+.era-ww2 .ttype { letter-spacing: .06em; }
+.era-ww2 .tstatus { background: #11110f; }
+.era-ww2 .tstatus .sstate { color: #ffd27a; text-shadow: 0 0 5px rgba(255,190,90,.5); }
+.era-ww2 .led.green.on { background: #ffe9a8; box-shadow: 0 0 6px #ffd56a, 0 0 0 1px #0b0b07; }
+
+/* ---------- stencilled captions ---------- */
+.era-ww2 .ptitle b, .era-ww2 .call, .era-ww2 .gcard44 .ptitle b {
+  font-family: var(--stencil); font-weight: 800; letter-spacing: .14em; color: var(--cream);
+  -webkit-mask: linear-gradient(180deg, #000 0 47%, rgba(0,0,0,.25) 47% 55%, #000 55%);
+  mask: linear-gradient(180deg, #000 0 47%, rgba(0,0,0,.25) 47% 55%, #000 55%);
+}
+.era-ww2 .ptitle i { color: #b7b4a4; }
+.era-ww2 .plate { background:
+    radial-gradient(circle, #d6d3c4 0 1.4px, #7a7a70 2.4px, #23231f 3.5px, transparent 4.1px) 5px 5px / 9px 9px no-repeat,
+    radial-gradient(circle, #d6d3c4 0 1.4px, #7a7a70 2.4px, #23231f 3.5px, transparent 4.1px) calc(100% - 5px) 5px / 9px 9px no-repeat,
+    radial-gradient(circle, #d6d3c4 0 1.4px, #7a7a70 2.4px, #23231f 3.5px, transparent 4.1px) 5px calc(100% - 5px) / 9px 9px no-repeat,
+    radial-gradient(circle, #d6d3c4 0 1.4px, #7a7a70 2.4px, #23231f 3.5px, transparent 4.1px) calc(100% - 5px) calc(100% - 5px) / 9px 9px no-repeat,
+    linear-gradient(180deg, rgba(255,255,240,.07), rgba(0,0,0,.16)),
+    var(--paint);
+  border-color: #171815; }
+.era-ww2 .lbl.cap { color: var(--cream); }
+.era-ww2 .lbl.cap i { color: var(--muted); }
+
+/* ---------- header ---------- */
+.era-ww2 .hdr { background: linear-gradient(#2a2c28, #1c1d1a); border-color: #0b0b0a; }
+.era-ww2 .call { font-size: 22px; }
+.era-ww2 .hsrow { display: flex; align-items: baseline; gap: 6px; }
+.era-ww2 .stat { color: #ffd88a; text-shadow: 0 0 6px rgba(255,200,100,.45); font-family: var(--stencil); font-size: 13px; letter-spacing: .08em; }
+.era-ww2 .staten { font: normal 8px/1 var(--stencil); color: var(--muted); }
+.era-ww2 .stat.bad { color: #ff7a52; text-shadow: 0 0 6px rgba(255,90,40,.5); }
+.era-ww2 .sline { color: #e9cf8a; }
+.era-ww2 .hhp { position: relative; }
+.era-ww2 .hguns { font: normal 8px/1 'DejaVu Sans Mono', monospace; color: var(--muted); }
+.era-ww2 .bar.hi .segs i.on { background: #e8dca8; box-shadow: 0 0 3px rgba(240,225,170,.6); }
+.era-ww2 .bar.mid .segs i.on { background: #ffb43c; box-shadow: 0 0 3px rgba(255,180,60,.6); }
+.era-ww2 .bar .segs { background: #10100e; }
+.era-ww2 .bar .segs i { background: #2c2c27; }
+.era-ww2 .bar .btxt { color: #e8dca8; }
+.era-ww2 .ann { --c: #e8402a; background: color-mix(in srgb, var(--c) 8%, #141311); color: color-mix(in srgb, var(--c) 30%, #2a2925); border-radius: 3px; }
+.era-ww2 .ann.on { background: radial-gradient(ellipse at 50% 40%, color-mix(in srgb, var(--c) 80%, #fff 12%), color-mix(in srgb, var(--c) 55%, #120c08)); }
+.era-ww2 .ann.on { color: #fff8e6; text-shadow: 0 0 3px rgba(0,0,0,.7); }
+.era-ww2 .selbar { background: #12120f; }
+.era-ww2 .seltxt { color: #ffd27a; text-shadow: 0 0 5px rgba(255,190,90,.4); }
+.era-ww2 .seleng.on { color: #ffe8a8; text-shadow: none; }
+.era-ww2 .helpline { color: #9d9b8d; }
+
+/* ---------- engraved label plates under the instruments ---------- */
+.c44 .lamp44 > .lbl, .c44 .drum44 > .lbl, .c44 .dial44 > .lbl, .c44 .kcapt, .era-ww2 .tog > .lbl {
+  background: linear-gradient(#d3d0c1, #b2af9f); color: var(--plate-ink); border-radius: 1.5px; padding: 2px 4px 1px;
+  box-shadow: 0 1px 0 rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.55); }
+.c44 .lamp44 > .lbl b, .c44 .drum44 > .lbl b, .c44 .dial44 > .lbl b, .c44 .kcapt b, .era-ww2 .tog > .lbl b { font-size: 8px; letter-spacing: .06em; color: var(--plate-ink); }
+.c44 .lamp44 > .lbl i, .c44 .drum44 > .lbl i, .c44 .dial44 > .lbl i, .c44 .kcapt i, .era-ww2 .tog > .lbl i { font-size: 6px; color: #3d3b33; opacity: 1; }
+
+/* ---------- push buttons (Bakelite), toggles, selectors ---------- */
+.era-ww2 .btn { border-radius: 6px; background: radial-gradient(ellipse at 50% 30%, #4a4440, #1a1614 70%); border-color: #070605; box-shadow: 0 2px 0 #050404, 0 3px 5px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,240,220,.15); }
+.era-ww2 .btn .face { border-radius: 4px; background: linear-gradient(color-mix(in srgb, var(--c) 55%, #2a2622), color-mix(in srgb, var(--c) 32%, #141210)); color: #f1ead6; box-shadow: inset 0 1px 0 rgba(255,255,255,.25), inset 0 -2px 3px rgba(0,0,0,.45); }
+.era-ww2 .btn.white .face { color: #1d1b17; background: linear-gradient(#e4dfcb, #b8b39f); }
+.era-ww2 .btn.lit .face { background: linear-gradient(color-mix(in srgb, var(--c) 90%, #fff 10%), color-mix(in srgb, var(--c) 66%, #000)); color: #1b0d04; box-shadow: inset 0 0 8px rgba(255,255,255,.3), 0 0 12px color-mix(in srgb, var(--c) 70%, transparent); }
+.era-ww2 .btn .lbl b { font-family: var(--stencil); letter-spacing: .1em; }
+.era-ww2 .btn.trig44 { min-width: 108px; height: 58px; }
+.era-ww2 .btn.trig44 .lbl b { font-size: 14px; }
+.era-ww2 .tog .well { background: radial-gradient(circle at 50% 50%, #0b0a09 0 38%, #2b2724 40% 100%); box-shadow: inset 0 0 5px #000, 0 0 0 3px #4f4a45, 0 0 0 4px #121110, 0 2px 4px rgba(0,0,0,.6); }
+.era-ww2 .tog .lever { background: linear-gradient(90deg, #6f6f6a, #e6e4dc 45%, #6c6c66); }
+.era-ww2 .tog.up .pilot { background: #ffd36a; box-shadow: 0 0 6px #ffc54a, 0 0 0 1px #0a0a06; }
+.era-ww2 .sbtn { background: linear-gradient(#3a3532, #1d1a18); color: #cfc8b4; box-shadow: inset 0 0 0 2px #4b4743, inset 0 0 0 3px #121010, 0 2px 0 #090807; border-radius: 4px; }
+.era-ww2 .sbtn.lit { background: linear-gradient(#ece5cc, #c3bca3); color: #1b1914; box-shadow: inset 0 0 0 2px #4b4743, inset 0 0 0 3px #121010, 0 0 8px rgba(255,235,180,.35); }
+.era-ww2 .zoom44 { position: absolute; right: 16px; top: 2px; gap: 3px; }
+.era-ww2 .zoom44 .sbtn { min-width: 30px; height: 16px; padding: 0 4px; }
+.era-ww2 .zoom44 .lbl b { font-size: 8.5px; }
+
+/* ---------- drum counters ---------- */
+.drum44 { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.drum44 .dwin { padding: 2px 3px; border-radius: 2px; background: #2a2925; border: 1px solid #0a0a09; box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 1px 0 rgba(255,255,255,.08); }
+.drum44 .dval { display: block; padding: 2px 4px 1px; font: 700 16px/1 'DejaVu Sans Mono', 'Liberation Mono', monospace; color: #f3eedb; white-space: pre; letter-spacing: .08em;
+  background: linear-gradient(180deg, #050505 0%, #1d1d1b 22%, #262624 50%, #1d1d1b 78%, #050505 100%); box-shadow: inset 0 0 3px #000; }
+.drum44.sm .dval { font-size: 12px; padding: 1px 3px 0; }
+
+/* ---------- signal lamps ---------- */
+.lamp44 { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 52px; --c: #ff3b2a; }
+.lamp44.green { --c: #4fe07a; }
+.lamp44.amber { --c: #ffb21e; }
+.lamp44.white { --c: #fff0c4; }
+.lamp44 .lens { display: block; width: 16px; height: 16px; border-radius: 50%;
+  background: radial-gradient(circle at 38% 34%, color-mix(in srgb, var(--c) 30%, #444) 0 18%, color-mix(in srgb, var(--c) 22%, #121110) 60%, #0a0a09 100%);
+  box-shadow: 0 0 0 2px #2a2724, 0 0 0 3px #8b857c, 0 0 0 4px #141210, 0 1px 3px 4px rgba(0,0,0,.35); }
+.lamp44.on .lens { background: radial-gradient(circle at 38% 34%, #fff 0 12%, var(--c) 45%, color-mix(in srgb, var(--c) 60%, #000) 100%); box-shadow: 0 0 0 2px #2a2724, 0 0 0 3px #8b857c, 0 0 0 4px #141210, 0 0 12px 4px color-mix(in srgb, var(--c) 60%, transparent); }
+.lamp44.blink.on .lens { animation: lamp44 .6s steps(2, jump-none) infinite; }
+@keyframes lamp44 { 0% { filter: brightness(1.15); } 100% { filter: brightness(.3); } }
+.lamp44.mini { min-width: 0; }
+.lamp44.mini .lens { width: 11px; height: 11px; }
+.lamp44.mini .lbl { display: none; }
+.c44 .lamp44 .lbl b { font-size: 7.5px; }
+.lamps44 { display: flex; gap: 5px; flex-wrap: wrap; align-items: flex-start; }
+
+/* ---------- rotary switches ---------- */
+.knob44 { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.knob44 .kface { position: relative; width: 120px; height: 62px; }
+.knob44 .kcap { position: absolute; left: 50%; top: 40px; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; cursor: pointer;
+  background: radial-gradient(circle at 36% 30%, #6b625b 0 8%, #2c2622 40%, #110e0c 75%), #1a1512; transition: transform .14s cubic-bezier(.3,1.4,.6,1);
+  box-shadow: 0 0 0 3px #0d0b0a, 0 0 0 5px #3d3a35, 0 3px 6px 3px rgba(0,0,0,.55), inset 0 -3px 5px rgba(0,0,0,.6); }
+.knob44 .kcap::before { content: ''; position: absolute; inset: 8px; border-radius: 50%; background: radial-gradient(circle at 40% 30%, #4e4640, #1c1714 70%); box-shadow: inset 0 1px 1px rgba(255,240,220,.15); }
+.knob44 .kptr { position: absolute; left: 50%; top: 2px; width: 3px; height: 15px; margin-left: -1.5px; border-radius: 2px; background: #efe8d2; box-shadow: 0 0 2px rgba(0,0,0,.8); }
+.knob44 .ktick { position: absolute; left: 50%; top: 12px; width: 2px; height: 28px; margin-left: -1px; transform-origin: 50% 100%; pointer-events: none; }
+.knob44 .ktick::before { content: ''; position: absolute; left: 0; top: 0; width: 2px; height: 4px; background: #ddd7c0; }
+.knob44 .kpos { position: absolute; left: calc(50% + var(--x) * 46px); top: calc(40px + var(--y) * 32px); transform: translate(-50%, -50%); padding: 1px 2px; border-radius: 2px; color: #cfc9b2; }
+.knob44 .kpos .lbl b { font-size: 8.5px; letter-spacing: .05em; }
+.knob44 .kpos .lbl i { font-size: 6px; white-space: nowrap; }
+.knob44 .kpos:hover { color: #fff; }
+.knob44 .kpos.lit { color: #ffe39a; text-shadow: 0 0 5px rgba(255,200,100,.5); }
+.knob44.n2 .kface { width: 100px; }
+.knob44.n2 .kpos { left: calc(50% + var(--x) * 38px); }
+
+/* ---------- dials ---------- */
+.dial44 { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.dialcv { display: block; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,.6); }
+.dials44 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px 4px; width: 100%; }
+.dials44 .dial44 > .lbl { min-width: 70px; }
+
+/* ---------- sight windows ---------- */
+.era-ww2 .sightwrap { box-shadow: 0 0 0 5px #0b0b0a, 0 0 0 6px #4c4943, 0 0 0 9px #1c1b18, 0 0 0 10px #050505; border-radius: 10px; }
+.sight44 { width: 352px !important; background: #070707; }
+.sight44 .sightcv { filter: sepia(.12) contrast(1.04); }
+.sight44 .sightov { cursor: pointer; }
+.sight44.s-kdo .sightglass { background: radial-gradient(circle at 50% 50%, transparent 44%, rgba(0,0,0,.15) 47%); }
+
+/* ---------- the plotting board, the Wuerzburg, the target list ---------- */
+.plot44 { position: relative; flex: none; border-radius: 2px; overflow: hidden; box-shadow: 0 0 0 3px #2a241d, 0 0 0 4px #0c0a08, 0 0 0 6px #5a5249, 0 2px 6px 6px rgba(0,0,0,.4); margin: 3px; }
+.plotcv { display: block; width: 100%; height: 100%; cursor: crosshair; }
+.wz44 { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.wztube { position: relative; border-radius: 50%; overflow: hidden; background: #020503; box-shadow: 0 0 0 4px #0b0b0a, 0 0 0 6px #45423c, 0 0 0 9px #171614, inset 0 0 18px #000; }
+.wztube::after { content: ''; position: absolute; inset: 0; border-radius: 50%; pointer-events: none; background: linear-gradient(130deg, rgba(255,255,255,.08), rgba(255,255,255,0) 35%), radial-gradient(circle, transparent 60%, rgba(0,0,0,.5) 100%); }
+.wzfine { position: relative; border-radius: 3px; overflow: hidden; background: #020503; box-shadow: 0 0 0 3px #0b0b0a, 0 0 0 4px #45423c; }
+.wzcv { display: block; width: 100%; height: 100%; }
+.tlist44 { width: 100%; background: #dcd4b8; border-radius: 2px; box-shadow: inset 0 0 6px rgba(0,0,0,.35), 0 0 0 3px #2a241d, 0 0 0 4px #0c0a08; font: 10.5px/1 'DejaVu Sans Mono', 'Liberation Mono', monospace; color: #2a2620; display: flex; flex-direction: column; min-height: 0; }
+.tlr { display: flex; height: 16px; align-items: center; padding: 0 3px; cursor: pointer; border-bottom: 1px solid rgba(60,90,140,.22); }
+.tlr:hover { background: rgba(179,36,26,.08); }
+.tlh { cursor: default; height: 16px; font: 700 8px/1 var(--stencil, sans-serif); letter-spacing: .05em; color: #3c5a8c; border-bottom: 1px solid rgba(60,90,140,.5); }
+.tlc { flex: none; padding: 0 2px; white-space: nowrap; overflow: hidden; text-align: right; }
+.tlc.c-cls, .tlc.c-src, .tlc.c-eng { text-align: left; }
+.tlr.link { color: #6c5d4b; }
+.tlr.eng { color: #b3241a; }
+.tlr.chaff { color: #8a8478; font-style: italic; }
+.tlr.sel { background: rgba(179,36,26,.18); box-shadow: inset 3px 0 0 #b3241a; color: #1a1612; font-weight: 700; }
+.tlb { overflow-y: auto; overflow-x: hidden; flex: 1; min-height: 0; scrollbar-width: thin; }
+.tlempty { padding: 12px; text-align: center; color: #8a8270; font-size: 9px; }
+
+/* ---------- the heavy battery's console ---------- */
+.battery44 .top { flex: none; }
+.battery44 .leftc { flex: none; width: 372px; }
+.battery44 .rightc { flex: 1; min-width: 0; }
+.battery44 .rightc .plate, .battery44 .leftc .plate { width: 100%; }
+.battery44 .pl-sight .pbody { align-items: center; }
+.battery44 .pl-kdo .pbody { gap: 6px; }
+.battery44 .krow { flex-wrap: nowrap; align-items: flex-start; gap: 5px; width: 100%; justify-content: space-between; }
+.battery44 .krow .lamps44 { flex-wrap: nowrap; gap: 3px; }
+.battery44 .krow .lamp44 { min-width: 50px; }
+.battery44 .krow .lamp44 .lbl i { white-space: nowrap; }
+.c44 .knobs { gap: 4px; flex-wrap: nowrap; justify-content: space-between; width: 100%; align-items: flex-start; padding: 0 6px; }
+.platoon44 .knobs { justify-content: space-around; }
+.c44 .btns44 { gap: 8px; flex-wrap: nowrap; align-items: flex-end; width: 100%; }
+.c44 .btns44 .tog { padding-top: 4px; }
+.battery44 .btns44 { gap: 3px; }
+.battery44 .btns44 .btn:not(.trig44) { min-width: 54px; }
+.battery44 .pl-fire .pbody { gap: 4px; }
+.glist44 { display: flex; flex-direction: column; gap: 1px; width: 100%; }
+.grow44 { display: grid; grid-template-columns: 70px 48px 30px 40px 32px 38px 1fr; align-items: center; height: 19px; padding: 0 4px; border-radius: 2px; background: rgba(0,0,0,.14); }
+.grow44.ghead { height: 18px; background: none; }
+.grow44.ghead .lbl.cap { align-items: center; }
+.grow44.ghead .lbl.cap b { font-size: 7.5px; }
+.grow44.ghead .lbl.cap i { font-size: 5.5px; }
+.grow44 .gid { display: flex; align-items: baseline; gap: 5px; }
+.grow44 .gid b { font: 800 13px/1 var(--stencil); color: var(--cream); width: 14px; }
+.grow44.close .gid b { font-size: 9px; width: auto; }
+.grow44 .gid i { font: normal 7px/1 var(--stencil); color: var(--muted); letter-spacing: .05em; }
+.grow44 .gcell { display: flex; align-items: center; gap: 6px; }
+.grow44 .gcell .dialcv { box-shadow: none; }
+.grow44 > .lamp44 { justify-self: center; }
+.grow44 .gfz, .grow44 .grd { font: 700 10.5px/1 'DejaVu Sans Mono', monospace; color: #f3eedb; text-align: right; padding-right: 5px; }
+.grow44 .gst { font: 700 8.5px/1 'DejaVu Sans Mono', monospace; color: #e9cf8a; padding-left: 4px; white-space: nowrap; overflow: hidden; }
+.grow44 .gst.bad { color: #ff7a52; }
+.grow44.dead { opacity: .55; }
+.grow44.close { height: 18px; }
+.battery44 .low { flex: 1; min-height: 0; }
+.battery44 .low .plate { display: flex; flex-direction: column; }
+.battery44 .pl-wz { flex: none; }
+.battery44 .pl-plot { flex: none; }
+.battery44 .pl-list, .platoon44 .pl-list { flex: 1; min-width: 0; }
+.c44 .pl-list .pbody { flex: 1; min-height: 0; width: 100%; align-items: stretch; }
+.c44 .pl-list .tlist44 { flex: 1; }
+
+/* ---------- the platoon consoles ---------- */
+.platoon44 .top { flex: none; }
+.platoon44 .pl-sight { flex: none; width: 372px; }
+.platoon44 .pl-sight .pbody { align-items: center; }
+.platoon44 .pl-zug { flex: 1; min-width: 0; }
+.platoon44 .pl-zug .pbody { gap: 6px; width: 100%; }
+.platoon44 .pl-zug .btns44 .btn.trig44 { flex: 1.4; }
+.platoon44 .pl-zug .btns44 .btn { flex: 1; }
+.platoon44 .pl-zug .drums { gap: 8px; }
+.guns44 { flex: none; gap: 7px; }
+.gcard44 { flex: 1; min-width: 0; padding: 20px 8px 7px; cursor: pointer; }
+.gcard44 .ptitle b { font-size: 9.5px; }
+.gcard44.view { box-shadow: inset 0 0 0 2px rgba(255,220,140,.55), 0 2px 5px rgba(0,0,0,.55); }
+.gcard44.dead { opacity: .6; filter: grayscale(.6); }
+.gcard44 .pbody { gap: 4px; width: 100%; }
+.gcard44 .glamps { gap: 8px; flex-wrap: nowrap; }
+.gcard44 .glamps .lamp44.mini { flex-direction: row; gap: 4px; }
+.gcard44 .glamps .lamp44.mini .lbl { display: flex; align-items: flex-start; text-align: left; padding: 0; background: none; box-shadow: none; }
+.gcard44 .glamps .lamp44.mini .lbl b { color: var(--cream); font-size: 7.5px; }
+.gcard44 .glamps .lamp44.mini .lbl i { color: var(--muted); font-size: 5.5px; }
+.gcard44 .gline { display: flex; flex-direction: column; gap: 2px; min-height: 22px; }
+.gcard44 .gtgt { font: 700 10px/1 'DejaVu Sans Mono', monospace; color: #ffd88a; }
+.gcard44 .gwhy { font: normal 8px/1 'DejaVu Sans Mono', monospace; color: var(--muted); }
+.gcard44 .gwhy.bad { color: #ff8a62; }
+.gcard44 .gdrums { gap: 6px; flex-wrap: nowrap; }
+.feed44 { display: flex; flex-direction: column; gap: 3px; width: 100%; }
+.feed44 .pips { display: flex; gap: 1.5px; padding: 2px 3px; background: #121210; border-radius: 2px; box-shadow: inset 0 1px 2px #000; }
+.feed44 .pips i { display: block; width: 5px; height: 12px; border-radius: 2.5px 2.5px 1px 1px; background: #2a2a26; }
+.feed44 .pips i.on { background: linear-gradient(90deg, #8a6a2a, #e3c06a 45%, #8a6a2a); }
+.feed44 .pips.clip i { width: 8px; height: 16px; border-radius: 4px 4px 1px 1px; }
+.table44 { display: flex; gap: 4px; }
+.table44 .pips { flex: 1; justify-content: space-between; box-shadow: inset 0 1px 2px #000, 0 0 0 1px #4a4740; }
+.loader44 { display: flex; align-items: center; gap: 6px; }
+.loader44 .lbl.cap b { font-size: 7.5px; }
+.loader44 .lbl.cap i { font-size: 5.5px; }
+.loader44 .lwell { flex: 1; height: 6px; background: #121210; border-radius: 3px; overflow: hidden; box-shadow: inset 0 1px 2px #000; }
+.loader44 .lbar { display: block; height: 100%; background: #e3c06a; transform-origin: 0 50%; transform: scaleX(0); }
+.loader44 .ltxt { font: 700 8.5px/1 'DejaVu Sans Mono', monospace; color: #e9cf8a; min-width: 70px; text-align: right; }
+.mags44 { display: grid; gap: 3px 6px; }
+.mags44.n4 { grid-template-columns: 1fr 1fr; }
+.mag44 { display: flex; align-items: center; gap: 4px; }
+.mag44 b { font: 700 8px/1 var(--stencil); color: var(--cream); width: 18px; }
+.mags44.n1 .mag44 b { display: none; }
+.mags44.n4 .pips { gap: 1px; padding: 2px; }
+.mags44.n4 .pips i { width: 2.5px; height: 10px; border-radius: 1px; }
+.mag44 { position: relative; }
+.mags44.n4 .mag44 .chg { position: absolute; left: 22px; right: 0; top: 2px; text-align: center; background: rgba(18,18,16,.85); border-radius: 2px; }
+.mags44.n4 .mag44 .chg:empty { display: none; }
+.mags44.n1 .pips i { width: 7px; height: 16px; }
+.mag44 .chg { font: 700 7.5px/1 'DejaVu Sans Mono', monospace; color: #ffb43c; font-style: normal; white-space: nowrap; }
+.mag44.chg .pips { box-shadow: inset 0 1px 2px #000, 0 0 0 1px rgba(255,180,60,.6); }
+.platoon44 .low { flex: 1; min-height: 0; }
+.platoon44 .low .plate { display: flex; flex-direction: column; }
+.platoon44 .pl-plot { flex: none; }
+
+/* the plotting board's scale buttons beside it; the smaller toggles of the WW2 consoles */
+.c44 .plotrow { flex-wrap: nowrap; align-items: flex-start; gap: 6px; }
+.era-ww2 .seg.stack44 { flex-direction: column; gap: 3px; flex-wrap: nowrap; margin-top: 3px; }
+.era-ww2 .seg.stack44 .sbtn { min-width: 30px; height: 26px; padding: 0 3px; }
+.era-ww2 .seg.stack44 .lbl b { font-size: 9px; }
+.era-ww2 .seg.stack44 .lbl i { display: block; font-size: 6px; }
+.c44 .tog .well { width: 32px; height: 46px; }
+.c44 .tog .lever { left: 11px; top: 6px; height: 34px; }
+.c44 .tog .pilot { right: 0; }
+/* a long unit name must not push the status line */
+.c44 .hdr .hid { max-width: 150px; }
+.c44 .hdr .uname { overflow: hidden; text-overflow: ellipsis; }
+.c44 .hdr .hstat { flex: none; }
+/* room above the capitals for the umlauts' dots (the title strip hides what overflows it) */
+.era-ww2 .plate .ptitle { padding-top: 2px; top: 2px; }
+.era-ww2 .ptitle b { line-height: 1.2; }
+/* the platoon's gun data plate beside its range lamps */
+.platoon44 .lrow { flex-wrap: nowrap; align-items: center; gap: 10px; width: 100%; }
+.dplate44 { flex: 1; padding: 3px 6px 2px; border-radius: 2px; background: linear-gradient(#d3d0c1, #b2af9f); box-shadow: 0 1px 0 rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.55); }
+.dplate44 .lbl b { font-size: 8.5px; color: var(--plate-ink); letter-spacing: .04em; white-space: nowrap; }
+.dplate44 .lbl i { font-size: 6px; color: #3d3b33; opacity: 1; white-space: nowrap; }

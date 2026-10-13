@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { fromBearingVec } from './sim/flight.js';
+import { SYSTEMS, THREATS } from './sim/systems.js';
+import { SHELLS, reachOf } from './ballistics.js';
 import { ERA } from './deploy.js';
 import { eraById } from './eras/index.js';
 import { setHighlight } from './ui/highlight.js';
@@ -1050,6 +1052,371 @@ export const TUTORIALS = [
     ],
   },
 ];
+
+// ---------------------------------------------------------------------------------------------------
+// The WW2 era's lessons (eras/ww2.js lists them): its own threat axis and units (the heavy battery BTY, the
+// 3.7 cm platoon MED1, the Vierling platoon VIER, the 2 cm platoon LIGHT), its aircraft flying the sim's
+// attack roles (sim/planes.js): single aircraft from spawnOne at a height or low over the ground, bomber
+// boxes from spawnGroup. The consoles' data-tut names are in eras/ww2/consoles/battery.js and platoon.js.
+const WW2 = eraById('ww2');
+const FROM44 = WW2.layout.threatAxis;
+
+// a WW2 aircraft `range` m from the unit on a bearing (`alt` m, or `agl` m over the ground), attacking one
+// of the unit's guns (`part`): a strafer passes over it, a dive bomber dives on it
+function plane44(T, key, type, o = {}) {
+  const sim = T.sim, u = T.u;
+  const start = fromBearingVec(o.bearing ?? FROM44, o.range ?? 8000, new THREE.Vector3());
+  start.x += u.pos.x;
+  start.z += u.pos.z;
+  start.y = o.agl != null ? sim.heightAt(start.x, start.z) + o.agl : o.alt ?? THREATS[type].alt;
+  const part = o.part ?? 0, p = u.parts[part];
+  const target = { kind: 'unit', id: u.id, part, pos: p.pos.clone().setY(p.pos.y + 1) };
+  const t = sim.threatAI.spawnOne(type, start, target, { group: T.group++, agl: o.agl, alt: o.alt, passes: o.passes, dive: o.dive, release: o.release, target: 'light' }, 0);
+  if (t) {
+    t.lesson = target;
+    T.threats.set(key, t);
+  }
+  return t;
+}
+// keep an aircraft coming at the platoon: each new pass at this unit again (the sim would pick any gun
+// position), and a new one once it turns for home or is lost without the unit's kill
+const keepPlane = (key, type, o) => (T) => {
+  const t = T.threats.get(key);
+  if (t?.alive && t.phase === 'egress') T.sim.remove(t);
+  else if (t?.alive && t.lesson && t.target !== t.lesson && t.phase === 'ingress') t.target = t.lesson;
+  T.keep(key, () => plane44(T, key, type, typeof o === 'function' ? o(T) : o));
+};
+
+// a box of B-17s on its bomb run at the runway, `range` m out from the field (the battery stands under its
+// approach), optionally throwing Window; the leader is kept under `key`
+function box44(T, key, o = {}) {
+  const out = T.sim.threatAI.spawnGroup({
+    type: 'b17', count: o.count ?? 6, bearing: FROM44 + (o.off ?? 0), range: o.range ?? 16000, spread: 0, alt: o.alt ?? 7300,
+    box: true, window: !!o.window, target: 'runway', group: T.group++,
+  });
+  if (out[0]) T.threats.set(key, out[0]);
+  return out;
+}
+// the box's aircraft still in it (not straggling home)
+const boxOf = (T, key) => {
+  const l = T.threats.get(key);
+  return l ? T.sim.threats.filter((t) => t.alive && t.box === l.box && t.type === l.type) : [];
+};
+// keep a box coming: a new one once this one has bombed, gone home or been shot down
+const keepBox = (key, o) => (T) => {
+  const m = boxOf(T, key);
+  if (T.threats.get(key) && m.some((t) => !t.released && t.phase !== 'egress' && t.phase !== 'straggle')) return;
+  if (T.threats.get(key)) {
+    for (const t of m) T.sim.remove(t);
+    T.respawned = true;
+    T.hint('Another formation is on its way.');
+  }
+  box44(T, key, o);
+};
+const inBox = (T, key, id) => id != null && boxOf(T, key).some((t) => t.id === id);
+// the predictor's state
+const pr44 = (T) => T.u.predictor;
+// can the platoon's shells reach the aircraft (the trigger's rule, eras/ww2/consoles/kit.js reach44)? 'in'
+// inside a gun's opening range, 'long' beyond it, 'out' beyond the shells' reach
+function reach44(T, key) {
+  const t = T.threats.get(key), u = T.u;
+  if (!t?.alive) return null;
+  let r = 'out';
+  for (const p of u.parts) {
+    const def = SYSTEMS[u.kind].guns?.[p.kind];
+    if (!def || !p.alive) continue;
+    const d = p.pos.distanceTo(t.pos);
+    if (d > reachOf(SHELLS[def.shell])) continue;
+    if (d < def.range && t.pos.y - T.sim.heightAt(t.pos.x, t.pos.z) < def.maxAlt) return 'in';
+    r = 'long';
+  }
+  return r;
+}
+
+const battery44 = {
+  id: 'flak88',
+  name: '8.8 cm battery',
+  unit: 'BTY',
+  blurb: 'The battery officer: the Kommandogerät 40, its solution settling, salvos and their bursts, Window against the Würzburg, barrage fire.',
+  outro: 'The heavy battery fights the bombers the light guns cannot reach: pick the formation early, let the solution settle before you fire, range by the rangefinder when Window spoils the radar, and lay a barrage when the predictor cannot help.',
+  setup: (T) => {
+    T.u.mode = 'hold';
+  },
+  steps: [
+    {
+      title: 'The battery',
+      text: 'You are the battery officer of six 8.8 cm guns, Anton to Friedrich, laid together from the Kommandogerät 40, the predictor with its 4 m rangefinder, and the Würzburg D radar beside it. The guns fire together, by salvo, with time fuzes set for where the target will be. GESCHÜTZMELDUNGEN shows each gun: laid, loaded, its fuze, fired. In this lesson nothing is scored and nothing can be destroyed.',
+      hi: ['header', 'guns'],
+    },
+    {
+      title: 'The air picture',
+      text: 'A formation of Fortresses is coming in from the west at 7,300 m. The plotting board (FLUGMELDEKARTE) is north up, centred on the battery: filled red marks are aircraft your own lookouts or the Würzburg hold, hollow ones only the aircraft reporting service has plotted by telephone. The list beside it gives their number, class, range, height and bearing.',
+      hi: ['plot', 'tracks'],
+      enter: (T) => {
+        T.clear();
+        box44(T, 'a');
+      },
+      tick: keepBox('a'),
+    },
+    {
+      title: 'Fire on command',
+      text: 'The FEUERERLAUBNIS switch: FREI lets the crew fire on its own, BEFEHL fires only on your orders, HALT is weapons safe.',
+      goal: 'Set the switch to BEFEHL (manual)',
+      hi: ['mode'],
+      tick: keepBox('a'),
+      done: (T) => T.u.mode === 'manual',
+    },
+    {
+      id: 'pick',
+      title: 'Designate the target',
+      text: 'Click one of the formation\'s marks on the plotting board or its row in the list, or press Tab: it is handed to the predictor, which swings onto it. The telescope (ZIELFERNROHR) looks along the predictor\'s line; Q switches 12x and 24x.',
+      goal: 'Select an aircraft of the formation',
+      hi: ['plot', 'tracks'],
+      tick: keepBox('a'),
+      done: (T) => inBox(T, 'a', T.u.selected) && pr44(T).target === T.u.selected,
+    },
+    {
+      title: 'Let the solution settle',
+      text: 'ERFASST lights once the telescopes or the Würzburg hold the target. The predictor then works out course and speed: the GÜTE needle climbs and the LÖSUNG lamp blinks while the solution settles, and burns once it is good enough to fire on. The dials show the target\'s data, ZÜNDER the fuze it sends to the guns. While the formation is too far for the shells ZU WEIT lights: wait for it (time compression helps).',
+      goal: 'Wait for a steady LÖSUNG lamp',
+      hi: ['kdo', 'quality', 'solution'],
+      tick: (T) => {
+        keepBox('a')(T);
+        if (T.respawned) T.goto('pick');
+      },
+      done: (T) => pr44(T).state === 'solution' && inBox(T, 'a', pr44(T).target),
+    },
+    {
+      title: 'Fire salvos',
+      text: 'Hold FEUER (or Space): every gun that is loaded and laid fires together, then the loaders put the next rounds in and the fuze setters set them. SALVE fires one salvo. A salvo every few seconds is all the guns can do.',
+      goal: 'Fire three salvos',
+      hi: ['trigger', 'salvo', 'guns'],
+      enter: (T) => {
+        T.mem.s0 = pr44(T).salvos;
+      },
+      tick: (T) => {
+        keepBox('a')(T);
+        if (T.respawned) T.goto('pick');
+      },
+      done: (T) => pr44(T).salvos - T.mem.s0 >= 3,
+    },
+    {
+      title: 'Read the bursts',
+      text: 'The shells take 15 to 25 seconds to get up there; then their black bursts appear round the formation in the telescope. STREUUNG is how far the solution may be off: it shrinks as the solution settles. Bursts close round the target do the damage; if they are scattered, let it settle longer. Keep firing until a burst hits.',
+      goal: 'Keep firing until a burst damages a bomber',
+      hi: ['sight', 'quality', 'trigger'],
+      enter: (T) => {
+        T.mem.t0 = T.sim.time;
+      },
+      tick: (T) => {
+        keepBox('a')(T);
+        if (T.respawned) T.goto('pick');
+        const l = T.threats.get('a');
+        if (l && T.sim.threats.some((t) => t.box === l.box && t.type === 'b17' && (t.hitT ?? -99) > T.mem.t0)) T.mem.hit = true;
+      },
+      done: (T) => !!T.mem.hit,
+    },
+    {
+      id: 'window',
+      title: 'Window',
+      text: 'A second formation is throwing Window: clouds of foil strips that echo like aircraft. On the Würzburg\'s round trace they crowd round the target\'s range, DÜPPEL lights and the solution goes wrong (STREUUNG grows). The answer by day is the rangefinder: turn ENTFERNUNG AUS to E-MESSER. Select the new formation first.',
+      goal: 'Select the new formation and range by the rangefinder (E-MESSER)',
+      hi: ['wurzburg', 'ranging', 'window'],
+      enter: (T) => {
+        T.clear();
+        T.u.predictor.ranging = 'radar';
+        box44(T, 'b', { window: true, off: 4 });
+      },
+      tick: (T) => {
+        keepBox('b', { window: true, off: 4 })(T);
+        if ((pr44(T).window ?? 0) > 0.3) T.mem.saw = true;
+      },
+      done: (T) => pr44(T).ranging === 'optical' && inBox(T, 'b', pr44(T).target),
+    },
+    {
+      title: 'Barrage fire',
+      text: 'When the predictor cannot help (Window at night, the Kommandogerät knocked out), the battery fires a barrage (Sperrfeuer): a box of bursts laid on the formation\'s course where the shells can meet it, every gun firing as fast as it is loaded, so the bombers fly through it. Keep the formation selected, turn FEUERART to SPERRE and hold FEUER. The bursts start a few seconds before the formation gets there.',
+      goal: 'Lay a barrage and fire into it',
+      hi: ['barrage', 'trigger'],
+      enter: (T) => {
+        T.mem.s0 = null;
+      },
+      tick: (T) => {
+        keepBox('b', { window: true, off: 4 })(T);
+        const pr = pr44(T);
+        if (pr.barrage && T.mem.s0 == null) T.mem.s0 = pr.salvos;
+      },
+      done: (T) => !!pr44(T).barrage && T.mem.s0 != null && pr44(T).salvos - T.mem.s0 >= 2,
+    },
+    {
+      title: 'Back to predicted fire',
+      text: 'A barrage spends many rounds for few hits; aimed salvos on a settled solution are the battery\'s real weapon. Turn FEUERART back to GEZIELT, and FEUERERLAUBNIS to FREI to leave the battery to its crew.',
+      goal: 'FEUERART to GEZIELT',
+      hi: ['barrage', 'mode'],
+      done: (T) => !pr44(T).barrage,
+    },
+  ],
+};
+
+// One lesson per platoon kind: the guns' names, the sight, the feed, the reach (from SYSTEMS and SHELLS),
+// the aircraft it practises on.
+function platoon44(kind, unit, o) {
+  const def = SYSTEMS[kind].guns[kind];
+  const reach = (reachOf(SHELLS[def.shell]) / 1000).toFixed(1);
+  const open = (def.range / 1000).toFixed(1);
+  const t1 = (o2) => keepPlane('a', o.type, o2 ?? o.spawn);
+  const back = (T) => {
+    t1()(T);
+    if (T.respawned) T.goto('pick');
+  };
+  return {
+    id: kind,
+    name: o.name,
+    unit,
+    blurb: o.blurb,
+    outro: o.outro,
+    setup: (T) => {
+      T.u.mode = 'hold';
+      T.u.concentrate = false;
+    },
+    steps: [
+      {
+        title: 'The platoon',
+        text: `${o.intro} You are the platoon leader (Zugführer): each gun has its own crew, its own sight and its own target, and you tell them what to fire at and when. Each gun's card shows it laid (GERICHTET), firing (FEUER), taking cover from strafing (DECKUNG), its target and its ammunition. In this lesson nothing is scored and nothing can be destroyed.`,
+        hi: ['header', 'guns'],
+      },
+      {
+        title: 'The air picture',
+        text: `${o.what} is coming in low from the west. The plotting board (FLUGMELDEKARTE) is north up, centred on the platoon, with the guns' reach drawn round it: filled marks your own spotters see, hollow ones only the aircraft reporting service has plotted. The list beside it gives number, class, range, height and bearing.`,
+        hi: ['plot', 'tracks'],
+        enter: (T) => {
+          T.clear();
+          plane44(T, 'a', o.type, o.spawn);
+        },
+        tick: t1(),
+      },
+      {
+        title: 'Fire on command',
+        text: 'The FEUERERLAUBNIS switch: FREI lets every crew pick its own target and fire, BEFEHL fires only on your orders, HALT is weapons safe.',
+        goal: 'Set the switch to BEFEHL (manual)',
+        hi: ['mode'],
+        tick: t1(),
+        done: (T) => T.u.mode === 'manual',
+      },
+      {
+        id: 'pick',
+        title: 'Name the target',
+        text: 'Click its mark on the plotting board or its row in the list, or press Tab. In BEFEHL all three guns take it.',
+        goal: 'Select the aircraft',
+        hi: ['plot', 'tracks'],
+        tick: t1(),
+        done: (T) => selectedIs(T, 'a'),
+      },
+      {
+        title: o.sightTitle,
+        text: o.sightText,
+        goal: 'Wait until the guns have a lead on it',
+        hi: ['sight', 'gunsel'],
+        tick: back,
+        done: (T) => T.u.parts.some((p) => p.gun?.aimOk && p.gun.target === T.threats.get('a')?.id),
+      },
+      {
+        title: 'Ranges',
+        text: `The ${o.gun} shells self-destruct after about ${reach} km, so the FEUER button greys out (ZU WEIT, OUT OF RANGE) while they cannot get there. Beyond about ${open} km, where the crews would open fire on their own, it blinks LONG RANGE: FEW HITS: the rounds arrive slow and scattered. IM BEREICH lights when it is close enough; ENTFERNUNG is the range-taker's range.`,
+        goal: 'Wait for the IM BEREICH lamp',
+        hi: ['trigger', 'lamps', 'range'],
+        tick: back,
+        done: (T) => reach44(T, 'a') === 'in',
+      },
+      {
+        title: 'Open fire',
+        text: 'Fire in bursts: hold FEUER (or Space) and each layer fires once his gun is on its lead, every round a tracer that shows where they go; release to stop. Short bursts while it is in range waste the least. If it leaves your reach and comes round again, wait for it.',
+        goal: 'Shoot it down',
+        hi: ['trigger', 'sight'],
+        tick: back,
+        done: (T) => T.killedBy('a', def.shell),
+      },
+      {
+        title: o.feedTitle,
+        text: o.feedText,
+        goal: o.feedGoal,
+        hi: ['feed', 'guns', 'trigger'],
+        enter: (T) => {
+          T.clear();
+          plane44(T, 'b', o.type, o.spawn);
+        },
+        tick: (T) => {
+          keepPlane('b', o.type, o.spawn)(T);
+          if (T.u.parts.some((p) => p.gun && (p.gun.load > 0 || p.gun.barrels.some((b) => b.change > 0)) && p.gun.shots > 0)) T.mem.fed = true;
+        },
+        done: (T) => !!T.mem.fed,
+      },
+      {
+        title: 'Spread or concentrate',
+        text: 'Three aircraft at once. In FREI every crew takes the most dangerous target it can see and reach, and the guns spread over them: an aircraft under fire aims worse, so three under fire bomb worse than one under three. ZIELVERTEILUNG ZUSAMMEN puts all three guns on your selected target instead.',
+        goal: 'Set FEUERERLAUBNIS to FREI and watch the guns take their targets',
+        hi: ['mode', 'concentrate', 'guns'],
+        enter: (T) => {
+          T.clear();
+          for (const [k, d] of [['c', -8], ['d', 0], ['e', 8]]) plane44(T, k, o.type, { ...o.spawn, bearing: FROM44 + d, part: ['c', 'd', 'e'].indexOf(k) % T.u.parts.length });
+        },
+        tick: (T) => {
+          for (const [k, d] of [['c', -8], ['d', 0], ['e', 8]]) keepPlane(k, o.type, { ...o.spawn, bearing: FROM44 + d })(T);
+        },
+        done: (T) => T.u.mode === 'auto' && T.u.parts.some((p) => p.gun?.target != null),
+      },
+    ],
+  };
+}
+
+TUTORIALS.push(
+  battery44,
+  platoon44('flak43', 'MED1', {
+    name: '3.7 cm Flak 43 platoon',
+    gun: '3.7 cm',
+    type: 'p47',
+    spawn: { range: 9000, alt: 2500, dive: 50, release: 800, passes: 2 },
+    blurb: 'The platoon leader: three 3.7 cm guns, the Schwebedornvisier\'s floating pin, the reach, clips on the loading table, spreading the fire.',
+    outro: 'The 3.7 cm reaches the fighter-bombers in their dives: name the target, wait until it is in range, let the layers hold it on the pin, and keep the loading tables full.',
+    intro: 'Three 3.7 cm Flak 43 in a triangle about 100 m a side.',
+    what: 'A Thunderbolt with bombs',
+    sightTitle: 'The floating pin',
+    sightText: 'The window is the layer\'s Schwebedornvisier 43 on the gun in action (or the gun you pick: the buttons, or click a gun\'s card). Through the small square backsight he sees the floating pin: the sight setter turns it along the aircraft\'s course and picks its colour by the speed (blue, yellow, white, red from slow to fast); its marks are for 1, 2 and 3 km. The layer holds the aircraft on the mark for its range, flying down the pin toward the centre, and the gun then points ahead of it by the lead.',
+    feedTitle: 'Clips on the loading table',
+    feedText: 'The 3.7 cm is fed by 8-round clips laid flat on a loading table that takes two; the loader lays a new clip every 3 to 4 s as the table empties, so in a long burst the loader sets the pace (LADETISCH and LADER on each card). Another Thunderbolt: fire on it and watch the loaders.',
+    feedGoal: 'Fire until a loader lays a new clip',
+  }),
+  platoon44('flakvierling', 'VIER', {
+    name: '2 cm Flakvierling platoon',
+    gun: '2 cm',
+    type: 'p51',
+    spawn: { range: 8000, agl: 70, passes: 3 },
+    blurb: 'The platoon leader: three quadruple 2 cm mounts (one on a tower), the Flakvisier 40, the short reach, four magazines per gun, spreading the fire.',
+    outro: 'The Vierling is a wall of fire for the last kilometre and a half: wait until the strafer is in range, hold the trigger in short bursts, and let the loaders keep up.',
+    intro: 'Three 2 cm Flakvierling 38, four guns on each mount; the third (TURM) stands on a wooden flak tower and sees over the trees.',
+    what: 'A Mustang strafing',
+    sightTitle: 'The Flakvisier',
+    sightText: 'The window is the layer\'s Flakvisier 40 on the gun in action (or the gun you pick: the buttons, or click a gun\'s card). It is a computing reflector sight: dynamos on the handwheels feel how fast the layer turns and move the lit ring and cross wires against the aircraft\'s course by the lead. The layer keeps the aircraft in the ring; the guns then point ahead of it.',
+    feedTitle: 'Magazines',
+    feedText: 'Each of the four guns has a 20-round magazine, two seconds and a half of fire. Two loaders change them, 3.5 s each; each pedal fires a diagonal pair, so one pair fires while the other is changed (the four magazines on each card: 1L 2R over 4L 3R). Another Mustang: fire on it and watch the changes.',
+    feedGoal: 'Fire until a magazine is changed',
+  }),
+  platoon44('flak38', 'LIGHT', {
+    name: '2 cm Flak 38 platoon',
+    gun: '2 cm',
+    type: 'p51',
+    spawn: { range: 8000, agl: 70, passes: 3 },
+    blurb: 'The platoon leader: three single 2 cm guns, the Flakvisier 38, the short reach, 20-round magazines, spreading the fire.',
+    outro: 'The single 2 cm swings fast onto a low attacker but its magazine is soon empty: fire in range, in bursts, and let the loader change it.',
+    intro: 'Three single 2 cm Flak 38, quick to swing onto a diving attacker.',
+    what: 'A Mustang strafing',
+    sightTitle: 'The Flakvisier',
+    sightText: 'The window is the layer\'s Flakvisier 38 on the gun in action (or the gun you pick: the buttons, or click a gun\'s card). It is a computing reflector sight: dynamos on the handwheels feel how fast the layer turns and move the lit ring and cross wires against the aircraft\'s course by the lead. The layer keeps the aircraft in the ring; the gun then points ahead of it.',
+    feedTitle: 'The magazine',
+    feedText: 'The Flak 38 fires from a 20-round magazine, under three seconds of fire; then its loader changes it, about 3.5 s, and the gun is silent meanwhile (MAGAZIN on each card). Another Mustang: fire on it and watch the change.',
+    feedGoal: 'Fire until a magazine is changed',
+  }),
+);
 
 // ---------------------------------------------------------------------------------------------------
 export class Tutorials {
