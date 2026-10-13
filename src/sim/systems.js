@@ -375,6 +375,14 @@ Object.assign(SYSTEMS, {
     dispersed: { flak128: 90, kdo40: 40, wurzburg: 35, flak43: 45, flakvierling: 40 },
     roles: { flak43: 'close', flakvierling: 'close' },
     groups: ['flak128', 'flak43', 'flakvierling'],
+    // the concrete a light gun cannot fire through (its masked arcs, sim/mounts.js masked): boxes in the
+    // unit's frame (m, -z toward its bearing, y over the ground at the site), from the tower's model
+    // (eras/ww2/models/flakturm.js FLAKTURM): the block, the roof parapet, the corner turrets
+    structure: [
+      [-20, 0, -20, 20, 32, 20],
+      [-20, 32, -20, 20, 33.2, -19.2], [-20, 32, 19.2, 20, 33.2, 20], [-20, 32, -20, -19.2, 33.2, 20], [19.2, 32, -20, 20, 33.2, 20],
+      ...[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz]) => [sx * 15 - 6.8, 0, sz * 15 - 6.8, sx * 15 + 6.8, 37.4, sz * 15 + 6.8]),
+    ],
     // the lookouts on the roof see far
     search: { range: 34000, period: 2, height: 4, low: 0.7, optical: true },
     radar: { range: 32000, beam: 0.1, gate: 500 },

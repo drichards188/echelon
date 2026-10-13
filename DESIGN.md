@@ -1292,7 +1292,11 @@ light group under command `u.nextGun`, `u.weapons.gun` (its `shell` too) and the
 guns. Parts with `deck` (eras/ww2.js) stand that high over the ground at the unit's site (units.js
 createUnits; `part.deck`), so their bores, sights and line of sight are up there and bombs on the ground below
 hardly reach them; the `flakturm` part (role 'tower') has no hit points (Sim.applyWarhead skips parts without
-`maxHp`). The tower's lookouts see to 34 km. Render: `models/flak128.js` (a sketch of the twin: two recoiling
+`maxHp`). The tower's lookouts see to 34 km. Masked arcs: `structure` (boxes in the unit's frame: the block,
+the roof parapet, the corner turrets; `u.structure` puts them at the tower part) stops a light gun firing
+through the tower: `Mounts.masked(u, i, dir)` tests its line of fire over the first 90 m; a masked target is
+not one its crew picks, and under the player's command the gun holds (`gun.hold` 'masked', the consoles'
+VERDECKT) without laying into the concrete. The heavy twins on the turrets fire high and are not masked. Render: `models/flak128.js` (a sketch of the twin: two recoiling
 barrels, `setRecoil(m)` or `setRecoil(k, m)`, `anchors.muzzles` and `breeches` [2]) and `models/flakturm.js`
 (the block, 40 m square, roof 32 m, corner turrets 36 m, galleries 26 m: `FLAKTURM`); a gun with `deck` leaves
 its pit behind (`rig.emplacement` removed), the tower is never culled (`WHOLE`), no data cables; crews
