@@ -10,14 +10,16 @@
 // default), or 'default', or 'alt' for every alternative. --era picks the era (src/eras, default
 // 'modern'; any registered era with units, available on the menu or not), whose slots --loadout then
 // names. --table prints only the summary, --log the whole radio log. Games run in worker threads; the
-// sim is deterministic per seed.
+// sim is deterministic per seed. With --era ww2 the scripted players are the WW2 era's: 's400' (or 'area')
+// runs the heavy battery, 'full' the battery and the four platoons; its columns are the slots, with the
+// battery's own 2 cm guns apart (B20).
 import { Worker, isMainThread, parentPort } from 'node:worker_threads';
 import os from 'node:os';
 import { Sim } from '../src/sim/sim.js';
 import { WAVES } from '../src/sim/director.js';
 import { ERA, SLOT_OPTIONS, DEFAULT_LOADOUT, setEra } from '../src/deploy.js';
 import { ERAS, DEFAULT_ERA, eraById } from '../src/eras/index.js';
-import { MISSILES } from '../src/sim/systems.js';
+import { MISSILES, SYSTEMS, THREATS } from '../src/sim/systems.js';
 
 let heightAt, los;
 try {
@@ -46,7 +48,12 @@ try {
 const LABEL = { s400: 'S400', buk: 'BUK', pantsir: 'PAN', tunguska: 'TUN', osa: 'OSA', tor: 'TOR', strela: 'STR', shilka: 'SHK' };
 const NAME = { s400: 'S-400', buk: 'Buk', pantsir: 'Pantsirs', tunguska: 'Tunguskas' };
 const modern = () => ERA.id === 'modern';
+// the WW2 era's columns: the heavy battery's 8.8 cm, the two 3.7 cm platoons (Flak lane, dispersal), the
+// Vierlinge, the 2 cm, and the battery's own 2 cm
+const WW2_LABEL = { flak88: '88', flak43: '37', flakvierling: 'VIER', flak38: '20' };
+const ww2 = () => ERA.id === 'ww2';
 function layersFor(loadout) {
+  if (ww2()) return [...loadout.map((k, i) => (WW2_LABEL[k] ?? k.toUpperCase()) + (loadout.indexOf(k) < i ? 'B' : loadout.indexOf(k, i + 1) > i ? 'A' : '')), 'B20'];
   if (!modern()) return loadout.map((k, i) => (LABEL[k] ?? k.toUpperCase()) + (loadout.indexOf(k) < i ? i + 1 : ''));
   const pd = loadout[1] === loadout[2] ? LABEL[loadout[1]] : 'PD';
   return [LABEL[loadout[0]], pd, 'GUN', LABEL[loadout[3]], LABEL[loadout[4]]];
@@ -54,6 +61,10 @@ function layersFor(loadout) {
 // the layer a kill key (`unitId:weapon`) counts in
 function layerOf(sim, layers, key) {
   const [id, weapon] = key.split(':');
+  if (ww2()) {
+    const u = sim.unitById.get(id);
+    return u && SYSTEMS[u.kind].predictor && weapon !== '88mm' ? 'B20' : layers[u?.slot ?? 0];
+  }
   if (!modern()) return layers[sim.unitById.get(id)?.slot ?? 0];
   const slot = sim.unitById.get(id)?.slot ?? 4;
   if ((slot === 1 || slot === 2) && /mm$/.test(weapon)) return 'GUN';
@@ -187,20 +198,101 @@ function pdPlayer(sim, u) {
   if (cands.length) sim.unitsAI.engage(u, cands[0].id, pair ? 2 : 1, false);
 }
 
+// ---------------------------------------------------------------- scripted WW2 players
+// how far (m) the 8.8 cm battery can put a burst at a height, roughly (refs/ww2/flak88, the fuze limit)
+const heavyReach = (alt) => (alt > 8500 ? 4500 : alt > 6500 ? 7000 : 7600);
+
+// a player who runs the heavy battery by hand: the predictor on the bomber boxes that have not bombed yet
+// (the box nearest its release first, its leader if it can), kept while the solution holds; fighters at
+// height only when no bomber is in reach; the rangefinder instead of the Wuerzburg while Window spoils the
+// radar range; salvo fire as soon as the solution is fair; barrage at the leading box if the predictor is
+// knocked out
+function heavyPlayer(sim, u) {
+  const id = u.id;
+  const pr = u.predictor;
+  if (u.mode !== 'manual') sim.command(id, 'mode', { mode: 'manual' });
+  if (pr.ranging === 'radar' && pr.window > 0.2) sim.command(id, 'ranging', { source: 'optical' });
+  else if (pr.ranging === 'optical' && pr.window < 0.02 && !sim.threats.some((t) => t.alive && THREATS[t.type].chaff && t.pos.distanceTo(u.pos) < 15000)) sim.command(id, 'ranging', { source: 'radar' });
+  const c = u.pos;
+  const score = (tr) => {
+    const t = sim.threatById.get(tr.id);
+    if (!t?.alive || !THREATS[t.type].plane || t.phase === 'straggle') return Infinity;
+    const agl = tr.pos.y - sim.heightAt(tr.pos.x, tr.pos.z);
+    if (agl < 1200) return Infinity;
+    const hd = Math.hypot(tr.pos.x - c.x, tr.pos.z - c.z);
+    const reach = heavyReach(tr.pos.y);
+    const closing = (c.x - tr.pos.x) * tr.vel.x + (c.z - tr.pos.z) * tr.vel.z > 0;
+    // inbound bombers are tracked well before they are in reach, so the solution has settled
+    if (hd > reach + (closing ? (THREATS[t.type].role === 'level' ? 9000 : 2500) : 0)) return Infinity;
+    if (THREATS[t.type].role === 'level') {
+      if (t.released) return 50000 + hd;
+      // the box nearest its target first, its leader a little before the others
+      return Math.hypot(t.pos.x - t.target.pos.x, t.pos.z - t.target.pos.z) - (t.lead ? 0 : 400);
+    }
+    return 30000 + hd;
+  };
+  const cur = pr.target != null ? u.tracks.find((tr) => tr.id === pr.target) : null;
+  let pick = cur && score(cur) < Infinity && (pr.valid || pr.t < 10) ? cur : null;
+  if (!pick || score(pick) >= 30000) {
+    let bs = pick ? score(pick) - 2000 : Infinity;
+    for (const tr of u.tracks) {
+      const s = score(tr);
+      if (s < bs) {
+        bs = s;
+        pick = tr;
+      }
+    }
+  }
+  if ((pick?.id ?? null) !== u.selected) sim.command(id, 'select', { trackId: pick?.id ?? null });
+  if (pr.hold === 'no predictor') {
+    if (pick && !pr.barrage) sim.command(id, 'barrage', { on: true, trackId: pick.id });
+    sim.command(id, 'trigger', { down: !!pr.barrage });
+    return;
+  }
+  sim.command(id, 'trigger', { down: !!pick && pr.valid && pr.quality > 0.35 });
+}
+
+// a player who runs a light or medium platoon: its crews fire on their own (auto, the guns spread over
+// the targets), and the player points them at a dive-bomber or rocket aircraft diving on this position, the
+// nearest first (a selection the crews take at once)
+function platoonPlayer(sim, u) {
+  const id = u.id;
+  const def = Object.values(SYSTEMS[u.kind].guns)[0];
+  if (u.mode !== 'auto') sim.command(id, 'mode', { mode: 'auto' });
+  let best = null, bs = Infinity;
+  for (const tr of u.tracks) {
+    const t = sim.threatById.get(tr.id);
+    if (!t?.alive || !t.attack || t.phase !== 'dive' || t.target?.id !== id || !THREATS[t.type].vis) continue;
+    const d = tr.pos.distanceTo(u.pos);
+    if (d > def.range * 1.3) continue;
+    if (d < bs) {
+      bs = d;
+      best = tr;
+    }
+  }
+  if ((best?.id ?? null) !== u.selected) sim.command(id, 'select', { trackId: best?.id ?? null });
+}
+
 function areaPlayer(sim) {
   const s = sim.area;
   if (!s?.alive) return;
   if (s.kind === 'buk') bukPlayer(sim, s);
+  else if (SYSTEMS[s.kind].predictor) heavyPlayer(sim, s);
   else s400Player(sim, s);
 }
 
 function fullPlayer(sim) {
   areaPlayer(sim);
+  if (ww2()) {
+    for (const u of sim.units) if (u.alive && SYSTEMS[u.kind].mounts === 'platoon') platoonPlayer(sim, u);
+    return;
+  }
   for (const u of sim.units) if ((u.slot === 1 || u.slot === 2) && u.alive && u.weapons.missiles && u.weapons.gun) pdPlayer(sim, u);
 }
 
 const PLAYERS = { auto: null, s400: areaPlayer, area: areaPlayer, full: fullPlayer };
 const playerName = (player, loadout) => {
+  if (ww2()) return { auto: 'all auto', s400: 'scripted heavy battery', area: 'scripted heavy battery', full: 'scripted battery + platoons' }[player];
   const pd = loadout[1] === loadout[2] ? NAME[loadout[1]] ?? loadout[1] : 'Pantsir and Tunguska';
   const area = NAME[loadout[0]] ?? loadout[0];
   return { auto: 'all auto', s400: `scripted ${area}`, area: `scripted ${area}`, full: `scripted ${area} + ${pd}` }[player];
@@ -223,6 +315,8 @@ function run(seed, player, difficulty, fullLog = false, loadout = DEFAULT_LOADOU
     if (firstShot === null) firstShot = sim.time;
     if (cur && cur.first === null) cur.first = sim.time - cur.t0;
   };
+  // the WW2 guns (sim/mounts.js): a heavy salvo or a light gun's burst counts as the first shot
+  if (ww2()) sim.events.salvo = sim.events.muzzle = sim.events.launch;
   const script = PLAYERS[player];
   let steps = 0, worst = 0, total = 0, maxThreats = 0, scriptT = 0;
   while (sim.state !== 'victory' && sim.state !== 'defeat' && sim.time < 3600) {

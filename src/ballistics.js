@@ -2,7 +2,8 @@ import * as THREE from 'three';
 
 // Shells and tracers, from maxgfx's ballistics.js: quadratic drag and gravity in typed arrays, every
 // tracer in one instanced mesh. Here the 30 mm of the Pantsir and the Tunguska and the Shilka's 23 mm
-// use it. Game values, tuned for play. MAX shells alive: a heavy raid keeps up to about 1100 in the air.
+// use it, and the WW2 era's flak (8.8 cm time-fuzed shells, 3.7 cm and 2 cm self-destroying HE tracer).
+// Game values, tuned for play. MAX shells alive: a heavy raid keeps up to about 1100 in the air.
 const G = 9.81;
 
 // c: quadratic drag (1/m), v0 muzzle velocity, life: flight time before the round self-destructs,
@@ -19,6 +20,27 @@ export const SHELLS = {
   // lighter, slows sooner and self-destructs earlier (the Shilka; effective to about 2.5 km slant, 1.5 km
   // up): 1.3 s to 1 km, 3.05 s to 2 km, 4.25 s to 2.5 km, gone at 2.7 to 2.9 km
   '23mm': { id: 1, v0: 970, c: 0.00036, life: 5, dmg: 0.14, tracer: [20, 9, 3], width: 0.14, tail: 0.025, every: 3, radius: 1.8, spread: 0.005, grow: 0.5 },
+  // The WW2 era (eras/ww2.js, refs/ww2). `burst` (m): a time-fuzed shell; it bursts when its fuze runs
+  // out (Ballistics.fire's `fuze`, set from the predictor; `life` is the longest fuze) or on contact, and
+  // the burst damages every aircraft within `burst` metres, falling off with the distance (Sim.flakBurst).
+  // lifeVar: the self-destruct time's spread (+- that fraction; default 0.05); burn: how long the tracer
+  // burns (s; the shell's life by default).
+  // H (m): the air thins with height, the drag falling as exp(-y / H) (only shells that climb high carry
+  // it; the others keep the plain drag).
+  // 8.8 cm Flak 36/37, Sprgr. L/4,5 with the Zt.Z. S/30 clockwork time fuze (1.5 to 29.5 s), 820 m/s; the
+  // drag fitted to the gun sheet's trajectory model (refs/ww2/flak88 section 7: 85 degrees to 7,000 m in
+  // 15.2 s, 70 degrees 17.4 s, 60 degrees 21.8 s, 85 degrees to 5,000 m 9.0 s; here 15.2, 17.3, 21.8, 9.1 s;
+  // the US ground table's 6.52 s to 4 km and 18.2 s to 8 km come out 6.7 and 18.7 s): 15 to 22 s to bomber
+  // height. No tracer, no contact fuze (a direct hit bursts it anyway, a game rule).
+  '88mm': { id: 2, v0: 820, c: 0.00015, H: 8500, life: 29.5, dmg: 1.5, tracer: null, width: 0, tail: 0, every: 0, radius: 1.5, spread: 0.0008, grow: 0, burst: 55 },
+  // 3.7 cm Flak 43, Sprgr. L'spur (every round a tracer), 820 m/s, contact fuze; the tracer burns through
+  // to the destruct charge 7 to 10 s out, at 2,800 to 3,500 m (refs/ww2/flak43: the drag fits its times of
+  // flight, 1.5 s to 1 km, 3.9 s to 2 km, 7.6 s to 3 km; here 1.53, 3.9, 7.6 s)
+  '37mm': { id: 3, v0: 820, c: 0.00044, life: 8.5, lifeVar: 0.17, dmg: 0.55, tracer: [20, 6.5, 1.6], width: 0.2, tail: 0.03, every: 1, radius: 1.5, spread: 0.004, grow: 0.4 },
+  // 2 cm Flak 38 and Flakvierling 38, Sprgr. L'spur, 900 m/s, contact fuze, self-destroying when the
+  // tracer burns out at about 6 s and 2,200 m (refs/ww2/flak38, flakvierling: 1 s to 650 m, 6 s to 2,190
+  // m on the TM 9-228 chart; here 0.95 s and 2,200 m)
+  '20mm': { id: 4, v0: 900, c: 0.00072, life: 6, lifeVar: 0.08, burn: 6, dmg: 0.25, tracer: [18, 8, 2.4], width: 0.14, tail: 0.025, every: 1, radius: 1.0, spread: 0.005, grow: 0.5 },
 };
 const BY_ID = Object.values(SHELLS);
 const NAMES = Object.keys(SHELLS);
@@ -66,12 +88,15 @@ const _sd = new THREE.Vector3();
  * shell fired this step moves once before the target moves again), and the aim corrected by its miss at
  * the closest approach until it passes within `tol` metres. The target moves at `tVel` and, optionally,
  * accelerates at `acc`. Writes the aim point to `out`; returns the time of flight, or -1 when the shell
- * self-destructs before it gets there (or cannot catch the target).
+ * self-destructs before it gets there (or cannot catch the target). `warm`: start from the aim point
+ * already in `out` (a fire control following its target from step to step) instead of the closed form.
+ * A shell that climbs high (its kind's `H`) takes the correction scaled by the aim point's distance over
+ * the miss point's (its long flights bend away from the line of departure).
  */
-export function solveLead(kind, from, tPos, tVel, out, acc = null, dt = 0.05, iterations = 4, tol = 0.3) {
-  let tof = leadPoint(kind, from, tPos, tVel, out);
-  if (acc) out.addScaledVector(acc, 0.5 * tof * tof);
-  const c = kind.c, life = kind.life;
+export function solveLead(kind, from, tPos, tVel, out, acc = null, dt = 0.05, iterations = 4, tol = 0.3, warm = false) {
+  let tof = warm ? 0 : leadPoint(kind, from, tPos, tVel, out);
+  if (acc && !warm) out.addScaledVector(acc, 0.5 * tof * tof);
+  const c = kind.c, life = kind.life, H = kind.H;
   const ax = acc ? acc.x * 0.5 : 0, ay = acc ? acc.y * 0.5 : 0, az = acc ? acc.z * 0.5 : 0;
   // the round self-destructs after 0.95 to 1.05 of its life
   const steps = Math.floor((life * 0.95) / dt);
@@ -87,7 +112,8 @@ export function solveLead(kind, from, tPos, tVel, out, acc = null, dt = 0.05, it
       const tt = i * dt;
       const qx = tPos.x + (tVel.x + ax * tt) * tt, qy = tPos.y + (tVel.y + ay * tt) * tt, qz = tPos.z + (tVel.z + az * tt) * tt;
       const sp = Math.sqrt(vx * vx + vy * vy + vz * vz);
-      const dk = 1 / (1 + c * sp * dt);
+      const ce = H ? c * Math.exp(-py / H) : c;
+      const dk = 1 / (1 + ce * sp * dt);
       vx *= dk;
       vy = vy * dk - G * dt;
       vz *= dk;
@@ -109,6 +135,14 @@ export function solveLead(kind, from, tPos, tVel, out, acc = null, dt = 0.05, it
     if (bt >= (steps - 1) * dt) return -1;
     tof = bt;
     if (best < tol * tol) return tof;
+    if (H) {
+      // the miss point is nearer than the aim point: scale the correction up by the lever
+      const qx = tPos.x + (tVel.x + ax * bt) * bt - bx, qy = tPos.y + (tVel.y + ay * bt) * bt - by, qz = tPos.z + (tVel.z + az * bt) * bt - bz;
+      const k = Math.hypot(out.x - from.x, out.y - from.y, out.z - from.z) / Math.max(1, Math.hypot(qx - from.x, qy - from.y, qz - from.z));
+      bx *= k;
+      by *= k;
+      bz *= k;
+    }
     out.x += bx;
     out.y += by;
     out.z += bz;
@@ -195,9 +229,10 @@ export class Ballistics {
 
   /**
    * Fire a shell. dir must be normalised. `unit` is the index of the firing unit, for kill credit.
-   * `rng` (default Math.random) varies the self-destruct time; the sim passes its seeded one.
+   * `rng` (default Math.random) varies the self-destruct time; the sim passes its seeded one. `fuze` (s,
+   * a time-fuzed shell's setting): it bursts then (at most its kind's `life`).
    */
-  fire(kindName, pos, dir, owner, unit = 0, { dmg = 1, rng = Math.random } = {}) {
+  fire(kindName, pos, dir, owner, unit = 0, { dmg = 1, rng = Math.random, fuze = 0 } = {}) {
     if (this.n >= MAX) return false;
     const k = SHELLS[kindName];
     const i = this.n++;
@@ -206,12 +241,12 @@ export class Ballistics {
     this.vy[i] = dir.y * k.v0;
     this.vz[i] = dir.z * k.v0;
     this.age[i] = 0;
-    this.life[i] = k.life * (0.95 + rng() * 0.1);
+    this.life[i] = fuze > 0 ? Math.min(fuze, k.life) : k.lifeVar ? k.life * (1 + (rng() - 0.5) * 2 * k.lifeVar) : k.life * (0.95 + rng() * 0.1);
     this.kind[i] = k.id;
     this.owner[i] = owner;
     this.unit[i] = unit;
     this.dmg[i] = dmg * k.dmg;
-    this.lit[i] = this.count++ % k.every === 0 ? 1 : 0;
+    this.lit[i] = k.every && this.count++ % k.every === 0 ? 1 : 0;
     if (owner === OWNER.PLAYER) this.stats.fired++;
     return true;
   }
@@ -227,8 +262,9 @@ export class Ballistics {
 
   /**
    * ctx: {
-   *   targets: [{ pos, radius, alive }],
+   *   targets: [{ pos, radius, alive, ghost }],   (ghost: never hit, e.g. chaff clouds and falling bombs)
    *   hit(target, point, kindName, owner, dmg, unit),
+   *   burst(point, kindName, owner, dmg, unit),   a time-fuzed shell bursts (its fuze ran out, or on contact)
    *   groundAt(x, z) -> height, ground(point, kindName),
    *   expire(point, kindName)
    * }
@@ -241,7 +277,8 @@ export class Ballistics {
       const ox = this.px[i], oy = this.py[i], oz = this.pz[i];
       let vx = this.vx[i], vy = this.vy[i], vz = this.vz[i];
       const sp = Math.sqrt(vx * vx + vy * vy + vz * vz);
-      const dk = 1 / (1 + k.c * sp * dt);
+      const ck = k.H ? k.c * Math.exp(-oy / k.H) : k.c;
+      const dk = 1 / (1 + ck * sp * dt);
       vx *= dk;
       vy = vy * dk - G * dt;
       vz *= dk;
@@ -257,7 +294,7 @@ export class Ballistics {
       const sl = Math.sqrt(sl2);
       for (let j = 0; j < targets.length; j++) {
         const tg = targets[j];
-        if (!tg.alive) continue;
+        if (!tg.alive || tg.ghost) continue;
         const cx = tg.pos.x - ox, cy = tg.pos.y - oy, cz = tg.pos.z - oz;
         const r = tg.radius + k.radius;
         const reach = r + sl;
@@ -267,7 +304,8 @@ export class Ballistics {
         const dx = cx - sx * t, dy = cy - sy * t, dz = cz - sz * t;
         if (dx * dx + dy * dy + dz * dz < r * r) {
           p.set(ox + sx * t, oy + sy * t, oz + sz * t);
-          ctx.hit(tg, p, NAMES[k.id], this.owner[i], this.dmg[i], this.unit[i]);
+          if (k.burst) ctx.burst?.(p, NAMES[k.id], this.owner[i], this.dmg[i], this.unit[i]);
+          else ctx.hit(tg, p, NAMES[k.id], this.owner[i], this.dmg[i], this.unit[i]);
           if (this.owner[i] === OWNER.PLAYER) this.stats.hits++;
           dead = true;
           break;
@@ -283,7 +321,8 @@ export class Ballistics {
       }
       if (!dead && this.age[i] >= this.life[i]) {
         p.set(nx, ny, nz);
-        ctx.expire?.(p, NAMES[k.id]);
+        if (k.burst) ctx.burst?.(p, NAMES[k.id], this.owner[i], this.dmg[i], this.unit[i]);
+        else ctx.expire?.(p, NAMES[k.id]);
         dead = true;
       }
       if (dead) this.kill(i);
@@ -297,6 +336,9 @@ export class Ballistics {
     for (let i = 0; i < this.n; i++) {
       if (!this.lit[i]) continue;
       const k = BY_ID[this.kind[i]];
+      // a tracer that burns out before the shell's life (the 2 cm) fades over its burn time and goes out
+      const burn = Math.min(k.burn || Infinity, this.life[i]);
+      if (this.age[i] >= burn) continue;
       const o = m * 4;
       A[o] = this.px[i];
       A[o + 1] = this.py[i];
@@ -305,7 +347,7 @@ export class Ballistics {
       B[o] = k.tracer[0];
       B[o + 1] = k.tracer[1];
       B[o + 2] = k.tracer[2];
-      B[o + 3] = 1 - Math.pow(Math.min(this.age[i] / this.life[i], 1), 6);
+      B[o + 3] = 1 - Math.pow(Math.min(this.age[i] / burn, 1), 6);
       const tail = Math.min(k.tail, this.age[i]);
       D[o] = this.vx[i] * tail;
       D[o + 1] = this.vy[i] * tail;

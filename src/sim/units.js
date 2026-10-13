@@ -4,12 +4,14 @@ import { SYSTEMS, MISSILES, SLOTS, THREATS, PART_ROLE, CLS_TYPE } from './system
 import { clamp, wrapPi, TAU } from './flight.js';
 import { inEnvelope, makeMissile } from './missiles.js';
 import { solveLead, reachOf, SHELLS, OWNER } from '../ballistics.js';
+import { Mounts, initMounts } from './mounts.js';
 
 // Fire units: state the UI and render layer read, the commands the player gives, and the AI crews.
 // AI crews are competent but imperfect on purpose (slow to react, they fire on decoys, never go silent
 // against radar-seeking missiles, use the big missiles on everything) so the player's choices count.
 // What differs between the kinds comes from their SYSTEMS entry (fire-control channel, capabilities),
-// not from checks on the kind.
+// not from checks on the kind. Gun units of several mounts (SYSTEMS `mounts`: the WW2 era's batteries and
+// platoons) are run by sim/mounts.js, called from here.
 
 const _v = new THREE.Vector3();
 const _dir = new THREE.Vector3();
@@ -57,9 +59,12 @@ export function createUnits(heightAt, rng = null) {
     const sys = SYSTEMS[def.kind];
     const parts = partPlacements(def).map((p) => {
       const part = {
-        kind: p.kind, role: PART_ROLE[p.kind] ?? 'main', pos: new THREE.Vector3(p.x, heightAt(p.x, p.z), p.z), heading: p.heading,
+        kind: p.kind, role: sys.roles?.[p.kind] ?? PART_ROLE[p.kind] ?? 'main', pos: new THREE.Vector3(p.x, heightAt(p.x, p.z), p.z), heading: p.heading,
         slots: SLOTS[p.kind] ? new Array(SLOTS[p.kind]).fill(true) : [], rounds: 0, alive: true,
       };
+      // a part's own name and letter (the WW2 battery's guns A to F)
+      if (p.name) part.name = p.name;
+      if (p.letter) part.letter = p.letter;
       const hp = sys.dispersed?.[p.kind];
       if (hp) part.hp = part.maxHp = hp;
       // a Buk launcher vehicle turns and raises its own launcher; a TELAR also has its own radar channel
@@ -81,7 +86,8 @@ export function createUnits(heightAt, rng = null) {
       pos: parts[0].pos.clone(), heading: parts[0].heading, parts,
       hp, maxHp: hp, alive: true,
       mode: 'auto',
-      radar: { search: !!sys.search, track: false, sweep: (rng ? rng() : (index * 0.618) % 1) * TAU, range: sys.search?.range ?? 0 },
+      // (observers who scan by eye, search.optical, are no radar: radar.search stays false for them)
+      radar: { search: !!sys.search && !sys.search.optical, track: false, sweep: (rng ? rng() : (index * 0.618) % 1) * TAU, range: sys.search?.range ?? 0 },
       tracks: [], trackMap: new Map(), linkMap: new Map(), selected: null,
       engagements: [],
       weapons: {
@@ -134,6 +140,7 @@ export function createUnits(heightAt, rng = null) {
       for (const st of Object.values(stock)) for (const [i, n] of racksOf(u, st.type)) parts[i].rounds = n;
     }
     syncRounds(u);
+    if (sys.mounts) initMounts(u);
     return u;
   });
 }
@@ -216,11 +223,14 @@ function syncRounds(u) {
 export class FireUnits {
   constructor(sim) {
     this.sim = sim;
+    // the units of several gun mounts (SYSTEMS `mounts`)
+    this.mounts = new Mounts(sim, this);
   }
 
   // ---------------------------------------------------------------- queries
   // what each unit's tracking channels follow (they refresh those tracks every step)
   channelTargets(u) {
+    if (SYSTEMS[u.kind].mounts) return this.mounts.channelTargets(u);
     const ids = [];
     // the designation (the Strela's channel is its seeker, which locks by its own rules)
     if (u.desig.state === 'held' && !u.lay) ids.push(u.desig.id);
@@ -330,6 +340,7 @@ export class FireUnits {
   // (they differ only where the missiles have a channel of their own); a Buk: the TELAR holding it
   channelSees(u, t, use = 'any') {
     const sys = SYSTEMS[u.kind];
+    if (sys.mounts) return this.mounts.sees(u, t);
     if (sys.fc === 'telar') return u.parts.some((p, i) => p.target === t.id && this.sees(u, t, 'telar', i));
     const src = this.fcSource(u, use === 'gun' ? 'gun' : 'missile');
     if (this.sees(u, t, src)) return true;
@@ -378,6 +389,8 @@ export class FireUnits {
    * engagement, the TELAR that would take the next target. null if the unit has no such missile.
    */
   nextLauncher(u, type = u.weapons.type, e = null) {
+    // a battery or platoon: the gun that fires next
+    if (SYSTEMS[u.kind].mounts) return this.mounts.nextGun(u);
     const st = type ? u.weapons.stock[type] : null;
     if (!st) return null;
     const racks = racksOf(u, type);
@@ -430,6 +443,7 @@ export class FireUnits {
 
   vehicleName(u, i) {
     const p = u.parts[i];
+    if (p.name) return p.name;
     if (p.role === 'telar') return `TELAR ${u.telars.indexOf(i) + 1}`;
     return { loader: 'loader-launcher', radar: 'search radar', cp: 'command post' }[p.role] ?? 'vehicle';
   }
@@ -439,6 +453,7 @@ export class FireUnits {
     const sim = this.sim;
     if (!u || !u.alive) return false;
     const sys = SYSTEMS[u.kind];
+    if (sys.mounts) return this.mounts.command(u, name, a);
     switch (name) {
       case 'radar':
         if (!sys.search) return false;
@@ -849,6 +864,7 @@ export class FireUnits {
       u.radar.track = u.telars.some((j) => u.parts[j].track);
     }
     if (p.role === 'radar') u.radar.search = false;
+    if (SYSTEMS[u.kind].mounts) this.mounts.partDown(u, i);
     syncRounds(u);
     sim.say(u, `${this.vehicleName(u, i)} knocked out`, 'alert');
     sim.events.partDestroyed?.(u, i);
@@ -927,6 +943,7 @@ export class FireUnits {
         u.weapons.gun.rounds = u.weapons.gun.max;
         u.weapons.gun.heat = 0;
       }
+      if (sys.mounts) this.mounts.resupply(u);
       this.updateSlots(u);
     }
   }
@@ -952,6 +969,7 @@ export class FireUnits {
           p.alive = false;
           if (p.track) p.track = false;
           if (p.target) p.target = null;
+          if (p.gun) p.gun.firing = false;
         }
         const g = u.weapons.gun;
         if (g) {
@@ -999,6 +1017,12 @@ export class FireUnits {
         else u.erect[i] = Math.min(1, u.erect[i] + dt / erectTime(i));
       }
 
+      // a battery or platoon of gun mounts: sim/mounts.js
+      if (sys.mounts) {
+        this.mounts.update(u, dt);
+        this.describe(u);
+        continue;
+      }
       this.designate(u);
       if (u.mode === 'auto') this.crew(u, dt);
       this.runEngagements(u, dt);
@@ -1815,9 +1839,10 @@ export class FireUnits {
     if (u.weapons.gun?.overheated) a.push('OVERHEAT');
     for (const p of u.parts) {
       if (p.alive || p.hp == null) continue;
-      const k = { telar: 'TELAR DOWN', loader: 'LOADER DOWN', radar: 'RADAR DOWN', cp: 'CP DOWN' }[p.role];
+      const k = { telar: 'TELAR DOWN', loader: 'LOADER DOWN', radar: 'RADAR DOWN', cp: 'CP DOWN', gun: 'GUN DOWN', close: 'GUN DOWN', predictor: 'PREDICTOR DOWN' }[p.role];
       if (k && !a.includes(k)) a.push(k);
     }
+    if (sys.mounts) this.mounts.alerts(u);
   }
 }
 

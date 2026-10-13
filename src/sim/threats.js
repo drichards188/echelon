@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { THREATS } from './systems.js';
 import { G, clamp, fly, levelToward, fromBearingVec } from './flight.js';
+import { Planes } from './planes.js';
 
 // Threat behaviour as scripted game paths: high flyers that launch standoff weapons and turn back,
 // low terrain-hugging cruise missiles on dogleg routes, slow drone swarms, helicopters that pop up from
 // behind cover, and a ballistic arc. Every enemy weapon in flight is a threat too, so it can be shot down.
+// The WW2 era's aircraft, bombs, rockets and Window (THREATS `plane`, `ghost`) fly in sim/planes.js.
 
 const _d = new THREE.Vector3();
 const _p = new THREE.Vector3();
@@ -22,12 +24,15 @@ export function makeThreat(type, pos, dir, extra = {}) {
     ...extra,
   };
   t.vel.copy(t.fwd).multiplyScalar(t.speed);
+  // never hit by shells or bursts (falling bombs, rockets, chaff)
+  if (def.ghost) t.ghost = true;
   return t;
 }
 
 export class ThreatAI {
   constructor(sim) {
     this.sim = sim;
+    this.planes = new Planes(sim);
   }
 
   // ---------------------------------------------------------------- spawning
@@ -36,6 +41,7 @@ export class ThreatAI {
    * spacing (m), group }. target: 'assets' | 'radar' | 'short' | 'units' | 'any'.
    */
   spawnGroup(g) {
+    if (THREATS[g.type]?.plane) return this.planes.spawnGroup(g);
     const sim = this.sim;
     const rng = sim.rng;
     const out = [];
@@ -111,7 +117,7 @@ export class ThreatAI {
         break;
       }
       default:
-        return null;
+        return THREATS[type]?.plane ? this.planes.spawnOne(type, start, target, g, i) : null;
     }
     sim.addThreat(t);
     return t;
@@ -169,8 +175,10 @@ export class ThreatAI {
         case 'glide':
         case 'atgm': this.guided(t, dt); break;
         case 'tbm': this.ballistic(t, dt); break;
+        default: this.planes.update(t, dt);
       }
-      if (t.dead || !t.alive) continue;
+      // (chaff never reaches the ground: it is gone first)
+      if (t.dead || !t.alive || t.ghost && THREATS[t.type].chaff) continue;
       const gh = sim.heightAt(t.pos.x, t.pos.z);
       if (t.pos.y < gh) {
         t.pos.y = gh;

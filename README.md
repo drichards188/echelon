@@ -1,6 +1,6 @@
 # Echelon: layered air defense
 
-A three.js (WebGL2) game built on the MaxGFX framework (`../threejs-maxgfx`). One game holds several eras of air defense; the modern one is playable, a late-war WW2 era (German flak, 1944 to 1945) is in development. In the modern era you command the air defense of an airbase on the steppe: an S-400 battalion for the long-range, high layer, two Pantsir-S1 for point defense, an Osa-AKM and a Strela-10M3 for the short-range layer, against seven escalating raids of drones, cruise missiles, fighters with radar-seeking missiles and glide bombs, decoys, attack helicopters and ballistic missiles.
+A three.js (WebGL2) game built on the MaxGFX framework (`../threejs-maxgfx`). One game holds several eras of air defense; the modern one is playable, a late-war WW2 era (German flak defending the jet airfield at Hopsten, February to March 1945) is in development: its battles run in the headless sim, its models and consoles are being built. In the modern era you command the air defense of an airbase on the steppe: an S-400 battalion for the long-range, high layer, two Pantsir-S1 for point defense, an Osa-AKM and a Strela-10M3 for the short-range layer, against seven escalating raids of drones, cruise missiles, fighters with radar-seeking missiles and glide bombs, decoys, attack helicopters and ballistic missiles.
 
 The left half of the screen is a third-person view of the unit you have selected; the right half is that unit's console. The units you are not operating fight on their own, in whatever mode you left them. Everything is procedural (terrain, vehicles, aircraft, missiles, the consoles, almost all the sound); the only asset files are four CC0 recordings in `public/audio` (see `CREDITS.md` there).
 
@@ -84,7 +84,7 @@ Between raids (40 s of quiet) a supply column refills the reserves; launchers st
 - `/?era=modern` starts in that era without saving it (an era still in development falls back to modern); `window.__iads.setEra(id)` switches it from a test (`__iads.era` is the era in play). Local storage keeps `echelon.era` and the loadout per era in `echelon.loadout.<era>`.
 - `/ui.html?unit=STR`: the consoles against a mock battle.
 - `/audio.html`: a live smoke test of the audio engine.
-- `node tools/simtest.mjs 1 2 3 --both --quiet`: whole battles headless, all-auto against a scripted S-400 player. `--all` adds a player who also runs both Pantsirs, `--difficulty Easy|Normal|Hard|all` picks the difficulty, `--era ID` the era (default `modern`), `--loadout KINDS|alt` the units, `--table` prints only the summary, `--log` the whole radio log, `--jobs N` sets the worker threads. Each game prints a per-wave summary.
+- `node tools/simtest.mjs 1 2 3 --both --quiet`: whole battles headless, all-auto against a scripted S-400 player. With `--era ww2` the scripted players are the WW2 era's (a heavy battery player, and one who also runs the platoons) and the columns are its slots, with the heavy battery's own 2 cm guns apart (B20). `--all` adds a player who also runs both Pantsirs, `--difficulty Easy|Normal|Hard|all` picks the difficulty, `--era ID` the era (default `modern`), `--loadout KINDS|alt` the units, `--table` prints only the summary, `--log` the whole radio log, `--jobs N` sets the worker threads. Each game prints a per-wave summary.
 - `node tools/audiotest.mjs`: renders every synthesized sound bank offline and reports levels.
 - `node tools/shot.mjs "/?play=1&unit=1&quality=Low" shots/x.png --until "window.__iads?.state === 'playing'" --eval "window.__iads.fastForward(60)"`: a headless capture of the game.
 
@@ -96,18 +96,20 @@ src/
   eras/            one module per era: map layout, slots and options, raids, text, alert captions, theme
     index.js       the registry (ERAS), the derived default loadouts, loadEra (an era's lazily loaded content)
     modern.js      the modern era (the airbase on the steppe)
-    ww2.js         the WW2 era, 1944 to 1945: a placeholder, in development (ww2/content.js: its lazy modules, empty)
+    ww2.js         the WW2 era: Fliegerhorst Hopsten, February to March 1945, its flak, six day raids (in development; ww2/content.js: its lazy modules)
   deploy.js        the era in play (setEra) and where everything sits (units, their vehicles, the assets), bearing helpers
   sim/             the battle, pure logic (runs in Node)
     sim.js         Sim: update order, events, damage, targets for the attackers, radio
     systems.js     game values: fire units, missiles, threats, difficulty
     sensors.js     search radars, tracks, the fused picture and the data link
     units.js       fire units: commands, AI crews, engagements, Pantsir guns, Strela seeker
+    mounts.js      gun units of several mounts (WW2): the heavy battery's predictor, salvos and barrage, the platoons' guns and feeds
     missiles.js    interceptor flight and hit resolution
     threats.js     threat behaviour and the weapons aircraft release
+    planes.js      the WW2 aircraft's attack roles (recon, strafing, dive bombing, rockets, bomber boxes, escorts), bombs, rockets, Window
     director.js    the raids, lulls, resupply, win and loss
     flight.js      shared kinematics
-  ballistics.js    30 mm shells and tracers (from maxgfx)
+  ballistics.js    shells and tracers (from maxgfx): the 30 and 23 mm, the WW2 8.8 cm (time fuzes, bursts), 3.7 and 2 cm
   render/
     units.js       vehicles and buildings bound to the sim (turrets, radars, masts, erectors, Tor lids, wrecks; the Buk loader-launcher's crane is its reload scene, reload/buk.js), rebuilt when the loadout changes
     entities.js    everything that flies, instanced, with plumes and wreck trails (distant flyers are enlarged to stay visible)

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { ERA, ASSETS, partPlacements, setLoadout, setEra } from '../deploy.js';
 import { mulberry32 } from '../noise.js';
-import { Ballistics } from '../ballistics.js';
+import { Ballistics, SHELLS } from '../ballistics.js';
 import { THREATS, MISSILES, DIFFICULTY, SYSTEMS } from './systems.js';
 import { createUnits, FireUnits } from './units.js';
 import { ThreatAI, resetIds } from './threats.js';
@@ -108,6 +108,7 @@ export class Sim {
     this.missileById = new Map();
     this.picture = [];
     this.sensors.pictureMap.clear();
+    this.sensors.plotMap?.clear();
     this.engagedBy = new Map();
     this.link = true;
     this.score = { points: 0, kills: 0, cost: 0, leaks: 0, damage: 0 };
@@ -159,10 +160,31 @@ export class Sim {
         this.events.detonate?.(p, kind, true);
         this.damageThreat(t, dmg, { unitId: this.units[unitIndex]?.id, weapon: kind });
       },
+      burst: (p, kind, owner, dmg, unitIndex) => this.flakBurst(p, kind, dmg, this.units[unitIndex]?.id),
       groundAt: this.heightAt,
       ground: (p, kind) => this.events.shellGround?.(p, kind),
       expire: (p, kind) => this.events.shellExpire?.(p, kind),
     };
+  }
+
+  // A time-fuzed shell bursts (the 8.8 cm): every aircraft within the shell's `burst` radius takes damage,
+  // falling off with the square of the distance (an arcade rule: the sheets give an 88's fragments about 12 m
+  // along its line of flight and 30 m to the sides, "about ten metres or less" lethal against a B-17).
+  flakBurst(p, kind, dmg, unitId) {
+    const R = SHELLS[kind].burst;
+    let hits = 0;
+    for (const t of this.threats) {
+      if (!t.alive || t.ghost) continue;
+      const d = t.pos.distanceTo(p) - t.radius * 0.5;
+      // a near miss shakes the crew (sim/planes.js rattle: the bomb aimer's error)
+      if (d < R * 1.8) t.nearT = this.time;
+      if (d >= R) continue;
+      const k = 1 - Math.max(0, d) / R;
+      t.hitT = this.time;
+      this.damageThreat(t, dmg * k * k, { unitId, weapon: kind });
+      hits++;
+    }
+    this.events.burst?.(p, kind, hits, unitId);
   }
 
   bookkeeping() {
@@ -192,6 +214,8 @@ export class Sim {
     for (const u of this.units) {
       if (u.weapons.gun?.firing && u.weapons.gun.target) add(u.weapons.gun.target, u.id);
       for (const e of u.engagements) if (e.state === 'aligning' || e.state === 'launch') add(e.trackId, u.id);
+      // the guns of a battery or platoon (sim/mounts.js), each on its own target
+      for (const p of u.parts) if (p.gun?.firing && p.gun.target) add(p.gun.target, u.id);
     }
     for (const [id, l] of this.engagedBy) if (!l.length && !this.threatById.has(id)) this.engagedBy.delete(id);
   }
@@ -217,7 +241,7 @@ export class Sim {
     if (this.attract) return;
     for (const p of this.picture) {
       const t = this.threatById.get(p.id);
-      if (!t) continue;
+      if (!t || t.ghost) continue;
       const key = t.type === 'arm' || t.type === 'tbm' || t.type === 'atgm' ? `${t.type}${t.parent || t.id}` : `g${t.group}`;
       let g = this.groups.get(key);
       if (!g) this.groups.set(key, (g = { t0: this.time, done: false, reporter: p.reporter }));
@@ -225,7 +249,7 @@ export class Sim {
       g.done = true;
       const members = this.picture.filter((q) => {
         const o = this.threatById.get(q.id);
-        return o && (key[0] === 'g' ? o.group === t.group && o.type !== 'arm' && o.type !== 'atgm' : o === t);
+        return o && (key[0] === 'g' ? o.group === t.group && o.type !== 'arm' && o.type !== 'atgm' && !o.ghost : o === t);
       });
       if (!members.length) continue;
       let x = 0, z = 0, y = 0;
@@ -278,7 +302,7 @@ export class Sim {
     t.alive = false;
     const def = THREATS[t.type];
     // aircraft and slow flyers fall as burning wrecks; missiles and bombs break up in the air
-    if (t.type === 'fighter' || t.type === 'helo' || t.type === 'drone' || t.type === 'cruise' || t.type === 'decoy') t.falling = true;
+    if (t.type === 'fighter' || t.type === 'helo' || t.type === 'drone' || t.type === 'cruise' || t.type === 'decoy' || def.plane) t.falling = true;
     else t.dead = true;
     if (silent || !by) return;
     if (!this.attract && !this.scripted && this.state !== 'victory' && this.state !== 'defeat') {
@@ -288,7 +312,7 @@ export class Sim {
     this.stats.add('kills', `${by.unitId}:${by.weapon}`);
     this.events.threatKilled?.(t, by);
     const u = this.unitById.get(by.unitId);
-    const name = { fighter: 'fighter', decoy: 'decoy', cruise: 'cruise missile', drone: 'drone', arm: 'ARM', glide: 'glide bomb', helo: 'helicopter', atgm: 'ATGM', tbm: 'ballistic target' }[t.type];
+    const name = { fighter: 'fighter', decoy: 'decoy', cruise: 'cruise missile', drone: 'drone', arm: 'ARM', glide: 'glide bomb', helo: 'helicopter', atgm: 'ATGM', tbm: 'ballistic target' }[t.type] ?? def.name;
     if (u) this.say(u, `target destroyed, ${name}`, 'kill');
   }
 
@@ -302,7 +326,9 @@ export class Sim {
       this.wreckImpact(t);
       return;
     }
-    const victim = this.applyWarhead(t.pos, def.warhead[0], def.warhead[1]);
+    // (a bomb or rocket may carry its aircraft's warhead)
+    const wh = t.warhead ?? def.warhead;
+    const victim = this.applyWarhead(t.pos, wh[0], wh[1]);
     if (victim) {
       this.score.leaks++;
       this.stats.add('leaked', t.type);
@@ -345,7 +371,8 @@ export class Sim {
           if (p.hp <= 0) this.unitsAI.partDown(u, i);
         });
         if (h <= 0) continue;
-        u.hp = u.parts.some((p) => p.alive && p.role === 'telar') ? u.parts.reduce((a, p) => a + (p.alive ? p.hp : 0), 0) : 0;
+        const core = SYSTEMS[u.kind].core ?? 'telar';
+        u.hp = u.parts.some((p) => p.alive && p.role === core) ? u.parts.reduce((a, p) => a + (p.alive ? p.hp : 0), 0) : 0;
       } else {
         let d = Infinity;
         for (const p of u.parts) d = Math.min(d, p.pos.distanceTo(pos));
@@ -398,6 +425,17 @@ export class Sim {
     return victim;
   }
 
+  // An aircraft's guns hit the ground round `point` (a burst of a strafing pass): damage there, and the
+  // crews of the gun pits it sprays duck for a moment (sim/mounts.js: they stop firing).
+  strafe(t, point, dmg) {
+    const victim = this.applyWarhead(point, dmg, 10);
+    for (const u of this.units) {
+      if (!u.alive || !SYSTEMS[u.kind].mounts) continue;
+      for (const p of u.parts) if (p.gun && p.alive && p.pos.distanceTo(point) < 25) p.gun.cover = this.time + 1.2 + this.rng() * 1.2;
+    }
+    this.events.strafe?.(t, point, victim);
+  }
+
   // ---------------------------------------------------------------- targets for the attackers
   pickTarget(kind) {
     const rng = this.rng;
@@ -411,7 +449,7 @@ export class Sim {
     const assetTarget = () => {
       const alive = this.assets.filter((a) => a.alive);
       const list = alive.length ? alive : this.assets;
-      const a = pick(list, (x) => ({ runway: 3, command: 2, shelter: 1, fuel: 1, tower: 0.5 })[x.kind] ?? 1);
+      const a = pick(list, (x) => x.weight ?? ({ runway: 3, command: 2, shelter: 1, fuel: 1, tower: 0.5 })[x.kind] ?? 1);
       const pos = a.pos.clone();
       if (a.kind === 'runway') {
         const b = (a.bearing * Math.PI) / 180, s = (rng() - 0.5) * a.length * 0.8;
@@ -442,11 +480,42 @@ export class Sim {
       }
       case 'short':
         return unitTarget((u) => !SYSTEMS[u.kind].area) ?? assetTarget();
+      // WW2: any gun position, the platoons, the heavy battery's guns, the runway, or assets of some kinds
+      // ('asset:revetment,hangar')
+      case 'flak':
+        return unitTarget(() => true) ?? assetTarget();
+      case 'light':
+        return unitTarget((u) => !SYSTEMS[u.kind].area) ?? assetTarget();
+      case 'heavy': {
+        const s = this.area;
+        const guns = s?.alive ? s.parts.filter((p) => p.alive && p.role === 'gun') : [];
+        if (!guns.length) return unitTarget(() => true) ?? assetTarget();
+        const p = guns[Math.floor(rng() * guns.length)];
+        return { kind: 'unit', id: s.id, part: s.parts.indexOf(p), pos: p.pos.clone().setY(p.pos.y + 1) };
+      }
+      case 'runway': {
+        const r = this.assets.find((a) => a.kind === 'runway' && a.alive);
+        if (!r) return assetTarget();
+        const b = (r.bearing * Math.PI) / 180, sl = (rng() - 0.5) * r.length * 0.7;
+        const pos = r.pos.clone();
+        pos.x += Math.sin(b) * sl;
+        pos.z -= Math.cos(b) * sl;
+        pos.y = this.heightAt(pos.x, pos.z);
+        return { kind: 'asset', id: r.id, pos };
+      }
       case 'units':
         return unitTarget(() => true) ?? assetTarget();
       case 'any':
         return rng() < 0.5 ? unitTarget(() => true) ?? assetTarget() : assetTarget();
       default:
+        if (kind?.startsWith('asset:')) {
+          const kinds = kind.slice(6).split(',');
+          const list = this.assets.filter((a) => a.alive && kinds.includes(a.kind));
+          if (list.length) {
+            const a = pick(list, (x) => x.weight ?? 1);
+            return { kind: 'asset', id: a.id, pos: a.pos.clone() };
+          }
+        }
         return assetTarget();
     }
   }
@@ -472,8 +541,11 @@ export class Sim {
     return { kind: 'unit', id: best.id, part: i, pos: _v.copy(p).setY(p.y + 5).clone() };
   }
 
-  // the data link stands while the area unit does (a dispersed one: while its command post stands)
+  // the data link stands while the area unit does (a dispersed one: while its command post stands); in an
+  // era with a reporting service's plot (layout.plot), while the post it comes through stands
   linkUp() {
+    const plot = ERA.layout.plot;
+    if (plot) return !!this.assets.find((x) => x.id === plot.post)?.alive;
     const a = this.area;
     if (!a?.alive) return false;
     const cp = a.parts.find((p) => p.role === 'cp');

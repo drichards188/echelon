@@ -1,4 +1,5 @@
 import { ERA, THREAT_AXIS, WAVES } from '../deploy.js';
+import { THREATS } from './systems.js';
 
 // The battle: the era in play's waves (eras/<era>.js `waves`: groups of threats with their bearing
 // offset from the threat axis, spawn range, delay and what they go for), lulls between them, win and loss.
@@ -48,7 +49,8 @@ export class Director {
     }));
     this.setState('wave');
     sim.events.wave?.(sim.wave, w.title, w.sub);
-    sim.radio(`Command: ${w.sub.toLowerCase()}. Stand by.`, 'alert');
+    // (an era's wave may carry its own call, `radio`)
+    sim.radio(w.radio ?? `Command: ${w.sub.toLowerCase()}. Stand by.`, 'alert');
   }
 
   update(dt) {
@@ -66,8 +68,10 @@ export class Director {
           sim.threatAI.spawnGroup(g);
           this.pending.splice(i, 1);
         }
-        // decoys and aircraft on their way home do not hold the raid open
-        const busy = sim.threats.some((t) => !t.dead && (t.alive || t.falling) && t.type !== 'decoy' && !((t.type === 'fighter' || t.type === 'helo') && t.phase === 'egress'));
+        // decoys and aircraft on their way home (or out of their formation, going home) do not hold the raid
+        // open, nor does chaff
+        const busy = sim.threats.some((t) => !t.dead && (t.alive || t.falling) && t.type !== 'decoy' && !THREATS[t.type].chaff &&
+          !((t.type === 'fighter' || t.type === 'helo' || THREATS[t.type].plane) && (t.phase === 'egress' || t.phase === 'straggle')));
         if (!this.pending.length && !busy && this.t > 10) {
           sim.stats.endWave();
           if (this.wave + 1 >= WAVES.length) {
@@ -81,6 +85,7 @@ export class Director {
             this.wave++;
             this.setState('lull');
             sim.unitsAI.resupply();
+            this.repair();
             sim.radio(ERA.text.lull, 'info');
           }
         }
@@ -94,6 +99,14 @@ export class Director {
       sim.stats.endWave();
       this.setState('defeat');
     }
+  }
+
+  // between raids the era's repairs (layout.repair: asset id -> share of its hit points) go on the assets
+  // still standing
+  repair() {
+    const rep = ERA.layout.repair;
+    if (!rep) return;
+    for (const a of this.sim.assets) if (a.alive && rep[a.id]) a.hp = Math.min(a.maxHp, a.hp + a.maxHp * rep[a.id]);
   }
 
   // the base is lost with all its vital assets (the modern era's runway and command post), or when no
