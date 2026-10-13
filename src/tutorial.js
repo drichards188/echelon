@@ -1374,6 +1374,17 @@ function platoon44(kind, unit, o) {
 // commanding one kind at a time through the gun selector while the others fight on with their crews.
 const shotsOf = (T, kind) => T.u.parts.reduce((a, p) => a + (p.kind === kind && p.gun ? p.gun.shots : 0), 0);
 const MUSTANG = { range: 7000, agl: 70, passes: 4, part: 9 };
+// keep a Mustang coming at the tower: a new one when it is shot down too (the tower has several kinds of gun
+// to practise on it, keepPlane would leave the lesson without a target after the first kill)
+const keepMustang = (T) => {
+  const t = T.threats.get('m');
+  if (t?.alive && t.phase === 'egress') T.sim.remove(t);
+  else if (t?.alive && t.lesson && t.target !== t.lesson && t.phase === 'ingress') t.target = t.lesson;
+  if (!t || isGone(t)) {
+    plane44(T, 'm', 'p51', MUSTANG);
+    if (t) T.hint('Another Mustang is coming in.');
+  }
+};
 const turm44 = {
   id: 'flakturm',
   name: 'Flak tower',
@@ -1434,7 +1445,7 @@ const turm44 = {
       },
       tick: (T) => {
         keepBox('a', { range: 20000 })(T);
-        keepPlane('m', 'p51', MUSTANG)(T);
+        keepMustang(T);
       },
       done: (T) => T.u.group === 'flakvierling',
     },
@@ -1448,7 +1459,7 @@ const turm44 = {
       },
       tick: (T) => {
         keepBox('a', { range: 20000 })(T);
-        keepPlane('m', 'p51', MUSTANG)(T);
+        keepMustang(T);
       },
       done: (T) => pr44(T).salvos > T.mem.s0,
     },
@@ -1462,7 +1473,7 @@ const turm44 = {
       },
       tick: (T) => {
         keepBox('a', { range: 20000 })(T);
-        keepPlane('m', 'p51', MUSTANG)(T);
+        keepMustang(T);
       },
       done: (T) => T.u.group === 'flakvierling' && shotsOf(T, 'flakvierling') - T.mem.v0 >= 40,
     },
@@ -1476,7 +1487,7 @@ const turm44 = {
       },
       tick: (T) => {
         keepBox('a', { range: 20000 })(T);
-        keepPlane('m', 'p51', MUSTANG)(T);
+        keepMustang(T);
       },
       done: (T) => T.u.group === 'flak43' && shotsOf(T, 'flak43') - T.mem.f0 >= 6,
     },
@@ -1487,7 +1498,7 @@ const turm44 = {
       hi: ['mode'],
       tick: (T) => {
         keepBox('a', { range: 20000 })(T);
-        keepPlane('m', 'p51', MUSTANG)(T);
+        keepMustang(T);
       },
       done: (T) => T.u.mode === 'auto',
     },
