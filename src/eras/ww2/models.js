@@ -24,3 +24,8 @@ registerVehicles({
 });
 
 registerAssets(ASSETS44);
+
+// The gun crews (models/crew44.js, its figure figure44.js, poses pose44.js and jobs jobs44.js): one Crew44 layer
+// on the scene, place(rig, kind) for every rig of the kinds above; the API is in crew44.js's header.
+export { Crew44, NEAR as CREW_NEAR, FAR as CREW_FAR } from './models/crew44.js';
+export { JOBS as CREW_JOBS } from './models/jobs44.js';
