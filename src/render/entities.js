@@ -38,14 +38,18 @@ export class Entities {
     this.groups = new Map();
     this.cam = new THREE.Vector3(); // the camera position, set each frame
     const add = (key, model, cap, shadow) => {
+      // a model with `state` (models/threats.js) gets one per-instance aState attribute shared by its parts
+      const state = model.state ? new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4).setUsage(THREE.DynamicDrawUsage) : null;
       const parts = model.parts.map((pt) => {
         let geo = pt.geometry;
         // spinning parts are drawn about their pivot
         if (pt.spin) geo = geo.clone().translate(-pt.pivot.x, -pt.pivot.y, -pt.pivot.z);
+        if (state) geo.setAttribute('aState', state);
         const mesh = new THREE.InstancedMesh(geo, pt.material, cap);
         mesh.count = 0;
         mesh.frustumCulled = false;
-        mesh.castShadow = shadow;
+        mesh.castShadow = shadow && pt.castShadow !== false;
+        if (pt.depthMaterial) mesh.customDepthMaterial = pt.depthMaterial;
         mesh.receiveShadow = false;
         mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
         scene.add(mesh);
@@ -58,10 +62,10 @@ export class Entities {
         pt.geometry.boundingSphere ?? pt.geometry.computeBoundingSphere();
         radius = Math.max(radius, pt.geometry.boundingSphere.radius);
       }
-      this.groups.set(key, { parts, model, cap, n: 0, radius });
+      this.groups.set(key, { parts, model, cap, n: 0, radius, state });
     };
     this.addGroup = add;
-    for (const t of THREAT_TYPES) add(t, buildThreat(t), CAP[t] ?? 32, true);
+    for (const t of THREAT_TYPES) add(t, buildThreat(t), CAP[t] ?? buildThreat(t).cap ?? 32, true);
     for (const k of INTERCEPTOR_KINDS) add(k, buildInterceptor(k), MCAP, false);
     for (const k of Object.values(INTERCEPTOR_STAGES)) add(k, buildInterceptor(k), MCAP, false);
     for (const k of Object.values(INTERCEPTOR_BOOSTERS)) add(k, buildInterceptor(k), MAX_BOOSTERS, true);
@@ -74,7 +78,7 @@ export class Entities {
 
   // flyers registered since the pools were made (an era's content, models/threats.js registerFlyers)
   sync() {
-    for (const t of THREAT_TYPES) if (!this.groups.has(t)) this.addGroup(t, buildThreat(t), CAP[t] ?? 32, true);
+    for (const t of THREAT_TYPES) if (!this.groups.has(t)) this.addGroup(t, buildThreat(t), CAP[t] ?? buildThreat(t).cap ?? 32, true);
     for (const k of INTERCEPTOR_KINDS) if (!this.groups.has(k)) this.addGroup(k, buildInterceptor(k), MCAP, false);
   }
 
@@ -203,7 +207,10 @@ export class Entities {
     for (const th of sim.threats) {
       if (th.dead || (!th.alive && !th.falling)) continue;
       const M = this.place(th.type, th.pos, th.fwd, th.bank, t, th.id);
-      if (!M || dt === 0) continue;
+      if (!M) continue;
+      const g = this.groups.get(th.type), model = g.model;
+      if (g.state) model.state(th, g.state.array, (g.n - 1) * 4);
+      if (dt === 0) continue;
       if (th.falling) fx.wreck(th.pos, th.vel);
       else if (th.type === 'arm' && th.age < 7) {
         // the radar-seeking missile's motor burns for its first seconds
@@ -212,6 +219,13 @@ export class Entities {
       } else if (th.type === 'atgm') {
         _p.copy(this.groups.get('atgm').model.plume).applyMatrix4(M);
         fx.motorPlume(_p, th.vel, 0.3);
+      } else if (model.motor) {
+        // a rocket's motor (model.motor: { burn s, size }) burns for its first seconds
+        if (th.age < model.motor.burn) fx.motorPlume(_p.copy(model.plume).applyMatrix4(M), th.vel, model.motor.size);
+      } else if (model.smoke && th.hp < th.maxHp * 0.7 && Math.random() < dt * 20) {
+        // a damaged aircraft trails smoke from one of its engines (model.smoke: engine points), black and burning when badly hit
+        const dmg = 1 - th.hp / th.maxHp;
+        fx.trail(_p.copy(model.smoke[th.id % model.smoke.length]).applyMatrix4(M), th.vel, dmg > 0.66 ? 0.75 : 0.3);
       }
     }
     for (const m of sim.missiles) {
@@ -235,6 +249,7 @@ export class Entities {
         p.mesh.count = g.n;
         if (g.n) p.mesh.instanceMatrix.needsUpdate = true;
       }
+      if (g.state && g.n) g.state.needsUpdate = true;
     }
   }
 

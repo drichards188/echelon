@@ -11,6 +11,11 @@ import { build9M311 } from './v/tunguska.js';
 // Model space: forward -Z, up +Y, real size in metres, origin near the middle of the body.
 // Spinning parts (props, rotors) carry `spin` (the axis) and `pivot` (the centre they turn about);
 // their geometry stays in model space.
+// Optional fields (an era's flyers use them, render/entities.js reads them): a part's `castShadow: false`
+// and `depthMaterial` (its shadow-pass material); the model's `cap` (pool size), `state(threat, array,
+// offset)` (writes four floats per instance into an `aState` attribute its materials read), `motor`
+// ({ burn, size }: a motor plume at `plume` while threat.age < burn) and `smoke` (engine points: a
+// damaged flyer trails smoke from one of them).
 
 export const THREAT_TYPES = ['fighter', 'decoy', 'cruise', 'drone', 'arm', 'glide', 'helo', 'tbm', 'atgm'];
 export const INTERCEPTOR_KINDS = ['48N6', '9M96', '57E6', '9M33', '9M37', '9M317', '9M338', '9M311'];

@@ -14,4 +14,9 @@
 // The game values (sim/systems.js SYSTEMS, MISSILES, THREATS) are plain data the headless sim needs,
 // so they stay in the static registries.
 
+// Each part has its own module, owned by whoever builds it, and registers itself when imported.
+import './models.js'; // the German guns, emplacements and fire control (registerVehicles, registerMarkingSet)
+import './aircraft.js'; // the Allied aircraft and their ordnance (registerFlyers)
+import './consoles.js'; // the consoles (registerConsole) and the era's console theme
+
 export default {};
