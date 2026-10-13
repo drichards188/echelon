@@ -1370,8 +1370,133 @@ function platoon44(kind, unit, o) {
   };
 }
 
+// The flak tower (eras/ww2.js slot 4, sim/mounts.js `groups`): one unit, three kinds of gun, the player
+// commanding one kind at a time through the gun selector while the others fight on with their crews.
+const shotsOf = (T, kind) => T.u.parts.reduce((a, p) => a + (p.kind === kind && p.gun ? p.gun.shots : 0), 0);
+const MUSTANG = { range: 7000, agl: 70, passes: 4, part: 9 };
+const turm44 = {
+  id: 'flakturm',
+  name: 'Flak tower',
+  unit: 'TURM',
+  blurb: 'The tower commander: three kinds of gun on one concrete tower, the gun selector, the 12.8 cm twins on the predictor, the light guns on the galleries.',
+  outro: 'The tower fights the whole sky at once: keep the 12.8 cm twins on the bombers, and whenever a fighter comes down on the tower take the light guns in hand, knowing the twins carry on without you.',
+  setup: (T) => {
+    T.u.mode = 'hold';
+    T.u.group = 'flak128';
+    T.u.concentrate = false;
+  },
+  steps: [
+    {
+      title: 'The tower',
+      text: 'A concrete flak tower, 36 m to the top of its corner turrets: four twin 12.8 cm Flakzwilling 40 on the turrets, laid together from the Kommandogerät and the Würzburg on the roof; two 3.7 cm Flak 43 on the roof; a 2 cm Flakvierling on the gallery of each face. Bombs on the ground below hardly reach the guns. In this lesson nothing is scored and nothing can be destroyed.',
+      hi: ['header'],
+    },
+    {
+      title: 'The gun selector',
+      text: 'You command one kind of gun at a time: GESCHÜTZWAHL at the top picks it, or press W. The console below is that kind\'s page: the predictor and the gun reports for the 12.8 cm, the platoon leader\'s page for the 3.7 cm and the 2 cm. The guns you do not command fight on with their own crews unless you order FEUER HALT.',
+      hi: ['groups'],
+    },
+    {
+      id: 'pick',
+      title: 'The heavy guns',
+      text: 'A formation of Fortresses is coming in from the west. With 12,8 CM selected, set FEUERERLAUBNIS to BEFEHL and hand a bomber of the formation to the predictor: click it on the plot or in the list, or press Tab.',
+      goal: 'BEFEHL, 12,8 CM, and a bomber selected',
+      hi: ['groups', 'mode', 'plot', 'tracks'],
+      enter: (T) => {
+        T.clear();
+        box44(T, 'a', { range: 20000 });
+      },
+      tick: keepBox('a', { range: 20000 }),
+      done: (T) => T.u.mode === 'manual' && T.u.group === 'flak128' && inBox(T, 'a', T.u.selected),
+    },
+    {
+      title: 'Twin salvos',
+      text: 'Wait for the LÖSUNG lamp to burn steady, then hold FEUER (Space): every twin that is loaded and laid fires both barrels together. The 12.8 cm shells climb faster and burst bigger than the 8.8 cm\'s, and reach higher.',
+      goal: 'Fire two salvos',
+      hi: ['solution', 'trigger', 'guns'],
+      enter: (T) => {
+        T.mem.s0 = pr44(T).salvos;
+      },
+      tick: (T) => {
+        keepBox('a', { range: 20000 })(T);
+        if (T.respawned) T.goto('pick');
+      },
+      done: (T) => pr44(T).salvos - T.mem.s0 >= 2,
+    },
+    {
+      id: 'vier',
+      title: 'A fighter on the tower',
+      text: 'A Mustang is coming down to strafe the tower. The 12.8 cm cannot follow a low, fast fighter: take the Vierlinge on the galleries in hand. Click 2 CM VIERLING in GESCHÜTZWAHL (or press W twice).',
+      goal: 'Select the 2 cm Vierlinge',
+      hi: ['groups'],
+      enter: (T) => {
+        plane44(T, 'm', 'p51', MUSTANG);
+      },
+      tick: (T) => {
+        keepBox('a', { range: 20000 })(T);
+        keepPlane('m', 'p51', MUSTANG)(T);
+      },
+      done: (T) => T.u.group === 'flakvierling',
+    },
+    {
+      title: 'The heavy guns carry on',
+      text: 'The page is now the Vierlinge\'s: four guns, one per face, each card with its magazines. The 12.8 cm twins have gone back to their crews and keep firing salvos at the formation on their own, as FEUER FREI. Watch the plot for their target.',
+      goal: 'Wait for a 12.8 cm salvo fired by the crews',
+      hi: ['guns', 'plot'],
+      enter: (T) => {
+        T.mem.s0 = pr44(T).salvos;
+      },
+      tick: (T) => {
+        keepBox('a', { range: 20000 })(T);
+        keepPlane('m', 'p51', MUSTANG)(T);
+      },
+      done: (T) => pr44(T).salvos > T.mem.s0,
+    },
+    {
+      title: 'Fire the Vierlinge',
+      text: 'Select the Mustang and hold FEUER (Space) as it comes in: each gun fires once its layer is on the lead. Inside 1.5 km the four Vierlinge put up a wall of fire; beyond that the trigger shows ZU WEIT.',
+      goal: 'Fire the Vierlinge at the Mustang',
+      hi: ['tracks', 'trigger', 'sight'],
+      enter: (T) => {
+        T.mem.v0 = shotsOf(T, 'flakvierling');
+      },
+      tick: (T) => {
+        keepBox('a', { range: 20000 })(T);
+        keepPlane('m', 'p51', MUSTANG)(T);
+      },
+      done: (T) => T.u.group === 'flakvierling' && shotsOf(T, 'flakvierling') - T.mem.v0 >= 40,
+    },
+    {
+      title: 'The 3.7 cm on the roof',
+      text: 'The two 3.7 cm Flak 43 reach further, to about 3 km. Switch to 3,7 CM and fire them at the fighter while it is still out of the Vierlinge\'s reach.',
+      goal: 'Select 3,7 CM and fire the 3.7 cm',
+      hi: ['groups', 'trigger'],
+      enter: (T) => {
+        T.mem.f0 = shotsOf(T, 'flak43');
+      },
+      tick: (T) => {
+        keepBox('a', { range: 20000 })(T);
+        keepPlane('m', 'p51', MUSTANG)(T);
+      },
+      done: (T) => T.u.group === 'flak43' && shotsOf(T, 'flak43') - T.mem.f0 >= 6,
+    },
+    {
+      title: 'Leave it to the crews',
+      text: 'Set FEUERERLAUBNIS to FREI: every gun on the tower then picks its own target, the twins the bombers and the light guns whatever comes low. Take a group in hand again whenever you want it on a target of your own.',
+      goal: 'FEUERERLAUBNIS to FREI',
+      hi: ['mode'],
+      tick: (T) => {
+        keepBox('a', { range: 20000 })(T);
+        keepPlane('m', 'p51', MUSTANG)(T);
+      },
+      done: (T) => T.u.mode === 'auto',
+    },
+  ],
+};
+
 TUTORIALS.push(
   battery44,
+  turm44,
   platoon44('flak43', 'MED1', {
     name: '3.7 cm Flak 43 platoon',
     gun: '3.7 cm',
