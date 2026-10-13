@@ -49,10 +49,10 @@ const HOLD = { 'out of reach': ['ZU WEIT', 'OUT OF REACH'], 'no lock': ['NICHT I
 // the gun whose sight the console shows: the one picked, else the gun in action (the camera's, u.nextGun)
 export const sightGun = (u, pick) => (pick >= 0 && u.parts[pick]?.gun ? pick : u.nextGun ?? 0);
 
-function line(u) {
+function line(u, keep) {
   if (u.alive === false) return 'No longer in action';
   if (u.mode === 'hold') return 'FEUER HALT: guns safe';
-  const guns = u.parts.filter((p) => p.gun && p.alive);
+  const guns = u.parts.filter((p) => p.gun && p.alive && keep(p));
   const g = u.weapons.gun;
   const firing = guns.filter((p) => p.gun.firing);
   const shell = SHELL[g.shell] ?? g.shell;
@@ -115,11 +115,20 @@ function feedView(kind, p) {
   return out;
 }
 
-export function mountPlatoon(ctx, kind) {
+// o (the flak tower's console, turm.js): keep(part) (the guns this page shows; default all), guns (their
+// buttons' labels in order; default 1, 2, 3), title [de, en], keys (more help)
+export function mountPlatoon(ctx, kind, o = {}) {
   const { send, memo } = ctx;
   const K = PLATOON[kind];
+  const keep = o.keep ?? (() => true);
   const root = el('div', `con c44 platoon44 k-${kind}`);
-  const hdr = new Header44(K.de, K.en);
+  const hdr = new Header44(...(o.title ?? [K.de, K.en]));
+  // the guns on this page (part indices) and the gun picked by its place among them
+  const gunsOf = (unit) => unit.parts.flatMap((p, i) => (p.gun && keep(p) ? [i] : []));
+  const nameOf = (unit, i) => {
+    const k = o.guns ? gunsOf(unit).indexOf(i) : -1;
+    return k >= 0 ? [`GESCHÜTZ ${o.guns[k]}`, `GUN ${o.guns[k]}`] : gunName(unit.parts[i], i);
+  };
   let u = null;
   memo.gun ??= -1;
   memo.plotR ??= 10000;
@@ -128,7 +137,8 @@ export function mountPlatoon(ctx, kind) {
   // ---------------------------------------------------------------- the layer's sight
   const ps = plate(K.sight[0], 'SIGHT', 'pl-sight');
   const sight = new Sight44({ canvas: ctx.sight, style: K.style, onPick: pick });
-  const gunSeg = new Seg({ cls: 'compact zoom44', items: [{ v: -1, ru: 'AUTO', en: 'IN ACTION' }, { v: 0, ru: '1', en: 'GUN' }, { v: 1, ru: '2', en: 'GUN' }, { v: 2, ru: kind === 'flakvierling' ? 'T' : '3', en: 'GUN' }], onChange: (v) => { memo.gun = v; } });
+  const labels = o.guns ?? ['1', '2', kind === 'flakvierling' ? 'T' : '3'];
+  const gunSeg = new Seg({ cls: 'compact zoom44', items: [{ v: -1, ru: 'AUTO', en: 'IN ACTION' }, ...labels.map((l, k) => ({ v: k, ru: l, en: 'GUN' }))], onChange: (v) => { memo.gun = v < 0 || !u ? -1 : gunsOf(u)[v] ?? -1; } });
   ps.el.append(gunSeg.el);
   ps.body.append(sight.el);
   tut(ps.el, 'sight');
@@ -195,7 +205,7 @@ export function mountPlatoon(ctx, kind) {
   top.append(ps.el, pz.el);
   const low = el('div', 'row low');
   low.append(pp.el, pt.el);
-  const keys = el('div', 'helpline', 'TAB: TARGET   SPACE: FEUER (HOLD)   A: MODE   G: DISTRIBUTION   Q: NEXT GUN\'S SIGHT   CLICK A GUN: ITS SIGHT');
+  const keys = el('div', 'helpline', 'TAB: TARGET   SPACE: FEUER (HOLD)   A: MODE   G: DISTRIBUTION   Q: NEXT GUN\'S SIGHT   CLICK A GUN: ITS SIGHT' + (o.keys ?? ''));
   root.append(hdr.el, selBar.el, top, pg, low, keys);
 
   function trigger(down) {
@@ -207,8 +217,8 @@ export function mountPlatoon(ctx, kind) {
     pg.replaceChildren();
     cards.length = 0;
     unit.parts.forEach((p, i) => {
-      if (!p.gun) return;
-      const nm = gunName(p, i);
+      if (!p.gun || !keep(p)) return;
+      const nm = nameOf(unit, i);
       const c = { i, el: el('section', 'plate gcard44') };
       const t = el('div', 'ptitle');
       t.append(el('b', null, nm[0]), el('i', null, nm[1]));
@@ -222,7 +232,7 @@ export function mountPlatoon(ctx, kind) {
       c.why = el('i', 'gwhy');
       const tl = el('div', 'gline');
       tl.append(c.tgt, c.why);
-      c.feed = feedView(kind, p);
+      c.feed = feedView(p.kind, p);
       c.shots = new Drum('SCHUSS', 'FIRED', '8888', 'sm');
       c.rounds = new Drum('MUNITION', 'IN THE PIT', '8888', 'sm');
       const dr = el('div', 'rowc gdrums');
@@ -257,7 +267,7 @@ export function mountPlatoon(ctx, kind) {
         case 'KeyA': send('mode', { mode: MODES[(MODES.indexOf(u.mode) + 1) % 3] }); snd('switch'); return true;
         case 'KeyG': send('concentrate', { on: !u.concentrate }); snd('switch'); return true;
         case 'KeyQ': {
-          const guns = u.parts.flatMap((p, i) => (p.gun ? [i] : []));
+          const guns = gunsOf(u);
           const cur = memo.gun < 0 ? -1 : guns.indexOf(memo.gun);
           memo.gun = cur + 1 >= guns.length ? -1 : guns[cur + 1];
           snd('click');
@@ -270,7 +280,7 @@ export function mountPlatoon(ctx, kind) {
       u = unit;
       const tracks = u.tracks || [];
       if (cards.key !== u.id) buildCards(u);
-      hdr.update(u, line(u));
+      hdr.update(u, line(u, keep));
       const sel = u.selected != null ? tracks.find((t) => t.id === u.selected) ?? null : null;
       selBar.update(u, sel, data);
       const sys = SYSTEMS[u.kind];
@@ -281,9 +291,9 @@ export function mountPlatoon(ctx, kind) {
       const def = sys.guns[p.kind];
       const g = p.gun;
       VIEW.set(u.id, { part: gi, fov: K.fov });
-      gunSeg.set(memo.gun);
+      gunSeg.set(memo.gun < 0 ? -1 : gunsOf(u).indexOf(memo.gun));
       const tg = (g.target ?? u.selected) != null ? tracks.find((t) => t.id === (g.target ?? u.selected)) ?? null : null;
-      const nm = gunName(p, gi);
+      const nm = nameOf(u, gi);
       const why = HOLD[g.hold];
       sight.update(dt, {
         eye: { x: p.pos.x, y: p.pos.y + def.height + 0.4, z: p.pos.z }, az: compassOf(u, p.turret), el: p.turret.el, fov: K.fov,
@@ -324,7 +334,7 @@ export function mountPlatoon(ctx, kind) {
         setText(c.why, dead ? 'OUT OF ACTION' : w ? `${w[0]} / ${w[1]}` : gg.target != null ? (gg.laid ? 'GERICHTET / LAID' : 'RICHTEN / LAYING') : '');
         setCls(c.why, 'bad', !!w || dead);
         const f = c.feed;
-        if (kind === 'flak43') {
+        if (q.kind === 'flak43') {
           // the table fires from the right: the right clip empties first
           for (let k = 0; k < 16; k++) setCls(f.pips[15 - k], 'on', k < gg.table);
           const laying = gg.load > 0;

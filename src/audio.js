@@ -103,6 +103,8 @@ const THREATS = {
 // mid bands' distances, and inside which distance a round ducks the mix.
 const SHOTS = {
   '88mm': { bank: 'g88', kind: 'heavy', ref: 200, level: 1.25, reverb: 0.3, near: 500, mid: 3000, close: 150 },
+  // the flak tower's 12.8 cm twin: the 8.8 cm's bank pitched down, louder
+  '128mm': { bank: 'g88', kind: 'heavy', ref: 260, level: 1.4, reverb: 0.35, near: 600, mid: 3500, close: 200, rate: 0.82 },
   '37mm': { bank: 'g37', kind: 'g37', ref: 60, level: 0.95, reverb: 0.12, near: 250, mid: 1500, close: 35 },
 };
 
@@ -1947,7 +1949,7 @@ export class AudioEngine {
 
   // ------------------------------------------------------------------ the WW2 era (ww2Tasks)
 
-  /** One round of a WW2 gun: '88mm' (the battery's guns) or '37mm'; its band by distance, heard late. */
+  /** One round of a WW2 gun: '88mm' (the battery's guns), '128mm' (the flak tower's) or '37mm'; its band by distance, heard late. */
   shot(kind, pos) {
     const S = SHOTS[kind];
     if (!S || !this.bank[S.bank]) return;
@@ -1955,7 +1957,7 @@ export class AudioEngine {
       const d = this.dist(p);
       const r = this.route(p, { ref: S.ref, level: S.level, reverb: S.reverb, bus: d < S.close ? this.blastBus : this.sfx });
       if (!r) return;
-      this.playBuf(r, this.variant(this.bank[S.bank], r.d, S.near, S.mid), { rate: 0.95 + Math.random() * 0.1 });
+      this.playBuf(r, this.variant(this.bank[S.bank], r.d, S.near, S.mid), { rate: (S.rate ?? 1) * (0.95 + Math.random() * 0.1) });
       this.finish(r);
       if (r.d < S.close) this.duck(0.45 + 0.4 * (r.d / S.close), 0.5, true);
     }, MAX_DELAY_WW2);

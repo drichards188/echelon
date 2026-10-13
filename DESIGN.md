@@ -997,7 +997,8 @@ the Vierlinge north of the centreline by the west threshold; the 2 cm by the fue
 | 1 medium, Flak lane | `flak43` MED1 Martha | three `flak43` in a triangle about 100 m a side (a Zug: 69 to 137 m apart, MIS 10) |
 | 2 medium, dispersal | `flak43` MED2 Nordpol | the same |
 | 3 light, quadruple | `flakvierling` VIER Otto | two `flakvierling` and a `flakvierling-tower` (on a wooden Flak tower, its guns 10.4 m up) |
-| 4 light, single | `flak38` LIGHT Paula | three `flak38` |
+| 4 light, single | `flakturm` TURM Paula (default; a what-if) | the flak tower: four `flak128` A to D on the corner turrets (`deck` 36 m), `kdo40`, `wurzburg` and two `flak43` on the roof (32 m), four `flakvierling` on the galleries (26 m), the `flakturm` building (see "The flak tower") |
+| 4, alternative | `flak38` LIGHT Paula | three `flak38` |
 
 **Gun units of several mounts** (SYSTEMS `mounts`, sim/mounts.js, hooked from units.js where a unit has
 it: update, command, channelTargets, channelSees, nextLauncher, resupply, partDown, describe). Every gun is a
@@ -1206,7 +1207,7 @@ them; 6 (24 March) Typhoons and P-47s on the flak and the heavy battery, an A-26
   `setMagazine` off while a barrel's magazine is changed (the Vierling's sim barrels 0 to 3 are the model's
   guns 0, 1, 3, 2) and the racks `setRack` from the full magazines in the pit (one fewer for each loader with
   one in his hands). Letters from `part.letter`, Dunkelgelb on guns B and E (`YELLOW_GUNS`), the rest grey;
-  kill rings: the battery's 8.8 cm kills this battle (`sim.stats` waves, `<unit>:88mm`) on every standing
+  kill rings: the battery's heavy kills this battle (`sim.stats` waves, `<unit>:<u.heavyShell>`) on every standing
   heavy gun. A knocked-out gun is knocked askew in its pit, barrel down, and burns (not the whole pit sagging,
   as a vehicle does). Gun positions further than 4.5 km from the camera are not drawn (`RIG_FAR`).
 - The battery's data cables: one ribbon mesh on the ground (`heightAt` + 3 cm, a little slack) from the
@@ -1274,7 +1275,32 @@ of the camera (`SHADOW_NEAR`; the shadow map covers the view's surroundings only
 | `radar` / `track` | battery | `{ on }` the Wuerzburg |
 | `ranging` | battery | `{ source: 'radar' \| 'optical' }` |
 | `barrage` | battery | `{ on, trackId?, point? }` (in manual it fires while the trigger is held) |
-| `concentrate` | platoons | `{ on }` |
+| `concentrate` | platoons, the flak tower | `{ on }` |
+| `group` | the flak tower | `{ kind }`: the gun kind under the player's command (`SYSTEMS[kind].groups`) |
+
+**The flak tower** (`flakturm`, slot 4's default; not historical at Hopsten: the G-towers stood in Berlin,
+Hamburg and Vienna; a what-if for play). One unit of three kinds of gun: a battery (`mounts: 'battery'`) whose
+heavy guns are four 12.8 cm Flakzwilling 40 (`flak128`: `barrels: 2`, both fired on every salvo, `twin` their
+half spacing; shell `128mm`, 880 m/s, fuze to 32 s, burst 70 m) under the Kommandogeraet and the Wuerzburg on
+the roof, and whose 'close' guns are two `flak43` and four `flakvierling`. `groups: ['flak128', 'flak43',
+'flakvierling']` lets the player command one kind at a time (`u.group`, the `group` command; the heavy kind
+first): in manual the group under command takes the selection and the trigger (as the battery's guns, or as a
+platoon's), the other groups fight on as in auto (every mode but hold). sim/mounts.js: `heavyManual(u)`,
+`gunManual(u, p)`, `lightGroup(u)`; the predictor's ballistics come from `u.heavyShell` (was the 88's),
+`predictor.reach` (default 11,000 m) the slant range beyond which the crew lets a target going away go; with a
+light group under command `u.nextGun`, `u.weapons.gun` (its `shell` too) and the camera follow that group's
+guns. Parts with `deck` (eras/ww2.js) stand that high over the ground at the unit's site (units.js
+createUnits; `part.deck`), so their bores, sights and line of sight are up there and bombs on the ground below
+hardly reach them; the `flakturm` part (role 'tower') has no hit points (Sim.applyWarhead skips parts without
+`maxHp`). The tower's lookouts see to 34 km. Render: `models/flak128.js` (a sketch of the twin: two recoiling
+barrels, `setRecoil(m)` or `setRecoil(k, m)`, `anchors.muzzles` and `breeches` [2]) and `models/flakturm.js`
+(the block, 40 m square, roof 32 m, corner turrets 36 m, galleries 26 m: `FLAKTURM`); a gun with `deck` leaves
+its pit behind (`rig.emplacement` removed), the tower is never culled (`WHOLE`), no data cables; crews
+(jobs44.js `flak128`: men at their posts, no hand work). Console: `consoles/turm.js`, the battery's page
+(`mountBattery(ctx, { heavyOnly, title, cal })`) and two platoon pages (`mountPlatoon(ctx, kind, { keep, guns,
+title })`) under a gun selector (GESCHÜTZWAHL; W cycles); each page has its own memo, the sight canvas moves to
+the page shown, and the sight pose is whichever part that page put in `VIEW`. Sound: `shot('128mm')`, the 88's
+bank pitched down. The Flak 38 lesson starts with the old loadout (its `loadout`).
 
 **Difficulty.** DIFFICULTY gains `aim` (Easy 0.85, Normal 1, Hard 1.5): it scales the WW2 light and medium
 crews' aiming errors, and the predictor's unless `heavyAim` is given (Hard 1.25); `bombAim` (Hard 0.9, 1 when
@@ -1490,3 +1516,4 @@ Reuse the maxgfx engine core (distance delay, air absorption, voice stealing, re
 - Sim (WW2 balance and pacing): wave 1 opens closer (the reconnaissance aircraft 15 km out, the Mustangs from 15 km after 20 and 35 s: the first shot at about 45 s, was 186); DIFFICULTY `heavyAim` (the predictor's, Hard 1.25) and `bombAim` (the WW2 aircraft's aim, Hard 0.9); `ERA.text.radio` templates in sim.js (raid call, kill, asset destroyed). Modern simtest byte-identical.
 - UI: ui/panel.js takes the status strip from `ERA.text.strip` when the era has one (the WW2 era's German).
 - WW2 release: `available: true` exposes Hopsten through the normal era toggle and `?era=ww2`. The battery and platoon consoles register through `ww2/content.js`; `registerSightPose` supplies their gun and predictor poses, `main.js` sends them to `SightRenderer`, and `UnitViews.sightPos` accepts a part index so each picture begins at its own eyepiece. Four gun tutorials are available from the title screen. The 2 cm loop banks' silent start buffers are intentional and excluded from `audiotest.mjs` silence warnings.
+- WW2 flak tower: slot 4's default is `flakturm` (TURM Paula), the 2 cm platoon its alternative. SYSTEMS `flakturm` (`groups`), `flak128`; SHELLS `128mm` (id 5); PART_ROLE `flak128` 'gun', `flakturm` 'tower'; parts' `deck`; mounts.js gun groups (`u.group`, `group` command, `heavyManual`, `gunManual`, `lightGroup`, `u.heavyKind`, `u.heavyShell`, twin barrels in `fireHeavy`, `predictor.reach`); Sim.applyWarhead skips parts without `maxHp`; models `flak128`, `flakturm`; consoles/turm.js; battery.js and platoon.js take options; simtest `TURM` column. The modern simtest and the WW2 one with the old loadout (`--loadout flak88,flak43,flak43,flakvierling,flak38`) are byte-identical.

@@ -75,10 +75,12 @@ function line(u, data) {
   return n ? `AUTO: lookouts watching ${n} aircraft` : 'AUTO: sky clear';
 }
 
-export function mountBattery(ctx) {
+// o (the flak tower's console, turm.js): title [de, en], heavyOnly (the gun reports list the heavy guns
+// only: the light ones have their own pages), cal (the heavy guns' calibre on the plot), keys (more help)
+export function mountBattery(ctx, o = {}) {
   const { send, memo } = ctx;
   const root = el('div', 'con c44 battery44');
-  const hdr = new Header44('8,8 CM FLAK 37', 'HEAVY BATTERY');
+  const hdr = new Header44(...(o.title ?? ['8,8 CM FLAK 37', 'HEAVY BATTERY']));
   let u = null;
   memo.zoom ??= 12;
   memo.plotR ??= 20000;
@@ -192,7 +194,7 @@ export function mountBattery(ctx) {
   top.append(left, right);
   const low = el('div', 'row low');
   low.append(pw.el, pp.el, pt.el);
-  const keys = el('div', 'helpline', 'TAB: TARGET   SPACE: FEUER (HOLD)   A: MODE   G: BARRAGE   T: RANGE FROM   R: WÜRZBURG   Q: ZOOM');
+  const keys = el('div', 'helpline', 'TAB: TARGET   SPACE: FEUER (HOLD)   A: MODE   G: BARRAGE   T: RANGE FROM   R: WÜRZBURG   Q: ZOOM' + (o.keys ?? ''));
   root.append(hdr.el, selBar.el, top, low, keys);
 
   function trigger(down) {
@@ -209,7 +211,7 @@ export function mountBattery(ctx) {
     for (const r of rows) r.el.remove();
     rows.length = 0;
     unit.parts.forEach((p, i) => {
-      if (!p.gun) return;
+      if (!p.gun || (o.heavyOnly && p.role !== 'gun')) return;
       const heavy = p.role === 'gun';
       const r = { i, heavy, el: el('div', 'grow44' + (heavy ? '' : ' close')) };
       const id = el('div', 'gid');
@@ -256,6 +258,7 @@ export function mountBattery(ctx) {
     update(dt, unit, data) {
       u = unit;
       const pr = u.predictor;
+      const P = SYSTEMS[u.kind].predictor;
       const tracks = u.tracks || [];
       if (rows.key !== u.id) buildRows(u);
       hdr.update(u, line(u, data));
@@ -311,7 +314,7 @@ export function mountBattery(ctx) {
         setCls(trig.el, 'warn', false);
         setCls(trig.el, 'out', false);
       } else {
-        const r = !tg ? null : pr.hold === 'out of reach' || pr.hold === 'no predictor' ? 'out' : pr.range > LONG || pr.hold === 'settling' ? 'long' : 'in';
+        const r = !tg ? null : pr.hold === 'out of reach' || pr.hold === 'no predictor' ? 'out' : pr.range > (P.reach ?? LONG) || pr.hold === 'settling' ? 'long' : 'in';
         setTrigger44(trig, r, 'SALVOS (HOLD)', g.rounds > 0);
         if (r === 'long' && pr.hold === 'settling') trig.text('FEUER', 'SETTLING: FEW HITS');
       }
@@ -349,7 +352,7 @@ export function mountBattery(ctx) {
       wz.update(dt, u, tracks, pr);
       plot.setRange(memo.plotR);
       scale.set(memo.plotR);
-      plot.update(dt, u, tracks, data, [[LONG, '8,8 cm'], [SYSTEMS.flak88.predictor.range, 'KdO 40']]);
+      plot.update(dt, u, tracks, data, [[P.reach ?? LONG, o.cal ?? '8,8 cm'], [P.range, 'KdO 40']]);
       list.update(dt, u, tracks, data);
     },
     dispose() {

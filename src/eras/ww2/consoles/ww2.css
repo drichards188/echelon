@@ -299,3 +299,19 @@
 .dplate44 { flex: 1; padding: 3px 6px 2px; border-radius: 2px; background: linear-gradient(#d3d0c1, #b2af9f); box-shadow: 0 1px 0 rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.55); }
 .dplate44 .lbl b { font-size: 8.5px; color: var(--plate-ink); letter-spacing: .04em; white-space: nowrap; }
 .dplate44 .lbl i { font-size: 6px; color: #3d3b33; opacity: 1; white-space: nowrap; }
+
+/* the flak tower's gun selector (turm.js): one slim row over the page it shows */
+.turm44 { gap: 3px; }
+.turm44 > .con { gap: 5px; }
+.turm44 > .turmbar44 { flex: none; display: flex; align-items: center; gap: 8px; padding: 1px 6px; border: 1px solid rgba(214, 196, 150, 0.25); border-radius: 3px; background: rgba(30, 28, 22, 0.55); }
+.turm44 .turmsel44 { display: flex; gap: 4px; flex: 1; }
+.turm44 .turmsel44 .sbtn { flex: 1; height: 19px; padding: 0 6px; }
+.turm44 .turmsel44 .lbl { flex-direction: row; gap: 6px; align-items: baseline; }
+/* four Vierling cards in a row: narrower magazines */
+.turm44 .k-flakvierling .gcard44 { padding: 20px 5px 7px; }
+.turm44 .k-flakvierling .mags44.n4 { gap: 3px 4px; }
+.turm44 .k-flakvierling .mag44 { gap: 2px; }
+.turm44 .k-flakvierling .mag44 b { width: 13px; }
+.turm44 .k-flakvierling .mags44.n4 .pips { gap: 0.8px; padding: 2px 1px; }
+.turm44 .k-flakvierling .mags44.n4 .pips i { width: 1.7px; }
+.turm44 .k-flakvierling .mags44.n4 .mag44 .chg { left: 15px; }

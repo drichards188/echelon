@@ -302,6 +302,18 @@ const FLAK88 = {
   err: 0.0015,
 };
 
+// 12.8 cm Flakzwilling 40 (the flak towers' twin mount; a game unit, not a sourced sheet): two Flak 40 side
+// by side on one cradle, laid by electric drives on the predictor's data and loaded by power rammers, so
+// the two barrels fire together about every 5 s; both shells leave on the one salvo (`twin`: the barrels'
+// half spacing, m)
+const FLAK128 = {
+  shell: '128mm', barrels: 2, twin: 0.48, rate: 1,
+  feed: { hand: true, load: 5, loadVar: 0.4 },
+  rounds: 260, // the tower's magazines feed the guns by hoist (E)
+  turnAz: 0.26, turnEl: 0.17, minEl: -0.05, maxEl: 1.53, height: 2.3, muzzle: 6.8,
+  err: 0.0012,
+};
+
 Object.assign(SYSTEMS, {
   // The heavy battery (Grossbatterie no; one static battery of the March 1945 establishment, TM-E 30-451:
   // six 8.8 cm and two 2 cm): the Kommandogeraet 40 tracks one target by optics (its 4 m rangefinder) or
@@ -350,6 +362,30 @@ Object.assign(SYSTEMS, {
     react: 3,
     guns: { flakvierling: FLAKVIERLING, 'flakvierling-tower': { ...FLAKVIERLING, height: 10.4 } },
   },
+  // A flak tower (Flakturm, a G-tower; not historical at Hopsten, a what-if): one concrete block with every
+  // calibre on it. Four Flakzwilling 40 on the corner turrets of the roof fire together by salvo from the
+  // Kommandogeraet on the roof (laid with the Wuerzburg beside it), as the heavy battery's guns; two 3.7 cm
+  // Flak 43 on the roof and four Flakvierlinge on the galleries fight as a platoon's guns. `groups`: the gun
+  // kinds the player can take command of one at a time (the console's gun selector, the `group` command);
+  // the others stay with their crews. Parts with `deck` stand that high on the tower (eras/ww2.js); the
+  // tower itself (role 'tower') has no hit points: bombs on the ground below hardly reach the guns 26 to
+  // 36 m up.
+  flakturm: {
+    mounts: 'battery', core: 'gun', stocks: {},
+    dispersed: { flak128: 90, kdo40: 40, wurzburg: 35, flak43: 45, flakvierling: 40 },
+    roles: { flak43: 'close', flakvierling: 'close' },
+    groups: ['flak128', 'flak43', 'flakvierling'],
+    // the lookouts on the roof see far
+    search: { range: 34000, period: 2, height: 4, low: 0.7, optical: true },
+    radar: { range: 32000, beam: 0.1, gate: 500 },
+    predictor: {
+      range: 20000, minRange: 1200, radarRange: 32000, maxSpeed: 300, rate: 0.12, settle: 8, minFuze: 1.5, reach: 14000,
+      err: { radar: [10, 0.004], optical: [15, 0.0045], window: 300 }, salvo: 3, wait: 1.5,
+      box: [550, 170, 90],
+    },
+    react: 7,
+    guns: { flak128: FLAK128, flak43: FLAK43, flakvierling: FLAKVIERLING },
+  },
   // a Zug of three 2 cm Flak 38
   flak38: {
     mounts: 'platoon', core: 'gun', stocks: {},
@@ -369,6 +405,7 @@ export const PART_ROLE = {
   's400-tel': 'launcher', 's400-radar': 'radar', 's400-search': 'search', 's400-cp': 'cp',
   'buk-telar': 'telar', 'buk-loader': 'loader', 'buk-radar': 'radar', 'buk-cp': 'cp',
   flak88: 'gun', kdo40: 'predictor', wurzburg: 'radar', flak43: 'gun', flakvierling: 'gun', 'flakvierling-tower': 'gun', flak38: 'gun',
+  flak128: 'gun', flakturm: 'tower',
 };
 
 // How many missiles each part's slot holds (the render layer shows a slot while it holds any).

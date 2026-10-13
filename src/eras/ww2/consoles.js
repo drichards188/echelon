@@ -9,6 +9,8 @@
 //   kit.js       the instruments (dials, drum counters, lamps, rotary switches), the header, the target
 //                list, the trigger's reach rule, the sights' projection
 //   sights.js    the sight overlays (the predictor's telescope, the Schwebedornvisier 43, the Flakvisier)
+//   turm.js      `flakturm`: the flak tower's console, the battery's and the platoons' pages under a gun
+//                selector (the group of guns the player commands)
 //   plot.js      the plotting board; wurzburg.js the Wuerzburg's display; ww2.css the `.era-ww2` theme
 //
 // The sight pictures: the panel gives these kinds a sight canvas (`sight: true`) and main's
@@ -21,10 +23,12 @@ import { registerSightPose } from '../../sight.js';
 import { SYSTEMS } from '../../sim/systems.js';
 import { mountBattery } from './consoles/battery.js';
 import { mountPlatoon, PLATOON, sightGun } from './consoles/platoon.js';
+import { mountTurm } from './consoles/turm.js';
 import { VIEW, compassOf } from './consoles/kit.js';
 import './consoles/ww2.css';
 
 registerConsole('flak88', { mount: mountBattery, label: '8,8 CM FLAK 37', sight: true });
+registerConsole('flakturm', { mount: mountTurm, label: 'FLAKTURM', sight: true });
 for (const kind of Object.keys(PLATOON)) {
   registerConsole(kind, { mount: (ctx) => mountPlatoon(ctx, kind), label: PLATOON[kind].de, sight: true });
 }
@@ -47,3 +51,11 @@ for (const kind of Object.keys(PLATOON)) {
     return { az: compassOf(u, p.turret), el: p.turret.el, fov: v?.fov ?? PLATOON[kind].fov, part: i };
   });
 }
+// the flak tower: the predictor's telescope or a gun's sight, whichever the page shown picked (VIEW)
+registerSightPose('flakturm', (u) => {
+  const v = VIEW.get(u.id);
+  const i = v?.part ?? u.parts.findIndex((p) => p.role === 'predictor');
+  const p = u.parts[i];
+  if (!p?.turret || !p.alive) return null;
+  return { az: compassOf(u, p.turret), el: p.turret.el, fov: v?.fov ?? 0.08, part: i };
+});
