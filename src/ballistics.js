@@ -41,6 +41,10 @@ export const SHELLS = {
   // tracer burns out at about 6 s and 2,200 m (refs/ww2/flak38, flakvierling: 1 s to 650 m, 6 s to 2,190
   // m on the TM 9-228 chart; here 0.95 s and 2,200 m)
   '20mm': { id: 4, v0: 900, c: 0.00072, life: 6, lifeVar: 0.08, burn: 6, dmg: 0.25, tracer: [18, 8, 2.4], width: 0.14, tail: 0.025, every: 1, radius: 1.0, spread: 0.005, grow: 0.5 },
+  // 12.8 cm Flak 40 (the flak tower's Flakzwilling 40), 880 m/s, the same clockwork time fuze run out to
+  // 32 s; the heavier shell keeps its speed better (game values: about 12 s to 7,000 m at 85 degrees, a
+  // reach to about 14 km up) and its burst is bigger
+  '128mm': { id: 5, v0: 880, c: 0.0001, H: 8500, life: 32, dmg: 2.2, tracer: null, width: 0, tail: 0, every: 0, radius: 2, spread: 0.0008, grow: 0, burst: 70 },
 };
 const BY_ID = Object.values(SHELLS);
 const NAMES = Object.keys(SHELLS);

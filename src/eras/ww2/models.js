@@ -10,6 +10,8 @@ import { buildWurzburg } from './models/wurzburg.js';
 import { buildFlak43 } from './models/flak43.js';
 import { buildFlakvierling, buildFlakvierlingTower } from './models/flakvierling.js';
 import { buildFlak38 } from './models/flak38.js';
+import { buildFlak128 } from './models/flak128.js';
+import { buildFlakturm } from './models/flakturm.js';
 import { ASSETS44 } from './models/assets44.js';
 import './models/markings44.js';
 
@@ -21,6 +23,8 @@ registerVehicles({
   flakvierling: buildFlakvierling,
   'flakvierling-tower': buildFlakvierlingTower,
   flak38: buildFlak38,
+  flak128: buildFlak128,
+  flakturm: buildFlakturm,
 });
 
 registerAssets(ASSETS44);

@@ -42,10 +42,10 @@ const RAISED = new Set(['buk-radar', 'tor', 'tunguska', 'shilka']);
 // (m) and the times of the stroke and of the run-out (s): the 8.8 cm 1.05 m at 0 degrees to 0.70 m at 85
 // (rig.recoilLength), back fast and run out by its recuperator over most of a second; the 3.7 cm 0.127 m
 // and the 2 cm 0.053 m (the Vierling's 0.085 m a gun) inside their cyclic periods (0.24 and 0.13 s).
-const RECOIL = { flak88: [0, 0.06, 0.9], flak43: [0.127, 0.02, 0.14], flak38: [0.053, 0.012, 0.08], flakvierling: [0.085, 0.01, 0.07] };
+const RECOIL = { flak88: [0, 0.06, 0.9], flak43: [0.127, 0.02, 0.14], flak38: [0.053, 0.012, 0.08], flakvierling: [0.085, 0.01, 0.07], flak128: [0.9, 0.07, 1.1] };
 RECOIL['flakvierling-tower'] = RECOIL.flakvierling;
 // each model's elevation limits (rad, from its header)
-const ELEV = { flak88: [-0.052, 1.484], flak43: [-0.175, 1.571], flak38: [-0.349, 1.571], flakvierling: [-0.175, 1.745], 'flakvierling-tower': [-0.175, 1.745], kdo40: [0, 1.571], wurzburg: [0, 1.571] };
+const ELEV = { flak88: [-0.052, 1.484], flak43: [-0.175, 1.571], flak38: [-0.349, 1.571], flakvierling: [-0.175, 1.745], 'flakvierling-tower': [-0.175, 1.745], kdo40: [0, 1.571], wurzburg: [0, 1.571], flak128: [-0.05, 1.53] };
 // the sim's Vierling barrels (0 upper left, 1 upper right, 2 lower left, 3 lower right) on the model's guns
 // (0 1L upper left, 1 2R upper right, 2 3R lower right, 3 4L lower left)
 const VIER_GUN = [0, 1, 3, 2];
@@ -54,7 +54,7 @@ const YELLOW_GUNS = new Set(['B', 'E']);
 // muzzle flashes (fx.muzzle size) and spent cases (fx.brass: diameter and length, m); the light guns'
 // cases only with the camera within CASES_NEAR m
 const FLASH44 = { flak43: 0.75, flak38: 0.42, flakvierling: 0.42 };
-const CASE = { flak88: [0.105, 0.57], flak43: [0.05, 0.25], flak38: [0.03, 0.14], flakvierling: [0.03, 0.14] };
+const CASE = { flak88: [0.105, 0.57], flak43: [0.05, 0.25], flak38: [0.03, 0.14], flakvierling: [0.03, 0.14], flak128: [0.15, 0.85] };
 for (const t of [RECOIL, FLASH44, CASE]) t['flakvierling-tower'] = t.flakvierling;
 const CASES_NEAR = 70;
 // Distance levels of a gun position (each gun or instrument is 11 to 24 meshes, a draw call each and another
@@ -64,6 +64,8 @@ const CASES_NEAR = 70;
 // layer 1 (no camera renders it), as the models switch their own meshes' `visible`.
 const LOD = [[600, 1], [1500, 2]];
 const RIG_FAR = 3000;
+// a structure seen from anywhere on the field (the flak tower): never culled, no distance levels
+const WHOLE = new Set(['flakturm']);
 // the stroke, then the run-out: 0..1 of the full stroke `t` s after the shot
 const recoilCurve = (t, rise, back) => {
   if (t < 0) return 0;
@@ -118,7 +120,14 @@ export class UnitViews {
         rig.loaded = [];
         // (the Wuerzburg's rig.spin(t) turns its dipole; rig.spin is the antennas' state here)
         if (typeof rig.spin === 'function') rig.quirl = rig.spin;
-        if (SYSTEMS[u.kind]?.mounts) {
+        // a gun standing on a structure (the flak tower's decks) leaves its pit behind
+        if (part.deck != null && rig.emplacement) {
+          rig.emplacement.removeFromParent();
+          rig.emplacement.traverse((o) => o.geometry?.dispose());
+          rig.emplacement = null;
+        }
+        if (WHOLE.has(part.kind)) rig.far = Infinity;
+        else if (SYSTEMS[u.kind]?.mounts) {
           rig.root.updateMatrixWorld(true);
           rig.lodParts = [];
           rig.root.traverse((o) => {
@@ -557,6 +566,15 @@ export class UnitViews {
         if (fresh > 0 && dt > 0) this.flash(rig, 0, fx, 'flak88', part.pos);
         return;
       }
+      if (part.kind === 'flak128') {
+        // the twin's barrels recoil together; a blast at each muzzle, the cases out of the breeches
+        rig.setRecoil?.(R[0] * recoilCurve(g.recoil, R[1], R[2]));
+        if (fresh > 0 && dt > 0) {
+          for (let k = 0; k < 2; k++) this.flash(rig, k, fx, 'flak88', part.pos);
+          if (near(part.pos)) for (const b of rig.anchors.breeches ?? []) this.ejectCase(b, CASE.flak128, fx, 3);
+        }
+        return;
+      }
       if (part.kind === 'flak43') {
         rig.setRecoil?.(R[0] * recoilCurve(g.recoil, R[1], R[2]));
         if (g.table !== st.table) rig.setRounds?.((st.table = g.table));
@@ -598,7 +616,7 @@ export class UnitViews {
     if (pr && (this.killT -= dt) <= 0) {
       this.killT = 1;
       let n = 0;
-      for (const w of sim.stats.waves) n += w.kills[`${u.id}:88mm`] ?? 0;
+      for (const w of sim.stats.waves) n += w.kills[`${u.id}:${u.heavyShell ?? '88mm'}`] ?? 0;
       if (n !== v.kills) {
         v.kills = n;
         u.parts.forEach((part, i) => part.role === 'gun' && !v.rigs[i].wreck && v.rigs[i].setKills?.(n));
@@ -608,7 +626,7 @@ export class UnitViews {
 
   // a gun position's distance level (LOD, RIG_FAR)
   lod(rig, d) {
-    rig.root.visible = d < RIG_FAR;
+    rig.root.visible = d < (rig.far ?? RIG_FAR);
     if (!rig.lodParts) return;
     let k = 0;
     while (k < LOD.length && d > LOD[k][0]) k++;
@@ -648,7 +666,8 @@ export class UnitViews {
   // with a little slack (dark ribbons, one mesh for the battery).
   cables(u, rigs) {
     const kg = u.parts.findIndex((p) => p.role === 'predictor');
-    if (kg < 0 || !rigs[kg]?.anchors.cable) return null;
+    // (on a structure the lines run inside it)
+    if (kg < 0 || !rigs[kg]?.anchors.cable || u.parts.some((p) => p.deck != null)) return null;
     for (const r of rigs) r.root.updateMatrixWorld(true);
     const at = (i) => rigs[i]?.anchors.cable?.getWorldPosition(new THREE.Vector3()) ?? null;
     const from = at(kg);

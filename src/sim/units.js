@@ -59,12 +59,15 @@ export function createUnits(heightAt, rng = null) {
     const sys = SYSTEMS[def.kind];
     const parts = partPlacements(def).map((p) => {
       const part = {
-        kind: p.kind, role: sys.roles?.[p.kind] ?? PART_ROLE[p.kind] ?? 'main', pos: new THREE.Vector3(p.x, heightAt(p.x, p.z), p.z), heading: p.heading,
+        kind: p.kind, role: sys.roles?.[p.kind] ?? PART_ROLE[p.kind] ?? 'main', heading: p.heading,
+        // a part on a structure (`deck` m over the ground at the unit's site: the flak tower's guns)
+        pos: new THREE.Vector3(p.x, p.deck != null ? heightAt(def.x, def.z) + p.deck : heightAt(p.x, p.z), p.z),
         slots: SLOTS[p.kind] ? new Array(SLOTS[p.kind]).fill(true) : [], rounds: 0, alive: true,
       };
       // a part's own name and letter (the WW2 battery's guns A to F)
       if (p.name) part.name = p.name;
       if (p.letter) part.letter = p.letter;
+      if (p.deck != null) part.deck = p.deck;
       const hp = sys.dispersed?.[p.kind];
       if (hp) part.hp = part.maxHp = hp;
       // a Buk launcher vehicle turns and raises its own launcher; a TELAR also has its own radar channel

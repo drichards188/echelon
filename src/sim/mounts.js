@@ -26,6 +26,9 @@ import { THREAT_AXIS } from '../deploy.js';
 //              course, from fixed data (no predictor needed).
 // The solution's error is a game rule, not a model of the predictor: an offset at the target that wanders,
 // its size set by the range source and the slant range and shrinking as the solution settles.
+// A battery with `groups` (the flak tower: its 12.8 cm twins, 3.7 cm and 2 cm) puts one kind of gun under
+// the player at a time (`u.group`, the `group` command): in manual that group takes the selection and the
+// trigger, as the heavy guns or as a platoon's; the other groups fight on with their crews as in auto.
 
 const _v = new THREE.Vector3();
 const _d = new THREE.Vector3();
@@ -36,6 +39,7 @@ const _r = new THREE.Vector3();
 const _u = new THREE.Vector3();
 const _p = new THREE.Vector3();
 const _q = new THREE.Vector3();
+const _bore = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
 
 const bearingOfDir = (d) => (Math.atan2(d.x, -d.z) + TAU) % TAU;
@@ -54,6 +58,8 @@ const LAID_M = 4, LAID_MIN = 0.0025, LAID_MAX = 0.02;
 const LAID_HEAVY = 0.006;
 // the classes the gun crews take (not the reporting service's plain echoes, nor Window)
 const PLANE_CLS = new Set(['bomber', 'fighter', 'recon']);
+// the calibres by shell (the radio)
+const NAME = { '128mm': '12.8 cm', '88mm': '8.8 cm', '37mm': '3.7 cm', '20mm': '2 cm' };
 
 // The per-gun state the render and the consoles read (DESIGN.md "WW2 era").
 function newGun(def) {
@@ -106,6 +112,11 @@ export function initMounts(u) {
   }
   const guns = u.parts.filter((p) => p.gun);
   const first = guns.find((p) => p.role === 'gun') ?? guns[0];
+  // the battery's heavy guns' kind and shell (the predictor's ballistics)
+  u.heavyKind = first.kind;
+  u.heavyShell = first.gun.shell;
+  // the group of guns the player commands (null: the heavy guns, or the platoon's)
+  u.group = sys.groups ? sys.groups[0] : null;
   // the unit's summary of its guns (the modern consoles' and the bookkeeping's `weapons.gun`): totals, and
   // the fire control of the gun the camera rides (u.nextGun) or the predictor's
   u.weapons.gun = {
@@ -150,6 +161,22 @@ export class Mounts {
   // ---------------------------------------------------------------- queries
   def(u, i) {
     return SYSTEMS[u.kind].guns[u.parts[i].kind];
+  }
+
+  // does the player command the battery's heavy guns (manual, and the heavy group selected)?
+  heavyManual(u) {
+    return u.mode === 'manual' && (!u.group || u.group === u.heavyKind);
+  }
+
+  // does the player command this light gun (manual, and its group selected; a battery's own 2 cm without
+  // groups never)?
+  gunManual(u, p) {
+    return u.mode === 'manual' && (u.group ? p.kind === u.group : p.role !== 'close');
+  }
+
+  // the group the player commands is a light one (the flak tower's 3.7 cm or 2 cm)
+  lightGroup(u) {
+    return !!u.group && u.group !== u.heavyKind;
   }
 
   // where a gun's bore is (its trunnion), into `out`
@@ -263,7 +290,7 @@ export class Mounts {
         return true;
       case 'fire':
         // the heavy battery in manual: one salvo now from the guns that are loaded and laid
-        if (!pr || u.mode !== 'manual') return false;
+        if (!pr || !this.heavyManual(u)) return false;
         pr.fireNow = true;
         return true;
       case 'cease': {
@@ -304,9 +331,20 @@ export class Mounts {
         }
         return this.layBarrage(u, a.trackId ?? u.selected, a.point, true);
       case 'concentrate':
-        if (pr) return false;
+        if (pr && !sys.groups) return false;
         u.concentrate = !!a.on;
         return true;
+      case 'group': {
+        // the guns the player takes command of (the flak tower); the trigger is let go
+        if (!sys.groups?.includes(a.kind) || u.group === a.kind) return false;
+        u.group = a.kind;
+        g.trigger = false;
+        if (pr) pr.fireNow = false;
+        u.nextGunT = 99;
+        const def = sys.guns[a.kind];
+        sim.say(u, `${NAME[def.shell] ?? def.shell} guns under command`, 'info', 'grp' + u.id);
+        return true;
+      }
     }
     return false;
   }
@@ -331,7 +369,7 @@ export class Mounts {
       let t = 12;
       for (let k = 0; k < 4; k++) {
         _p.copy(tr.pos).addScaledVector(tr.vel, t);
-        const tof = solveLead(SHELLS['88mm'], centre, _p, _v.set(0, 0, 0), _q, null, 0.05, 8, 3);
+        const tof = solveLead(SHELLS[u.heavyShell], centre, _p, _v.set(0, 0, 0), _q, null, 0.05, 8, 3);
         if (tof < 0) {
           t += 10;
           continue;
@@ -349,7 +387,7 @@ export class Mounts {
       if (player) sim.say(u, 'unable, no track for the barrage', 'warn');
       return false;
     }
-    const tofC = solveLead(SHELLS['88mm'], centre, box.center, _v.set(0, 0, 0), _q, null, 0.05, 8, 3);
+    const tofC = solveLead(SHELLS[u.heavyShell], centre, box.center, _v.set(0, 0, 0), _q, null, 0.05, 8, 3);
     if (tofC < 0) {
       if (player) sim.say(u, 'unable, the barrage is out of reach', 'warn');
       return false;
@@ -413,7 +451,7 @@ export class Mounts {
     // the target: the player's selection in manual (the heavy battery's own 2 cm stay with their crews, in
     // auto unless the battery holds fire), the crew's pick otherwise
     const hold = u.mode === 'hold';
-    const manual = u.mode === 'manual' && p.role !== 'close';
+    const manual = this.gunManual(u, p);
     if (hold) g.target = null;
     else if (manual) g.target = u.selected;
     else if ((g.pickT -= dt) <= 0) {
@@ -487,7 +525,7 @@ export class Mounts {
     const km = (g.aimOk ? _v.subVectors(g.aim, from).length() : 0) / 1000;
     const spread = shell.spread * (def.spread ?? 1) * 2 * (1 + (shell.grow ?? 0) * km);
     const dmg = (def.dmg ?? 1) * (sim.difficulty?.hit ?? 1);
-    const owner = u.mode === 'manual' ? OWNER.PLAYER : OWNER.AI;
+    const owner = this.gunManual(u, p) ? OWNER.PLAYER : OWNER.AI;
     let n = 0;
     g.barrels.forEach((b, k) => {
       const have = () => (def.feed.table ? g.table : b.mag);
@@ -600,7 +638,7 @@ export class Mounts {
     const g = u.parts[i].gun;
     const from = this.mountPos(u, i, _from);
     // (a battery's selection is its predictor's: its own 2 cm guns work on their own)
-    const sel = u.parts[i].role === 'close' ? null : u.selected;
+    const sel = (u.group ? u.parts[i].kind === u.group : u.parts[i].role !== 'close') ? u.selected : null;
     let best = null, bs = Infinity;
     for (const tr of u.tracks) {
       if (!PLANE_CLS.has(tr.cls)) continue;
@@ -638,6 +676,8 @@ export class Mounts {
     const kgI = u.parts.findIndex((p) => p.role === 'predictor');
     const wzI = u.parts.findIndex((p) => p.role === 'radar');
     const kgUp = kgI >= 0 && u.parts[kgI].alive;
+    const hm = this.heavyManual(u);
+    const HD = sys.guns[u.heavyKind];
     if (wzI >= 0 && !u.parts[wzI].alive) u.radar.track = false;
     const heavy = [];
     u.parts.forEach((p, i) => p.role === 'gun' && heavy.push(i));
@@ -654,7 +694,7 @@ export class Mounts {
     if (u.mode === 'hold') {
       pr.target = null;
       pr.barrage = null;
-    } else if (u.mode === 'manual') pr.target = u.selected;
+    } else if (hm) pr.target = u.selected;
     else if ((pr.pickT -= dt) <= 0) {
       pr.pickT = 0.5;
       pr.target = this.batteryPick(u, centre);
@@ -687,7 +727,7 @@ export class Mounts {
     pr.window += (jam - pr.window) * Math.min(1, dt * 1.5);
     pr.quality = held ? 1 - Math.exp(-pr.t / (P.settle * (pr.source === 'optical' ? 1.3 : 1))) : 0;
     // the AI crew notices that Window spoils its range after a while and goes over to the rangefinder
-    if (u.mode === 'auto' && pr.source === 'radar' && pr.window > 0.4) {
+    if (!hm && u.mode !== 'hold' && pr.source === 'radar' && pr.window > 0.4) {
       if ((pr.jamT += dt) > 60 && s.opt) {
         pr.ranging = 'optical';
         sim.say(u, 'Window on the Wuerzburg, ranging by the rangefinder', 'info', 'rng' + u.id);
@@ -701,7 +741,7 @@ export class Mounts {
       _p.copy(own.pos).add(pr.err);
       // followed from step to step: the last solution is the start of the next (a fresh target: the closed form)
       const warm = pr.warmId === pr.target;
-      const tof = solveLead(SHELLS['88mm'], centre, _p, pr.est.vel, pr.aim, null, 0.05, warm ? 3 : 8, 3, warm);
+      const tof = solveLead(SHELLS[u.heavyShell], centre, _p, pr.est.vel, pr.aim, null, 0.05, warm ? 3 : 8, 3, warm);
       pr.warmId = tof >= 0 ? pr.target : null;
       pr.tof = Math.max(0, tof);
       pr.fuze = pr.tof;
@@ -709,7 +749,7 @@ export class Mounts {
       const el = elevOfDir(_d.subVectors(pr.aim, centre));
       // the trackers' limits: speed and angular rate (a low, fast target is beyond them)
       const rate = _v.crossVectors(_s.subVectors(own.pos, centre), pr.est.vel).length() / Math.max(pr.range * pr.range, 1);
-      pr.valid = tof >= P.minFuze && el <= sys.guns.flak88.maxEl && pr.range > P.minRange && pr.est.vel.length() < P.maxSpeed && rate < P.rate;
+      pr.valid = tof >= P.minFuze && el <= HD.maxEl && pr.range > P.minRange && pr.est.vel.length() < P.maxSpeed && rate < P.rate;
     }
     pr.state = pr.barrage ? 'barrage' : !t?.alive ? 'idle' : !held ? 'acquiring' : pr.valid && pr.quality >= 0.55 ? 'solution' : 'tracking';
     pr.hold = !kgUp ? 'no predictor' : pr.target == null ? 'no target' : !held ? 'not held' : !pr.valid ? OUT_OF_REACH : pr.quality < 0.3 ? 'settling' : null;
@@ -760,7 +800,7 @@ export class Mounts {
     // salvo fire: in auto once the solution has settled, in manual while the trigger is held (or one salvo on
     // `fire`) from the moment it holds the target; the battery fires together when `salvo` guns are ready,
     // or the first ready one has waited `wait` s
-    const want = held && pr.valid && (u.mode === 'auto' ? pr.quality >= 0.55 : u.mode === 'manual' && (u.weapons.gun.trigger || pr.fireNow));
+    const want = held && pr.valid && (hm ? u.weapons.gun.trigger || pr.fireNow : u.mode !== 'hold' && pr.quality >= 0.55);
     const ready = heavy.filter((i) => u.parts[i].alive && u.parts[i].gun.loaded && u.parts[i].gun.laid && !(sim.time < (u.parts[i].gun.cover ?? 0)));
     if (!want || !ready.length) {
       pr.readyT = -1;
@@ -799,23 +839,36 @@ export class Mounts {
     const def = this.def(u, i);
     const shell = SHELLS[def.shell];
     const from = this.mountPos(u, i, _from);
-    if (dir) _d.copy(dir);
-    else this.boreDir(u, p.turret, _d);
-    _v.copy(from).addScaledVector(_d, def.muzzle);
+    if (dir) _bore.copy(dir);
+    else this.boreDir(u, p.turret, _bore);
+    const owner = this.heavyManual(u) ? OWNER.PLAYER : OWNER.AI;
     const spread = shell.spread * 2;
-    _d.x += (sim.rng() - 0.5) * spread;
-    _d.y += (sim.rng() - 0.5) * spread;
-    _d.z += (sim.rng() - 0.5) * spread;
-    _d.normalize();
-    const f = Math.max(shell.burst ? 1.5 : 0, fuze + gauss(sim.rng) * 0.04);
-    sim.ballistics.fire(def.shell, _v, _d, u.mode === 'manual' ? OWNER.PLAYER : OWNER.AI, u.index, { dmg: sim.difficulty?.hit ?? 1, rng: sim.rng, fuze: f });
+    // a twin mount fires both barrels together, side by side (`twin`: their half spacing)
+    const n = def.barrels ?? 1;
+    const h = u.heading + p.turret.az;
+    let f = 0;
+    for (let k = 0; k < n; k++) {
+      _d.copy(_bore);
+      _v.copy(from).addScaledVector(_d, def.muzzle);
+      if (n > 1) {
+        const side = (k ? 1 : -1) * (def.twin ?? 0.5);
+        _v.x += Math.cos(h) * side;
+        _v.z -= Math.sin(h) * side;
+      }
+      _d.x += (sim.rng() - 0.5) * spread;
+      _d.y += (sim.rng() - 0.5) * spread;
+      _d.z += (sim.rng() - 0.5) * spread;
+      _d.normalize();
+      f = Math.max(shell.burst ? 1.5 : 0, fuze + gauss(sim.rng) * 0.04);
+      sim.ballistics.fire(def.shell, _v, _d, owner, u.index, { dmg: sim.difficulty?.hit ?? 1, rng: sim.rng, fuze: f });
+    }
     g.loaded = false;
     g.load = def.feed.load * (1 + (sim.rng() - 0.5) * 2 * (def.feed.loadVar ?? 0));
     g.fuze = f;
     g.firing = true;
     g.shots++;
     g.recoil = 0;
-    sim.stats.fired[def.shell] = (sim.stats.fired[def.shell] ?? 0) + 1;
+    sim.stats.fired[def.shell] = (sim.stats.fired[def.shell] ?? 0) + n;
     sim.events.muzzle?.(u, i, _v, _d, def.shell);
   }
 
@@ -826,7 +879,7 @@ export class Mounts {
     const pr = u.predictor;
     const B = SYSTEMS[u.kind].predictor.box;
     const b = pr.barrage;
-    if (u.mode === 'hold' || (u.mode === 'manual' && !u.weapons.gun.trigger && !pr.fireNow)) return;
+    if (u.mode === 'hold' || (this.heavyManual(u) && !u.weapons.gun.trigger && !pr.fireNow)) return;
     if (sim.time < b.from) return;
     const across = _r.crossVectors(b.along, UP).normalize();
     let n = 0;
@@ -837,7 +890,7 @@ export class Mounts {
       _p.copy(b.center).addScaledVector(b.along, (rng() * 2 - 1) * B[0]).addScaledVector(across, (rng() * 2 - 1) * B[1]);
       _p.y += (rng() * 2 - 1) * B[2];
       const from = this.mountPos(u, i, _from);
-      const tof = solveLead(SHELLS['88mm'], from, _p, _v.set(0, 0, 0), _q, null, 0.05, 8, 3);
+      const tof = solveLead(SHELLS[u.heavyShell], from, _p, _v.set(0, 0, 0), _q, null, 0.05, 8, 3);
       if (tof < 0) continue;
       this.fireHeavy(u, i, tof, null, _d.subVectors(_q, from).normalize());
       n++;
@@ -861,7 +914,7 @@ export class Mounts {
     const [a, b] = P.err[pr.source === 'optical' ? 'optical' : 'radar'];
     let sigma = (a + b * pr.range) * (1 + 1.5 * (1 - pr.quality));
     if (pr.source === 'radar') sigma += pr.window * P.err.window;
-    sigma *= (u.mode === 'auto' ? 1.3 : 1) * (sim.difficulty.heavyAim ?? sim.difficulty.aim ?? 1);
+    sigma *= (this.heavyManual(u) ? 1 : 1.3) * (sim.difficulty.heavyAim ?? sim.difficulty.aim ?? 1);
     pr.sigma = sigma;
     if ((pr.errT -= dt) <= 0) {
       pr.errT = 1.5 + sim.rng() * 1.5;
@@ -910,7 +963,7 @@ export class Mounts {
       if (d > P.range) return false;
       // a target going away beyond the guns' reach is let go
       _v.subVectors(tr.pos, centre);
-      return d < 11000 || _v.dot(tr.vel) < 0;
+      return d < (P.reach ?? 11000) || _v.dot(tr.vel) < 0;
     };
     // the player's selection first, when it is one the crew would take
     const sel = u.selected != null ? this.fu.trackOf(u, u.selected) : null;
@@ -935,20 +988,25 @@ export class Mounts {
     const sim = this.sim;
     const g = u.weapons.gun;
     const pr = u.predictor;
+    // the player commands a light group of a battery (the flak tower's 3.7 cm or 2 cm): its guns are shown
+    // as a platoon's
+    const light = this.lightGroup(u);
+    const mine = (p) => (light ? p.kind === u.group : p.role === 'gun' || !pr);
     let rounds = 0, firing = false;
     for (const p of u.parts) {
       if (!p.gun) continue;
       rounds += roundsOf(p.gun);
-      if (p.gun.firing && (p.role === 'gun' || !pr)) firing = true;
+      if (p.gun.firing && mine(p)) firing = true;
     }
     g.rounds = rounds;
+    if (u.group) g.shell = SYSTEMS[u.kind].guns[u.group].shell;
     // a heavy battery is in action while its last salvo's shells are still flying
-    g.firing = pr ? sim.time - pr.lastSalvo < Math.max(4, pr.tof) : firing;
+    g.firing = pr && !light ? sim.time - pr.lastSalvo < Math.max(4, pr.tof) : firing;
     // the gun the camera rides: the battery's guns fire together, so its first standing gun in letter order
     // (gun A while it stands); a platoon's gun that is firing, else one with a solution, kept for a while
-    if (pr) u.nextGun = Math.max(0, u.parts.findIndex((p) => p.role === 'gun' && p.alive));
+    if (pr && !light) u.nextGun = Math.max(0, u.parts.findIndex((p) => p.role === 'gun' && p.alive));
     else {
-      const score = (p) => (!p.alive || !p.gun ? -1 : p.gun.firing ? 3 : p.gun.aimOk ? 2 : p.gun.target != null ? 1 : 0);
+      const score = (p) => (!p.alive || !p.gun || (light && p.kind !== u.group) ? -1 : p.gun.firing ? 3 : p.gun.aimOk ? 2 : p.gun.target != null ? 1 : 0);
       let best = u.nextGun, bs = score(u.parts[best]);
       u.parts.forEach((p, i) => {
         const s = score(p);
@@ -965,8 +1023,8 @@ export class Mounts {
       }
     }
     // the fire control the consoles show: the predictor's, or the camera's gun's
-    const src = pr ?? u.parts[u.nextGun]?.gun;
-    if (pr) {
+    const src = pr && !light ? pr : u.parts[u.nextGun]?.gun;
+    if (pr && !light) {
       g.target = pr.target;
       g.aim.copy(pr.aim);
       g.aimOk = pr.valid && pr.locked;

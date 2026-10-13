@@ -19,6 +19,20 @@ const AXIS = 250;
 const ZUG = [[0, -55], [-50, 30], [50, 30]];
 const RING = [[0, -32], [30.4, -9.9], [18.8, 25.9], [-18.8, 25.9], [-30.4, -9.9], [0, 0]];
 const platoon = (kind, last = kind) => ZUG.map(([dx, dz], i) => ({ kind: i === 2 ? last : kind, dx, dz, name: `gun ${i + 1}` }));
+// The flak tower (a what-if at Hopsten: the eight G-towers stood in Berlin, Hamburg and Vienna): a 40 m
+// concrete block, its roof 32 m up (eras/ww2/models/flakturm.js FLAKTURM). Four 12.8 cm Flakzwilling 40 on
+// the corner turrets (36 m), gun A first (the camera's), the Kommandogeraet and the Wuerzburg and two 3.7 cm
+// on the roof, a Flakvierling on the gallery of each face (26 m); `deck`: m over the ground at the site.
+const TURM = { roof: 32, turret: 36, gallery: 26, corner: 15, side: 24 };
+const flakturm = () => [
+  ...[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz], i) => ({ kind: 'flak128', dx: sx * TURM.corner, dz: sz * TURM.corner, deck: TURM.turret, name: `gun ${'ABCD'[i]}`, letter: 'ABCD'[i] })),
+  { kind: 'kdo40', dx: 0, dz: -8, deck: TURM.roof, name: 'predictor' },
+  { kind: 'wurzburg', dx: 0, dz: 9, deck: TURM.roof, name: 'Wuerzburg' },
+  { kind: 'flak43', dx: -8.5, dz: 0, deck: TURM.roof, name: '3.7 cm gun 1' },
+  { kind: 'flak43', dx: 8.5, dz: 0, deck: TURM.roof, name: '3.7 cm gun 2' },
+  ...[[0, -1], [1, 0], [0, 1], [-1, 0]].map(([sx, sz], i) => ({ kind: 'flakvierling', dx: sx * TURM.side, dz: sz * TURM.side, deck: TURM.gallery, name: `Vierling ${['north', 'east', 'south', 'west'][i]}` })),
+  { kind: 'flakturm', dx: 0, dz: 0, name: 'tower' },
+];
 
 export default {
   id: 'ww2',
@@ -31,7 +45,7 @@ export default {
 
   text: {
     sub: 'Flak at a jet airfield',
-    blurb: 'A battery of six 8.8 cm guns under its predictor, two platoons of 3.7 cm, a platoon of Flakvierlinge and one of 2 cm guns stand round Fliegerhorst Hopsten. Only the heavy guns reach the bombers at height; the light guns meet whatever comes down low.',
+    blurb: 'A battery of six 8.8 cm guns under its predictor, two platoons of 3.7 cm, a platoon of Flakvierlinge and a concrete flak tower with twin 12.8 cm guns stand round Fliegerhorst Hopsten. Only the heavy guns reach the bombers at height; the light guns meet whatever comes down low.',
     setting: 'Hopsten, a jet airfield in north-west Germany, February to March 1945: the flak against the Allied day raids.',
     orders: 'Flak command: all guns, fire at will. The aircraft reporting service has a raid inbound.',
     lull: 'Flak command: raid over. Ammunition is coming up, stand by.',
@@ -103,8 +117,10 @@ export default {
     ],
   },
 
-  // One unit per slot, the defaults only for now (the alternatives are listed in refs/ww2 README section 3).
-  // Unit ids: BTY (the heavy battery), MED1 and MED2 (the 3.7 cm platoons), VIER, LIGHT. Callsigns follow
+  // One unit per slot; the last slot's default is the flak tower, its alternative the 2 cm platoon (the
+  // other alternatives are listed in refs/ww2 README section 3).
+  // Unit ids: BTY (the heavy battery), MED1 and MED2 (the 3.7 cm platoons), VIER, TURM (the flak tower; or
+  // LIGHT, the 2 cm platoon it replaced, still an option). Callsigns follow
   // the period German spelling alphabet; the heavy guns are A to F (Anton to Friedrich), `letter`.
   slots: [
     {
@@ -144,6 +160,11 @@ export default {
     {
       cls: 'Light flak, single',
       options: [
+        {
+          kind: 'flakturm', id: 'TURM', name: 'Flak tower', callsign: 'Paula', label: 'Flak tower',
+          info: 'A concrete G-tower: four twin 12.8 cm on its predictor, two 3.7 cm and four Vierlinge on the galleries; pick which guns you fire',
+          parts: flakturm(),
+        },
         { kind: 'flak38', id: 'LIGHT', name: '2 cm Flak 38 platoon', callsign: 'Paula', label: '2 cm Flak 38', info: 'Three single guns: short reach, quick to swing onto a diving attacker', parts: platoon('flak38') },
       ],
     },

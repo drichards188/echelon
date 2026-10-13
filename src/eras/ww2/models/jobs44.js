@@ -840,8 +840,17 @@ const flak38 = {
   gf: { role: 'nco', kit: binoKit, prop: binoProp, pose: commander, place: turnObserver, easy: atEase },
 };
 
+// the flak tower's 12.8 cm twin (flak128.js; a sketch, so its men stand to their posts without hand work on
+// the mount): the layers in their cabins and the loaders and ammunition numbers at the trays and the hoist
+const post = (role, kit = []) => ({ role, kit, pose: atEase, easy: atEase });
+const flak128 = {
+  k1: post('tech', ['headset']), k2: post('tech', ['headset']), k3: post('gunner'), k4: post('gunner'),
+  k5: post('carrier'), k6: post('carrier'),
+  gf: { role: 'nco', kit: binoKit, prop: binoProp, pose: commander, place: turnObserver, easy: atEase },
+};
+
 export const JOBS = {
-  flak88, kdo40, wurzburg, flak43, flakvierling: vierling, 'flakvierling-tower': vierling, flak38,
+  flak88, kdo40, wurzburg, flak43, flakvierling: vierling, 'flakvierling-tower': vierling, flak38, flak128,
 };
 
 // poses a scene can ask for by name (m.pose = { name }) besides pose44.js's POSES

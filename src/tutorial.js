@@ -1273,6 +1273,7 @@ function platoon44(kind, unit, o) {
     id: kind,
     name: o.name,
     unit,
+    loadout: o.loadout,
     blurb: o.blurb,
     outro: o.outro,
     setup: (T) => {
@@ -1403,6 +1404,8 @@ TUTORIALS.push(
   }),
   platoon44('flak38', 'LIGHT', {
     name: '2 cm Flak 38 platoon',
+    // (the slot's default is the flak tower now)
+    loadout: ['flak88', 'flak43', 'flak43', 'flakvierling', 'flak38'],
     gun: '2 cm',
     type: 'p51',
     spawn: { range: 8000, agl: 70, passes: 3 },

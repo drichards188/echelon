@@ -50,7 +50,7 @@ const NAME = { s400: 'S-400', buk: 'Buk', pantsir: 'Pantsirs', tunguska: 'Tungus
 const modern = () => ERA.id === 'modern';
 // the WW2 era's columns: the heavy battery's 8.8 cm, the two 3.7 cm platoons (Flak lane, dispersal), the
 // Vierlinge, the 2 cm, and the battery's own 2 cm
-const WW2_LABEL = { flak88: '88', flak43: '37', flakvierling: 'VIER', flak38: '20' };
+const WW2_LABEL = { flak88: '88', flak43: '37', flakvierling: 'VIER', flak38: '20', flakturm: 'TURM' };
 const ww2 = () => ERA.id === 'ww2';
 function layersFor(loadout) {
   if (ww2()) return [...loadout.map((k, i) => (WW2_LABEL[k] ?? k.toUpperCase()) + (loadout.indexOf(k) < i ? 'B' : loadout.indexOf(k, i + 1) > i ? 'A' : '')), 'B20'];
@@ -63,7 +63,7 @@ function layerOf(sim, layers, key) {
   const [id, weapon] = key.split(':');
   if (ww2()) {
     const u = sim.unitById.get(id);
-    return u && SYSTEMS[u.kind].predictor && weapon !== '88mm' ? 'B20' : layers[u?.slot ?? 0];
+    return u && SYSTEMS[u.kind].predictor && !SYSTEMS[u.kind].groups && weapon !== u.heavyShell ? 'B20' : layers[u?.slot ?? 0];
   }
   if (!modern()) return layers[sim.unitById.get(id)?.slot ?? 0];
   const slot = sim.unitById.get(id)?.slot ?? 4;

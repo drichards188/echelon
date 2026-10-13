@@ -364,7 +364,8 @@ export class Sim {
         // each vehicle of a dispersed unit takes its own share and is knocked out on its own; the unit
         // is out with its last TELAR
         u.parts.forEach((p, i) => {
-          if (!p.alive) return;
+          // (a part without hit points, the flak tower's concrete, takes none)
+          if (!p.alive || p.maxHp == null) return;
           const d = p.pos.distanceTo(pos);
           if (d >= radius) return;
           const hi = dmg * fall(d);

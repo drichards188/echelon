@@ -50,7 +50,7 @@ const CLS_SHORT = { aircraft: 'AC', cruise: 'CM', drone: 'UAV', arm: 'ARM', tbm:
 // shells as the kill toasts name them
 Object.assign(KILL_NAME, { p51: 'Mustang', p47: 'Thunderbolt', typhoon: 'Typhoon', tempest: 'Tempest', a26: 'Invader', b17: 'Fortress', recon: 'Spitfire PR', gpbomb: 'bomb', rp3: 'rocket' });
 Object.assign(CLS_SHORT, { bomber: 'BMR', fighter: 'FTR', recon: 'RCN', rocket: 'RKT', window: 'WIN' });
-const WEAPON_NAME = { '88mm': '8.8 cm', '37mm': '3.7 cm', '20mm': '2 cm' };
+const WEAPON_NAME = { '128mm': '12.8 cm', '88mm': '8.8 cm', '37mm': '3.7 cm', '20mm': '2 cm' };
 // fx and sound sizes of interceptor warheads and of enemy warheads arriving
 const MSIZE = { '48N6': 1.4, '9M96': 1, '57E6': 0.6, '9M33': 0.8, '9M37': 0.5, '9M317': 1.1, '9M338': 0.7, '9M311': 0.55 };
 const COLD = { '48N6': 1.5, '9M96': 1.0, '9M338': 0.7 }; // cold-launched rounds: fx size
@@ -926,7 +926,7 @@ async function init() {
   // sound of all of it. The 8.8 cm and 3.7 cm report shot by shot (`muzzle`: every heavy round, every 3.7
   // cm round), the 2 cm's rattle is a loop per gun (ww2Sound), every sound arriving late with its distance.
   ev.muzzle = (u, i, pos, dir, shell) => {
-    if (shell === '88mm' || shell === '37mm') audio.shot(shell, pos);
+    if (shell === '128mm' || shell === '88mm' || shell === '37mm') audio.shot(shell, pos);
   };
   // a time-fuzed 8.8 cm shell bursting: the black puff and, long after it at that height, its crump
   ev.burst = (pos) => {
@@ -956,7 +956,7 @@ async function init() {
     } else if (kind === '20mm' && fx.cheap() && Math.random() < 0.35) fx.puff(p, 0.45);
   };
   ev.shellGround = (p, kind) => {
-    if (kind === '37mm' || kind === '20mm' || kind === '88mm') fx.spurt(p, kind === '88mm' ? 1.5 : kind === '37mm' ? 0.6 : 0.35);
+    if (kind === '37mm' || kind === '20mm' || kind === '88mm' || kind === '128mm') fx.spurt(p, kind === '128mm' ? 1.9 : kind === '88mm' ? 1.5 : kind === '37mm' ? 0.6 : 0.35);
   };
   // a bomb, a rocket or an aircraft coming down: the earth thrown up, its crater, fire where it hit
   // something, the bang
