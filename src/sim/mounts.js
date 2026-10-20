@@ -149,11 +149,12 @@ export function initMounts(u) {
     // rangefinder), source: the one in use (null: neither has the target); quality 0..1, t: s held; range
     // (slant m), fuze and tof (s), aim (the point the guns are laid on: the predicted burst with gravity's
     // aim-off), point (the predicted burst), valid (the burst inside the guns' reach), window (0..1, Window in
-    // the radar's beam), hold (why it cannot fire, or null), salvos fired, lastSalvo (sim time), barrage
+    // the radar's beam), hold (why it cannot fire, or null), salvos fired, lastSalvo and lastSingle
+    // (sim times of the last battery salvo and single-gun shot), barrage
     // ({ center, along, until } or null).
     u.predictor = {
       target: null, state: 'idle', ranging: 'radar', source: null, quality: 0, t: 0, lostT: 0, range: 0, fuze: 0, tof: 0,
-      aim: new THREE.Vector3(), point: new THREE.Vector3(), valid: false, window: 0, hold: null, salvos: 0, lastSalvo: -99,
+      aim: new THREE.Vector3(), point: new THREE.Vector3(), valid: false, window: 0, hold: null, salvos: 0, lastSalvo: -99, lastSingle: -99,
       barrage: null, readyT: -1, fireNow: false, pickT: 0, jamT: 0,
       est: { id: null, n: 0, vel: new THREE.Vector3(), acc: new THREE.Vector3(), prev: new THREE.Vector3() }, locked: false,
       err: new THREE.Vector3(), errN: new THREE.Vector3(), errT: 0, sigma: 0, warmId: null,
@@ -316,6 +317,7 @@ export class Mounts {
           if (pr) {
             pr.target = null;
             pr.barrage = null;
+            pr.fireNow = false;
           }
         }
         return true;
@@ -327,7 +329,7 @@ export class Mounts {
         g.trigger = !!a.down;
         return true;
       case 'fire':
-        // the heavy battery in manual: one salvo now from the guns that are loaded and laid
+        // the heavy battery in manual: fire one loaded and laid gun
         if (!pr || !this.heavyManual(u)) return false;
         pr.fireNow = true;
         return true;
@@ -338,6 +340,7 @@ export class Mounts {
         if (pr) {
           if (pr.target === id) pr.target = null;
           pr.barrage = null;
+          pr.fireNow = false;
         }
         return true;
       }
@@ -842,7 +845,7 @@ export class Mounts {
       }
     }
     if (pr.barrage) return this.barrageFire(u, heavy, dt);
-    // salvo fire: in auto once the solution has settled, in manual while the trigger is held (or one salvo on
+    // salvo fire: in auto once the solution has settled, in manual while the trigger is held (or one gun on
     // `fire`) from the moment it holds the target; the battery fires together when `salvo` guns are ready,
     // or the first ready one has waited `wait` s
     const want = held && pr.valid && (hm ? u.weapons.gun.trigger || pr.fireNow : u.mode !== 'hold' && pr.quality >= 0.55);
@@ -855,8 +858,15 @@ export class Mounts {
     if (pr.readyT < 0) pr.readyT = sim.time;
     const standing = heavy.filter((i) => u.parts[i].alive).length;
     if (!pr.fireNow && ready.length < Math.min(P.salvo, standing) && sim.time - pr.readyT < P.wait) return;
+    const single = pr.fireNow;
     pr.fireNow = false;
     pr.readyT = -1;
+    if (single) {
+      const i = ready[0];
+      this.fireHeavy(u, i, u.parts[i].gun.fuze, t);
+      pr.lastSingle = sim.time;
+      return;
+    }
     for (const i of ready) this.fireHeavy(u, i, u.parts[i].gun.fuze, t);
     pr.salvos++;
     pr.lastSalvo = sim.time;
@@ -939,9 +949,14 @@ export class Mounts {
       if (tof < 0) continue;
       this.fireHeavy(u, i, tof, null, _d.subVectors(_q, from).normalize());
       n++;
+      if (pr.fireNow) break;
     }
-    pr.fireNow = false;
     if (n) {
+      if (pr.fireNow) {
+        pr.fireNow = false;
+        pr.lastSingle = sim.time;
+        return;
+      }
       pr.salvos++;
       pr.lastSalvo = sim.time;
       sim.events.salvo?.(u, n, 0);
@@ -1045,8 +1060,8 @@ export class Mounts {
     }
     g.rounds = rounds;
     if (u.group) g.shell = SYSTEMS[u.kind].guns[u.group].shell;
-    // a heavy battery is in action while its last salvo's shells are still flying
-    g.firing = pr && !light ? sim.time - pr.lastSalvo < Math.max(4, pr.tof) : firing;
+    // a heavy battery is in action while its last shot's shells are still flying
+    g.firing = pr && !light ? sim.time - Math.max(pr.lastSalvo, pr.lastSingle) < Math.max(4, pr.tof) : firing;
     // the gun the camera rides: the battery's guns fire together, so its first standing gun in letter order
     // (gun A while it stands); a platoon's gun that is firing, else one with a solution, kept for a while
     if (pr && !light) u.nextGun = Math.max(0, u.parts.findIndex((p) => p.role === 'gun' && p.alive));

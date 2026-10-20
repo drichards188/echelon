@@ -1188,9 +1188,9 @@ const battery44 = {
     },
     {
       title: 'Fire salvos',
-      text: 'Hold FEUER (or Space): every gun that is loaded and laid fires together, then the loaders put the next rounds in and the fuze setters set them. SALVE fires one salvo. A salvo every few seconds is all the guns can do.',
+      text: 'Hold FEUER (or Space): every gun that is loaded and laid fires together, then the loaders put the next rounds in and the fuze setters set them. EINZEL fires one ready gun. A salvo every few seconds is all the guns can do.',
       goal: 'Fire three salvos',
-      hi: ['trigger', 'salvo', 'guns'],
+      hi: ['trigger', 'guns'],
       enter: (T) => {
         T.mem.s0 = pr44(T).salvos;
       },

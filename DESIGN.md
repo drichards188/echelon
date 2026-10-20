@@ -960,8 +960,9 @@ the crewman's way up, the containers lying on the bed (none is seen loaded in th
 German flak defends Fliegerhorst Hopsten (Rheine-Hopsten), the Me 262 base of KG 51 in north-west
 Germany, against the Allied day raids of February and March 1945. The research is in
 `refs/ww2/README.md` (the setting, the order of battle, the waves, the sources) with one sheet per system
-and aircraft; the game values below cite them. It plays in the headless sim with the slot defaults only
-(`node tools/simtest.mjs --era ww2`); the alternatives in refs/ww2 section 3 come later. The sim's state
+and aircraft; the game values below cite them. It plays in the headless sim (`node tools/simtest.mjs --era
+ww2`) with the slot defaults and slot 4's one alternative, the 2 cm platoon; the other alternatives in
+refs/ww2 section 3 come later. The sim's state
 and events are bound to the models, fx and sound in "Render, fx and audio" below. Its battery and platoon
 consoles have live 3D sight pictures. Play it in the browser with `/?era=ww2`.
 
@@ -1058,7 +1059,7 @@ plus up to 300 m with Window in the radar's range gate (500 m), 1.3 times larger
 the difficulty's `aim`. Each gun's `gun.order { az, el, fuze }` is the predictor's data at that gun (the
 follow-the-pointer dials, before its layers' own 1.5 mrad error; the render's `setOrder`). Guns fire together by salvo once at least 4 are loaded and laid (within 6 mrad of the
 data), or the first ready one has waited 1.5 s: in auto when the solution's quality is 0.55, in manual while
-the trigger is held (or one salvo on `fire`). Barrage fire (`barrage { on, trackId }`): a box 1,000 x 300 x
+the trigger is held (`fire` orders one loaded and laid gun to shoot). Barrage fire (`barrage { on, trackId }`): a box 1,000 x 300 x
 160 m laid on a formation's course where the shells can meet it, fired at by every gun as it is loaded, from
 just before the formation reaches it until it should be through (fixed data: no predictor, no range, so it
 works without the Kommandogeraet and against Window). AI crew: notices a track after 8 s, takes the player's
@@ -1184,7 +1185,7 @@ them; 6 (24 March) Typhoons and P-47s on the flak and the heavy battery, an A-26
   squadrons' 500 lb, the high and low squadrons' and the A-26s' 100 lb), `attack`, `phase`, `role`.
 - the battery: `u.predictor { target, state ('idle' | 'acquiring' | 'tracking' | 'solution' | 'barrage'),
   ranging, source, quality, t, range, tof, fuze, aim, point, valid, window, sigma, hold ('no predictor' | 'no
-  target' | 'not held' | 'out of reach' | 'settling' | null), salvos, lastSalvo, barrage }`; the `kdo40` and
+  target' | 'not held' | 'out of reach' | 'settling' | null), salvos, lastSalvo, lastSingle, barrage }`; the `kdo40` and
   `wurzburg` parts' `turret { az, el }` follow its target; `radar.track` is the Wuerzburg emitting.
 - the unit: `u.weapons.gun` (summary), `u.concentrate`, `u.nextGun` (= `sim.nextLauncher(u).part`: the
   battery's first standing gun in letter order; a platoon's gun that is firing, else one with a solution, kept
@@ -1270,7 +1271,7 @@ of the camera (`SHADOW_NEAR`; the shadow map covers the view's surroundings only
 | `mode` | all | auto, manual, hold (hold clears every target and the barrage) |
 | `select` | all | `{ trackId }`: the platoon's target (in manual every gun takes it, in auto it comes first for a gun that would take it) or the predictor's (in auto when the crew would take it) |
 | `trigger` | all | `{ down }`: in manual, the platoon's guns fire on their solutions, the battery fires its salvos |
-| `fire` | battery, manual | `{}` one salvo now from the guns loaded and laid |
+| `fire` | battery, manual | `{}` fire one loaded and laid gun now; the `trigger` still fires salvos while held |
 | `cease` | all | `{ trackId }` (and the barrage off) |
 | `radar` / `track` | battery | `{ on }` the Wuerzburg |
 | `ranging` | battery | `{ source: 'radar' \| 'optical' }` |
@@ -1525,3 +1526,4 @@ Reuse the maxgfx engine core (distance delay, air absorption, voice stealing, re
 - UI: ui/panel.js takes the status strip from `ERA.text.strip` when the era has one (the WW2 era's German).
 - WW2 release: `available: true` exposes Hopsten through the normal era toggle and `?era=ww2`. The battery and platoon consoles register through `ww2/content.js`; `registerSightPose` supplies their gun and predictor poses, `main.js` sends them to `SightRenderer`, and `UnitViews.sightPos` accepts a part index so each picture begins at its own eyepiece. Four gun tutorials are available from the title screen. The 2 cm loop banks' silent start buffers are intentional and excluded from `audiotest.mjs` silence warnings.
 - WW2 flak tower: slot 4's default is `flakturm` (TURM Paula), the 2 cm platoon its alternative. SYSTEMS `flakturm` (`groups`), `flak128`; SHELLS `128mm` (id 5); PART_ROLE `flak128` 'gun', `flakturm` 'tower'; parts' `deck`; mounts.js gun groups (`u.group`, `group` command, `heavyManual`, `gunManual`, `lightGroup`, `u.heavyKind`, `u.heavyShell`, twin barrels in `fireHeavy`, `predictor.reach`); Sim.applyWarhead skips parts without `maxHp`; models `flak128`, `flakturm`; consoles/turm.js; battery.js and platoon.js take options; simtest `TURM` column. The modern simtest and the WW2 one with the old loadout (`--loadout flak88,flak43,flak43,flakvierling,flak38`) are byte-identical.
+- WW2 battery (`fire`): the manual order fires one loaded and laid gun instead of a salvo, in predicted fire and in barrage (on the tower, one twin mount); the trigger still fires salvos while held. New `predictor.lastSingle` (sim time of the last single-gun shot; `gun.firing` counts it, no `salvo` event); hold, `cease` and `group` drop an order not yet fired. Console: the battery page's SALVE / ONE SALVO button is EINZEL / ONE GUN (highlight id `single`, was `salvo`), its status line shows ONE GUN; the battery lesson's salvo step names it. The WW2 simtest is unchanged (its players use the trigger).

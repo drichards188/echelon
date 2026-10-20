@@ -13,7 +13,7 @@
 //                               fire or barrage (Sperrfeuer) on the selected formation, the range source
 //                               (the 4 m rangefinder or the Wuerzburg), the Wuerzburg's power, the trigger
 //                               (salvos while held, the modern trigger's OUT OF RANGE and LONG RANGE faces),
-//                               one salvo, Stopfen (cease)
+//                               one gun, Stopfen (cease)
 //   the gun reports             A to F: laid (the elevation order and the barrel on a small follow-the-
 //                               pointer dial), loaded, the fuze set, fired, out of action, rounds; the
 //                               battery's two 2 cm guns (in action on their own in every mode but hold)
@@ -66,6 +66,7 @@ function line(u, data) {
     if (pr.hold === 'not held') return `LAYING ON ${id}: predictor not on it yet`;
     if (pr.hold === 'out of reach') return `${id} OUT OF REACH: no solution`;
     if (pr.source === 'radar' && pr.window > 0.3) return `WINDOW ON ${id}: miss ${Math.round(pr.sigma)} m, use E-MESSER`;
+    if (g.firing && pr.lastSingle > Math.max(pr.lastSalvo, (data.time ?? 0) - 6)) return `ONE GUN at ${id}, fuze ${dec(pr.fuze, 1)} s`;
     if (g.firing && pr.lastSalvo > (data.time ?? 0) - 6) return `SALVO ${pr.salvos} at ${id}, fuze ${dec(pr.fuze, 1)} s`;
     if (pr.state === 'tracking') return `SETTLING ON ${id}: ${Math.round(pr.quality * 100)} %, ${src}`;
     if (pr.state === 'solution') return u.mode === 'manual' ? `SOLUTION ON ${id}: FEUER (hold Space)` : `SOLUTION ON ${id}: crew firing salvos`;
@@ -141,18 +142,18 @@ export function mountBattery(ctx, o = {}) {
   knobs.append(mode.el, art.el, rng.el);
   const radar = new Toggle({ ru: 'FuMG 62', en: 'WÜRZBURG ON', color: 'green', onChange: (on) => send('radar', { on }) });
   const trig = new Btn({ ru: 'FEUER', en: 'SALVOS (HOLD)', color: 'red', hold: true, cls: 'big trig44', onDown: () => trigger(true), onUp: () => trigger(false) });
-  const salvo = new Btn({ ru: 'SALVE', en: 'ONE SALVO', color: 'amber', onClick: () => { takeManual(u, send, true); send('fire', {}); } });
+  const single = new Btn({ ru: 'EINZEL', en: 'ONE GUN', color: 'amber', onClick: () => { takeManual(u, send, true); send('fire', {}); } });
   const stop = new Btn({ ru: 'STOPFEN', en: 'CEASE ON TARGET', color: 'white', onClick: () => { if (u) send('cease', { trackId: u.selected }); } });
   const rSalvos = new Drum('SALVEN', 'SALVOS', '888');
   const bts = el('div', 'rowc btns44');
-  bts.append(radar.el, trig.el, salvo.el, stop.el, rSalvos.el);
+  bts.append(radar.el, trig.el, single.el, stop.el, rSalvos.el);
   pf.body.append(knobs, bts);
   tut(mode.el, 'mode');
   tut(art.el, 'barrage');
   tut(rng.el, 'ranging');
   tut(radar.el, 'radar');
   tut(trig.el, 'trigger');
-  tut(salvo.el, 'salvo');
+  tut(single.el, 'single');
   tut(stop.el, 'cease');
 
   // ---------------------------------------------------------------- the gun reports
@@ -306,7 +307,7 @@ export function mountBattery(ctx, o = {}) {
       radar.set(!!u.radar.track);
       const g = u.weapons.gun;
       trig.set(g.trigger && g.firing);
-      salvo.enable(!!pr.target || !!pr.barrage);
+      single.enable(!!pr.target || !!pr.barrage);
       rSalvos.set(String(pr.salvos % 1000));
       if (pr.barrage) {
         trig.enable(g.rounds > 0);

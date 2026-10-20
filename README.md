@@ -1,6 +1,6 @@
 # Echelon: layered air defense
 
-A three.js (WebGL2) game built on the MaxGFX framework (`../threejs-maxgfx`). It has two playable eras: modern layered air defense and late-war WW2 flak defending the jet airfield at Hopsten in February to March 1945. In the modern era you command the air defense of an airbase on the steppe: an S-400 battalion for the long-range, high layer, two Pantsir-S1 for point defense, an Osa-AKM and a Strela-10M3 for the short-range layer, against seven escalating raids of drones, cruise missiles, fighters with radar-seeking missiles and glide bombs, decoys, attack helicopters and ballistic missiles.
+A three.js (WebGL2) game built on the MaxGFX framework (`../threejs-maxgfx`). It has two playable eras: modern layered air defense and late-war WW2 flak defending the jet airfield at Hopsten in February to March 1945. In the modern era you command the air defense of an airbase on the steppe: an S-400 battalion for the long-range, high layer, two Pantsir-S1 for point defense, an Osa-AKM and a Strela-10M3 for the short-range layer, against seven escalating raids of drones, cruise missiles, fighters with radar-seeking missiles and glide bombs, decoys, attack helicopters and ballistic missiles. In the WW2 era you command the airfield's flak: a battery of six 8.8 cm guns laid from its predictor, two 3.7 cm platoons, a platoon of 2 cm Flakvierlinge and a what-if flak tower, against six day raids of Mustangs, Thunderbolts, rocket Typhoons, Tempests, Invaders and B-17 boxes dropping Window, the last on the day of the Rhine crossing.
 
 The left half of the screen is a third-person view of the unit you have selected; the right half is that unit's console. The units you are not operating fight on their own, in whatever mode you left them. The visuals are procedural; sound combines synthesis with recordings credited in `public/audio/CREDITS.md`.
 
@@ -18,7 +18,9 @@ Pick an era, a difficulty and a loadout and click **Take command**. A demonstrat
 
 **Era.** The toggle at the top of the options picks **Modern** (2020s) or **WW2** (1944 to 1945). The line under it gives the era's setting (point at the other era to read its own). An era brings its own map, units, raids and consoles; the loadout picker, the tutorials and the demonstration battle follow it. The era is kept in the browser for the next visit.
 
-**Loadout.** Under the difficulty the title screen lists the five slots (the number keys) with two options each, the default first; the line under a slot gives the chosen option's trade-off (point at the other option to read its own). Picking an option rebuilds the demonstration battle with it and cuts to that unit, so you see what you chose; **Take command** fights with it. The choice is kept in the browser for the next visit, one loadout per era. A tutorial runs on the default units with its own vehicle swapped in (the Buk, Tunguska, Tor and Shilka lessons) and puts your loadout back when it ends.
+**Loadout.** Under the difficulty the title screen lists the five slots (the number keys) with their options, the default first: two each in the modern era, and in WW2 so far only slot 5 has a choice. The line under a slot gives the chosen option's trade-off (point at the other option to read its own). Picking an option rebuilds the demonstration battle with it and cuts to that unit, so you see what you chose; **Take command** fights with it. The choice is kept in the browser for the next visit, one loadout per era. A tutorial runs on the default units with its own vehicle swapped in (the Buk, Tunguska, Tor and Shilka lessons, and the WW2 2 cm Flak 38 lesson) and puts your loadout back when it ends.
+
+Modern:
 
 | Slot | Default | Alternative |
 |---|---|---|
@@ -28,6 +30,16 @@ Pick an era, a difficulty and a loadout and click **Take command**. A demonstrat
 | 4 short range | Osa-AKM | Tor-M2: four targets at once inside its radar sector (a new one every 4 s at most), quick, best against small fast targets, dearer rounds fired straight up out of their cells |
 | 5 very short range | Strela-10M3 | ZSU-23-4M4 Shilka-M4: four 23 mm guns, free to fire, its shells reach about 2.8 km and its crew opens fire inside 2 km; its radar emits |
 
+WW2:
+
+| Slot | Default | Alternative |
+|---|---|---|
+| 1 heavy battery | 8.8 cm Flak 37 battery (Ludwig): six guns fired together from the Kommandogeraet 40 and the Wuerzburg radar, with two 2 cm guns of its own; the only answer to the bombers at height | none yet |
+| 2 medium, Flak lane | 3.7 cm Flak 43 platoon (Martha): three guns on their own sights, fed clip by clip, reach to about 3 km | none yet |
+| 3 medium, dispersal | 3.7 cm Flak 43 platoon (Nordpol) | none yet |
+| 4 light, quadruple | 2 cm Flakvierling 38 platoon (Otto): three quadruple mounts, one on a wooden tower, a wall of fire inside 1.5 km | none yet |
+| 5 light | Flak tower (Paula; a what-if, the real ones stood in Berlin, Hamburg and Vienna): four twin 12.8 cm on its corner turrets laid from the predictor on its roof, two 3.7 cm on the roof and four Vierlinge on the galleries | 2 cm Flak 38 platoon: three single guns, short reach, quick to swing onto a diving attacker |
+
 The search radars see high flyers far out and low flyers only close in and over open ground, so the long layer gets the aircraft, decoys and ballistic missiles, and what comes in low leaks through to the Pantsirs, the Osa and the Strela. Every unit starts in **auto** (its crew engages on its own, competently but wastefully: slow to react, it fires on decoys, uses the big missiles on everything and never switches its radar off). **Manual** fires only on your orders and your shots are a little better; **hold** never fires.
 
 - **S-400** (battalion command post): the big scope and the track table. Pick the 48N6 (long range, few) or the 9M96 (shorter range, cheap and plentiful), select a track and launch one or two (**NEXT THREAT** steps through the threats nobody is engaging yet). Slow "aircraft" that never close are often decoys: their class shows once a track has been held long enough. When a radar-seeking missile comes for the battalion, switching the emitter off makes it lose its aim, but blinds the battalion and its 48N6 in flight.
@@ -35,9 +47,13 @@ The search radars see high flyers far out and low flyers only close in and over 
 - **Osa-AKM**: one target at a time, salvoes of two, its tracking radar must hold the target until the missiles arrive.
 - **Strela-10M3**: no radar. Slew the optical sight onto the target (drag in the sight or arrow keys, the strip below it cues the bearings of the nearest threats from the battalion's picture), uncage the seeker (U), wait for the tone to steady and the LOCK lamp, then fire.
 
-In **WW2**, the six 8.8 cm guns share a predictor and fire salvos. Select a plotted aircraft, let the solution settle, then use **FEUER**; the battery console also has radar or optical ranging and aimed or barrage fire. Each 3.7 cm and 2 cm platoon has three guns with their own sights and ammunition feeds. Select a target and hold the trigger in manual mode, or leave the crews in auto. The four WW2 tutorials teach the battery and each platoon type.
+In **WW2** every unit is a group of guns, each with its own crew; the modes are FREI (auto), BEFEHL (manual) and HALT (hold), and aircraft come onto the plot from the lookouts, the Wuerzburg and the aircraft reporting service.
 
-Between raids (40 s of quiet) a supply column refills the reserves; launchers still have to reload, which takes from half a minute to two minutes and keeps that launcher out of action, so start them as the raid ends.
+- **8.8 cm battery**: the six guns share the Kommandogeraet 40. Select a plotted aircraft, let the solution settle, then hold **FEUER** (Space) for salvos, or click **EINZEL** to fire one ready gun. The console also picks the range source (the rangefinder or the Wuerzburg, T; Window spoils the radar), switches the Wuerzburg (R) and lays a barrage box on a formation's course (G), which works without the predictor and through Window.
+- **3.7 cm and 2 cm platoons**: three guns with their own sights and ammunition feeds (clips on a loading table, magazines changed by the loaders). In manual all three take the selected target and fire while FEUER is held; in auto each crew picks its own, and G puts them all on the selected one. Q switches the sight picture to the next gun.
+- **Flak tower**: one unit with three kinds of gun. The gun selector (GESCHÜTZWAHL, or W) picks the ones you command: the twin 12.8 cm on the predictor as a battery, or the 3.7 cm or the Vierlinge as a platoon. The others fight on with their crews. The tower's own walls mask its light guns, so a gun that would fire through the concrete holds (VERDECKT).
+
+Between raids (40 s of quiet) a supply column refills the reserves; launchers still have to reload, which takes from half a minute to two minutes and keeps that launcher out of action, so start them as the raid ends. In WW2 the guns' ammunition is brought up the same way and the runway is patched up.
 
 | Key | Action |
 |---|---|
@@ -50,10 +66,11 @@ Between raids (40 s of quiet) a supply column refills the reserves; launchers st
 | `C` | free camera (WASD to move) |
 | `[` `]` | time compression (x0.25 to x8); also the - and + buttons by the time readout (click the readout for x1) |
 | `Tab` / `Shift+Tab` | next / previous track |
-| `Space` | engage or fire (hold for the guns of the Pantsir, Tunguska and Shilka) |
-| `R` / `T` | search / tracking radar (the Shilka's one dish: search / track) |
-| `G` | Pantsir, Tunguska: missiles or guns |
-| `Q` | S-400: missile type; Buk: firing vehicle (best, TELAR 1, TELAR 2) |
+| `Space` | engage or fire (hold for the guns of the Pantsir, Tunguska and Shilka, and for FEUER in WW2) |
+| `R` / `T` | search / tracking radar (the Shilka's one dish: search / track); WW2 battery: Wuerzburg / range source |
+| `G` | Pantsir, Tunguska: missiles or guns; WW2 battery: barrage; WW2 platoon: spread or concentrate the fire |
+| `Q` | S-400: missile type; Buk: firing vehicle (best, TELAR 1, TELAR 2); WW2 battery: telescope zoom; WW2 platoon: the next gun's sight |
+| `W` | flak tower: the next kind of gun under your command |
 | `U` | Strela: uncage the seeker |
 | `A` | mode: auto, manual, hold |
 | `L` | reload |
@@ -64,7 +81,7 @@ Between raids (40 s of quiet) a supply column refills the reserves; launchers st
 
 ## Tutorials
 
-**Tutorials** on the title screen opens a list of short guided lessons, one for each vehicle, the loadout alternatives included, and one for the basics (a tick shows the ones you have finished, kept in the browser's local storage). Each runs on a quiet range: the raids are off, nothing is scored, nothing can be destroyed, and the other units stand down. A card over the 3D view gives the step, a pulsing amber frame marks the console control it is about, and the step completes when you do the thing; steps that only explain go on with **Next** (**Skip step** passes one you cannot complete). Time compression stays in your hands: the + and - buttons by the time readout, or [ and ]. Esc or **Exit** goes back to the list, Esc again to the title.
+**Tutorials** on the title screen opens a list of short guided lessons for the era in play, one for each vehicle or gun unit, the loadout alternatives included, and in the modern era one for the basics (a tick shows the ones you have finished, kept in the browser's local storage). Each runs on a quiet range: the raids are off, nothing is scored, nothing can be destroyed, and the other units stand down. A card over the 3D view gives the step, a pulsing amber frame marks the console control it is about, and the step completes when you do the thing; steps that only explain go on with **Next** (**Skip step** passes one you cannot complete). Time compression stays in your hands: the + and - buttons by the time readout, or [ and ]. Esc or **Exit** goes back to the list, Esc again to the title.
 
 - **The basics**: orbit and zoom, switching units (1 to 5, the tabs), modes, padlock (V), the missile chase (F), time compression, the layers.
 - **S-400 battalion**: the scope and the track table, manual mode, the long and the short missile, launching at an aircraft, a decoy that gives itself away (hold fire), switching the emitter off for an anti-radar missile, reloading.
@@ -75,10 +92,11 @@ Between raids (40 s of quiet) a supply column refills the reserves; launchers st
 - **2S6M Tunguska** (replaces a Pantsir): holding the trigger and the fire control's lead, heat and ammunition, the optical-only missile channel and when to use it, the search radar, reloading.
 - **Tor-M2** (replaces the Osa): the tracking sector, a vertical cold launch, several targets at once on separate channels, a salvo, reloading.
 - **Shilka-M4** (replaces the Strela): radar tracking and the lock lamp, the lead mark in the sight, a very short range, bursts and heat, the optical fallback with the dish off, the radar as an anti-radar target.
-- **WW2 8.8 cm battery**: the predictor, gun reports, salvos, optical ranging when Window spoils the radar, and barrage fire.
-- **WW2 3.7 cm, Flakvierling and 2 cm platoons**: one lesson per gun type, covering the sight, ammunition feed, target selection and firing.
+- **WW2 8.8 cm battery**: the air picture, designating a target, letting the solution settle, salvos, reading the bursts, optical ranging when Window spoils the radar, and barrage fire.
+- **WW2 flak tower**: the gun selector, twin 12.8 cm salvos on a bomber box, then the Vierlinge and the 3.7 cm in hand against a Mustang strafing the tower while the twins fight on with their crews.
+- **WW2 3.7 cm, Flakvierling and 2 cm platoons**: one lesson per gun type, covering the sight, ammunition feed, target selection and firing (the 2 cm lesson swaps the Flak 38 platoon in for the tower).
 
-`?tutorial=s400` (or `basics`, `pantsir`, `osa`, `strela`, `buk`, `tunguska`, `tor`, `shilka`) starts a modern lesson at once. Select WW2 and choose its lessons from the Tutorials list.
+`?tutorial=s400` (or `basics`, `pantsir`, `osa`, `strela`, `buk`, `tunguska`, `tor`, `shilka`) starts a modern lesson at once; with `?era=ww2`, `?tutorial=flak88` (or `flakturm`, `flak43`, `flakvierling`, `flak38`) starts a WW2 one.
 
 ## Development pages
 
@@ -101,6 +119,9 @@ src/
     index.js       the registry (ERAS), the derived default loadouts, loadEra (an era's lazily loaded content)
     modern.js      the modern era (the airbase on the steppe)
     ww2.js         the WW2 era: Fliegerhorst Hopsten, February to March 1945, its flak, six day raids (ww2/content.js: its lazy modules)
+    ww2/           the WW2 era's lazily loaded content: consoles/ (battery, platoon, turm: the flak tower's gun selector,
+                   plot, wurzburg, sights), models/ (the guns, the Kommandogeraet, the Wuerzburg, the flak tower, the
+                   airfield buildings, the crews), aircraft/ (the Allied aircraft and their ordnance), terrain.js
   deploy.js        the era in play (setEra) and where everything sits (units, their vehicles, the assets), bearing helpers
   sim/             the battle, pure logic (runs in Node)
     sim.js         Sim: update order, events, damage, targets for the attackers, radio
