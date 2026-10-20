@@ -58,3 +58,18 @@ Framework pieces from maxgfx keep their rules: `shaderlib.js` overrides three's 
 ### UI (`src/ui/`) and audio (`src/audio.js`)
 
 `Panel` reads only the data passed to `update` and talks back through `onSelect` and `onCommand(unitId, name, args)` (command table in DESIGN.md); one console per kind in `ui/consoles/`. It owns the console keys (Tab, Space, R, T, G, U, A, arrows, Q, L); main owns 1 to 5, C, V, F, M, H, F3, `[` and `]`. Each console has a status line under the header and a selected-track bar; a control that the AI crew would undo (slew, trigger, uncage, launch) first switches the unit to manual (`takeManual`). `AudioEngine` renders its banks at `start()` (a user gesture), lays the recordings over them when decoded, routes world sounds with travel delay and air absorption, runs threat engine loops with Doppler, the Pantsir gun loops, the Strela seeker tone and the console sounds.
+
+## README structure
+
+The README is a one-screen front page in the Smart Brevity style, shared with the sibling games (Battle Stations in `../threejs-maxgfx`, Echelon in `../threejs-iads`, Drumfire in `../threejs-drumfire`). Keep it under about 450 words of prose, with these headings in this order; the detail lives in `docs/`. Update the README and the docs when a change makes them inaccurate.
+
+1. `# Name: subtitle`, the screenshot (`docs/screenshot.jpg`), a bold one-sentence lede, then `**Why it's different:**` in one or two sentences
+2. `## What you do`: three to six bullets
+3. `## Play it`: the commands, the port, the browser, one line on sharing the build
+4. `## Controls`: the essential keys only, linking to the full list
+5. `## Status`: one line on what is playable, then at most five "not done yet" bullets
+6. `## Go deeper`: links to `docs/PLAYING.md` (modes, units, every key, tutorials), `docs/MODELLED.md` (rendering, simulation, sound), `docs/HISTORY.md` (what is real, what is game, sources) and `docs/DEVELOPMENT.md` (dev pages, tests, tools, the source layout)
+7. `## More games`: one bullet per sibling game, linking its GitHub repository with a one-line description; never say where the code came from
+8. `## Credits`: libraries, recordings and data, with any attribution their licenses require
+
+In `docs/`, keep paragraphs short (under about 100 words) and use bullets and bold lead-ins so a reader can skim.
