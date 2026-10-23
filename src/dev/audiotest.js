@@ -43,7 +43,21 @@ if (bar) {
     btn(`gun ${sh} (toggle)`, () => audio.gun('btn-' + sh, (on = !on), P(25, 3, -10), sh));
   }
   for (const k of ['buk', 'tor', 'tunguska', 'shilka', 'pantsir', 's400']) btn(`idle ${k}`, () => audio.vehicle(k));
+  // the WW2 era's heavy guns (WW2 era first: its banks render and its recordings load in a few seconds), one
+  // round and a battery's salvo of six guns 25 m apart; close ones dull the ears (deafen)
+  btn('WW2 era', () => audio.setEra('ww2'));
+  for (const k of ['88mm', '128mm']) for (const d of [20, 1500, 6000]) btn(`${k} ${d} m`, () => audio.shot(k, P(d, 2, -d / 4)));
+  btn('88mm salvo 30 m', () => {
+    for (let i = 0; i < 6; i++) setTimeout(() => audio.shot('88mm', P(30 + (i % 3) * 25, 2, -20 + Math.floor(i / 3) * 25)), Math.random() * 250);
+  });
   for (const k of ['Start']) btn(k, () => {});
+  // world sounds travel and land in update(), which the smoke test below stops calling after a few seconds
+  let running = false;
+  bar.addEventListener('click', () => {
+    if (running) return;
+    running = true;
+    setInterval(() => audio.update(1 / 60, camera, { threats: [] }), 16);
+  });
 }
 const tick = (n) => {
   for (let i = 0; i < n; i++) audio.update(1 / 60, camera, { threats });

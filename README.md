@@ -66,7 +66,7 @@ Not done yet:
 ## Credits
 
 - **Libraries:** [three.js](https://threejs.org) and [lil-gui](https://lil-gui.georgealways.com) (MIT); Vite (MIT) and playwright-core (Apache 2.0) for development.
-- **Recordings:** eight from Freesound, seven of them CC0 ([list](public/audio/CREDITS.md)). ["Tykki, laukaus / Big gun, cannon, 76 mm, single shots, gunshots"](https://freesound.org/s/332935/) by YleArkisto is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- **Recordings:** nine from Freesound, eight of them CC0 ([list](public/audio/CREDITS.md)). ["Tykki, laukaus / Big gun, cannon, 76 mm, single shots, gunshots"](https://freesound.org/s/332935/) by YleArkisto is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 - **WW2 terrain:** heights from EU-DEM v1.1 (Copernicus Land Monitoring Service, funded by the European Union); waterways and villages © OpenStreetMap contributors (ODbL).
 
 **License:** © 2026 David Richards. Echelon is source-available under [PolyForm Strict 1.0.0](LICENSE): you may play and study it for non-commercial purposes, but not copy, change or publish your own version of it, or use it commercially. Contributions are welcome here; see [Contributing](CONTRIBUTING.md). The libraries, recordings and data above keep their own licenses.

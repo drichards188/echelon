@@ -37,9 +37,10 @@ const RECORDINGS = {
   cannon: { file: 'cannon-shot-187767.mp3', slices: [[0.1, 2.4], [6.36, 2.4]] }, // a gun's crack, laid under the 57E6 booster
   brass: { file: 'shell-casings-318964.mp3', slices: [[8.49, 0.4], [13.04, 0.25], [16.8, 0.2], [18.95, 0.5], [20.92, 0.25], [23.17, 0.5], [25.9, 0.3], [27.83, 0.5], [39.2, 0.5]] }, // (CC0)
   // the WW2 era's, fetched only while it is in play (slices as maxgfx cut them, the machine gun's by its
-  // envelope): a 76 mm gun's shots for the 8.8 cm with the cannon above, a period automatic gun for the
-  // 3.7 cm, a .50 cal for the 2 cm and, three guns out of step, the fighters' Brownings, and a machine gun's
-  // bursts for them too
+  // envelope): a field gun's close report over a 76 mm gun's shots for the 8.8 cm (heavyShots), a period
+  // automatic gun for the 3.7 cm, a .50 cal for the 2 cm and, three guns out of step, the fighters'
+  // Brownings, and a machine gun's bursts for them too
+  fieldgun: { file: 'field-artillery-702245.mp3', era: 'ww2', slices: [[0.03, 0.7]] }, // InMotionAudio (CC0)
   gun76: { file: 'gun76-shots-332935.mp3', era: 'ww2', slices: [[0.68, 1.4], [6.67, 1.4], [19.15, 1.4]] }, // Yle archive (CC BY 4.0)
   bofors: { file: 'bofors-burst-486028.mp3', era: 'ww2', slices: [[0.92, 0.56], [1.51, 0.6], [2.145, 0.6], [2.76, 0.6], [3.375, 0.56], [3.965, 0.6]] }, // (CC0)
   avenger: { file: 'avenger50-160355.mp3', era: 'ww2', slices: [[0.615, 0.18], [0.81, 0.15], [0.955, 0.3], [3.28, 0.35]] }, // US Army .50 cal (CC0)
@@ -100,11 +101,12 @@ const THREATS = {
 };
 
 // The WW2 era's guns shot by shot (AudioEngine.shot): bank, queue kind, ref and level, reverb, the near and
-// mid bands' distances, and inside which distance a round ducks the mix.
+// mid bands' distances, inside which distance a round ducks the mix and, for the heavy guns, how many
+// octaves of the world's highs a round fired right beside the listener takes away (deafen) and for how long.
 const SHOTS = {
-  '88mm': { bank: 'g88', kind: 'heavy', ref: 200, level: 1.25, reverb: 0.3, near: 500, mid: 3000, close: 150 },
+  '88mm': { bank: 'g88', kind: 'heavy', ref: 200, level: 1.25, reverb: 0.3, near: 500, mid: 3000, close: 150, deafen: 3.5, ring: 1.6 },
   // the flak tower's 12.8 cm twin: the 8.8 cm's bank pitched down, louder
-  '128mm': { bank: 'g88', kind: 'heavy', ref: 260, level: 1.4, reverb: 0.35, near: 600, mid: 3500, close: 200, rate: 0.82 },
+  '128mm': { bank: 'g88', kind: 'heavy', ref: 260, level: 1.4, reverb: 0.35, near: 600, mid: 3500, close: 200, rate: 0.82, deafen: 4, ring: 2 },
   '37mm': { bank: 'g37', kind: 'g37', ref: 60, level: 0.95, reverb: 0.12, near: 250, mid: 1500, close: 35 },
 };
 
@@ -310,6 +312,24 @@ function tail(x, sr, sec = 0.05) {
   const n = Math.min(x.length, Math.round(sec * sr));
   for (let i = 0; i < n; i++) x[x.length - 1 - i] *= i / n;
   return x;
+}
+
+/** Lower and longer (a bigger object), by resampling: `rate` under 1 lowers it. */
+function resample(x, rate) {
+  const n = Math.floor(x.length / rate), o = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const p = i * rate, j = Math.floor(p), f = p - j;
+    o[i] = (x[j] || 0) * (1 - f) + (x[j + 1] || 0) * f;
+  }
+  return o;
+}
+
+/** Where a recorded shot starts: 5 ms before its first sample within 20 dB of the peak. */
+function onset(x, sr) {
+  const m = peak(x) * 0.1;
+  let i = 0;
+  while (i < x.length && Math.abs(x[i]) < m) i++;
+  return Math.max(0, i - Math.round(0.005 * sr));
 }
 
 /** Distant versions: slower rise, highs gone, a ground reflection and a rolling echo. */
@@ -895,6 +915,27 @@ function flak88Shot(sr, r, band) {
   return x;
 }
 
+/**
+ * The 8.8 cm close up from recordings, built in layers as a game's gun is: a close-miked report's crack and
+ * body (`crack`, pitched lower take by take), a second gun's report under it for weight and its own tail
+ * (`body`), the sub thump the recordings lack and the rolling echo off the field. Two takes per `body` slice.
+ */
+export function heavyShots(sr, r, crack, body) {
+  const PITCH = [0.97, 0.93, 0.89, 0.95, 0.91, 0.87];
+  return [...body, ...body].map((b, k) => {
+    const c = resample(crack[k % crack.length], PITCH[k % PITCH.length]);
+    const x = new Float32Array(Math.ceil(2.4 * sr));
+    mixInto(x, c.subarray(onset(c, sr)), 0, 1, sr);
+    mixInto(x, b.subarray(onset(b, sr)), 0.004, 0.5, sr);
+    thump(x, sr, 0.003, 62, 30, 0.06, 0.2, 0.18, 0.004);
+    // the shell's crack leaving the muzzle
+    mixInto(x, layer(sr, r, { dur: 0.06, attack: 0.0002, decay: 0.01, type: 'hp', f: 2800 }), 0.002, 0.3, sr);
+    roll(x, x.slice(0, Math.round(0.35 * sr)), sr, r, { count: 12, t0: 0.22, t1: 1.9, gain: 0.22, f: 450 });
+    biquad(x, sr, 'hp', 22);
+    return tail(normalize(x, 0.95), sr, 0.3);
+  });
+}
+
 /** 3.7 cm Flak 43: maxgfx's Bofors, a touch higher: the deep "pom", the recoil and the loader's clank close up. */
 function flak37Shot(sr, r, band) {
   const len = band === 'far' ? 0.5 : 0.62;
@@ -1272,19 +1313,27 @@ export class AudioEngine {
     soft.curve = sc;
     this.mix.connect(this.master).connect(comp).connect(wall).connect(soft).connect(ctx.destination);
 
+    // the listener's ears: every sound but the consoles' loses its highs for a moment after a heavy gun fires
+    // right beside it (deafen); the cutoff moves by its detune, in octaves
+    this.ears = ctx.createBiquadFilter();
+    this.ears.type = 'lowpass';
+    this.ears.frequency.value = 20000;
+    this.ears.Q.value = -3;
+    this.ears.connect(this.mix);
+
     // open country: a short, sparse tail
     this.reverb = ctx.createConvolver();
     this.reverb.buffer = this.impulse(2, 3);
     this.reverbSend = ctx.createGain();
     this.reverbSend.gain.value = 0.6;
-    this.reverbSend.connect(this.reverb).connect(this.mix);
+    this.reverbSend.connect(this.reverb).connect(this.ears);
 
     // ambience, engines and music duck under close launches and blasts
     this.duckBus = ctx.createGain();
-    this.duckBus.connect(this.mix);
+    this.duckBus.connect(this.ears);
     this.sfxDuck = ctx.createGain();
-    this.sfxDuck.connect(this.mix);
-    const bus = (g, dest = this.mix) => {
+    this.sfxDuck.connect(this.ears);
+    const bus = (g, dest = this.ears) => {
       const b = ctx.createGain();
       b.gain.value = g;
       b.connect(dest);
@@ -1295,7 +1344,7 @@ export class AudioEngine {
     this.music = bus(this.musicVolume * 0.45, this.duckBus);
     this.sfx = bus(1, this.sfxDuck);
     this.blastBus = bus(1);
-    this.uiBus = bus(1);
+    this.uiBus = bus(1, this.mix);
     // gun loops get a limiter so sustained fire never clips the mix
     this.gunBus = ctx.createGain();
     const lim = ctx.createDynamicsCompressor();
@@ -1425,15 +1474,7 @@ export class AudioEngine {
         return normalize(x, 0.95);
       });
     };
-    // lower and longer (a bigger object), by resampling
-    const pitch = (x, rate) => {
-      const n = Math.floor(x.length / rate), o = new Float32Array(n);
-      for (let i = 0; i < n; i++) {
-        const p = i * rate, j = Math.floor(p), f = p - j;
-        o[i] = (x[j] || 0) * (1 - f) + (x[j + 1] || 0) * f;
-      }
-      return o;
-    };
+    const pitch = resample;
     // a recording laid over a synthesized buffer, then normalized together
     const blend = (buf, x, g) => {
       if (!buf || buf.sampleRate !== SR) return buf;
@@ -1474,8 +1515,8 @@ export class AudioEngine {
   }
 
   /**
-   * The WW2 era's recordings over its banks: the cannon and the 76 mm's shots replace the 8.8 cm's synthesis
-   * close up and through distance (as maxgfx's 5in); the period automatic gun is laid over the 3.7 cm's
+   * The WW2 era's recordings over its banks: the field gun's report layered over the 76 mm's shots
+   * (heavyShots) replaces the 8.8 cm's synthesis close up and through distance; the period automatic gun is laid over the 3.7 cm's
    * synthesized "pom"; the .50 cal over the 2 cm's rounds in their loops; three .50 cal bursts out of step
    * and the machine gun's bursts make the fighters' strafing near; the distant explosions make the 8.8 cm's
    * bursts heard from far off.
@@ -1487,7 +1528,10 @@ export class AudioEngine {
     const rng = mulberry(4343);
     const ROLL = { count: 18, t0: 0.25, t1: 3.2, gain: 0.55, f: 380 };
     const ROLL_SMALL = { count: 14, t0: 0.12, t1: 1.6, gain: 0.45, f: 700 };
-    const heavy = [...cut('cannon'), ...cut('gun76')];
+    // the 8.8 cm built in layers from the field gun and the 76 mm (heavyShots); without the field gun, the
+    // cannon and the 76 mm as they are
+    const crack = cut('fieldgun'), g76 = cut('gun76');
+    const heavy = crack.length && g76.length ? heavyShots(SR, rng, crack, g76) : [...cut('cannon'), ...g76];
     if (heavy.length && B.g88) {
       B.g88.near = heavy.map((x) => make([Float32Array.from(x)]));
       B.g88.mid = heavy.map((x) => make(distant(SR, rng, x, 'mid', { len: 3.2, roll: ROLL })));
@@ -1632,6 +1676,21 @@ export class AudioEngine {
       g.setTargetAtTime(depth, now, 0.004);
       g.setTargetAtTime(1, now + time * 0.25, time * 0.45);
     }
+  }
+
+  /**
+   * Hearing dulled by a heavy gun fired right beside the listener: 30 ms after the round (its crack gets
+   * through) the world's highs drop `octaves`, then come back over about `time` seconds. A weaker round never
+   * cuts short a stronger one's dulling.
+   */
+  deafen(octaves, time) {
+    const now = this.ctx.currentTime, D = this.deaf;
+    if (D && octaves <= D.oct * Math.exp(-Math.max(0, now - D.at) / D.tau)) return;
+    const d = this.ears.detune, at = now + 0.03, tau = time * 0.35;
+    d.cancelScheduledValues(now);
+    d.setTargetAtTime(-1200 * octaves, at, 0.012);
+    d.setTargetAtTime(0, at + 0.09, tau);
+    this.deaf = { oct: octaves, at: at + 0.09, tau };
   }
 
   throttled(name, gap) {
@@ -1960,6 +2019,7 @@ export class AudioEngine {
       this.playBuf(r, this.variant(this.bank[S.bank], r.d, S.near, S.mid), { rate: (S.rate ?? 1) * (0.95 + Math.random() * 0.1) });
       this.finish(r);
       if (r.d < S.close) this.duck(0.45 + 0.4 * (r.d / S.close), 0.5, true);
+      if (S.deafen && r.d < S.close) this.deafen(S.deafen * (1 - r.d / S.close) ** 2, S.ring);
     }, MAX_DELAY_WW2);
   }
 

@@ -1255,9 +1255,13 @@ start and on every switch): 'g88' (8.8 cm), 'g37' (3.7 cm), 'g20' and 'g20v' (th
 engines 'merlin' (P-51, the reconnaissance Spitfire), 'r2800' (P-47), 'sabre' (Typhoon, Tempest), 'twin'
 (A-26: two R-2800 a cycle apart in the loop, so they beat), 'four' (B-17: four Cyclones). A bomber stream's
 aircraft past the eight engine voices drone on as one bed (`THREATS[type].drone`). Recordings (RECORDINGS with
-`era: 'ww2'`, public/audio/CREDITS.md): the cannon shot and Yle's 76 mm shots replace the 8.8 cm's synthesis,
-the period automatic gun is laid over the 3.7 cm's, the .50 cal over the 2 cm's rounds, three .50 cal bursts out
-of step and a machine gun's bursts are the strafing, the distant explosions the bursts' far crump. A gun
+`era: 'ww2'`, public/audio/CREDITS.md): InMotionAudio's field gun laid over Yle's 76 mm shots with a sub thump and
+the rolling echo (`heavyShots`, six takes; without the field gun the cannon shot and the 76 mm as they are)
+replace the 8.8 cm's synthesis near, mid and far, the period automatic gun is laid over the 3.7 cm's, the .50 cal
+over the 2 cm's rounds, three .50 cal bursts out of step and a machine gun's bursts are the strafing, the distant
+explosions the bursts' far crump. A heavy gun's round within `SHOTS[kind].close` of the listener also dulls the
+world (`deafen`: the `ears` low-pass, between every bus but the consoles' and the mix, drops `deafen` octaves
+scaled by (1 - d / close)^2 and comes back over `ring` seconds; 8.8 cm 3.5 octaves, 1.6 s; 12.8 cm 4, 2 s). A gun
 position's idle (`vehicle(kind)`): the battery's generator far off, the platoons only the wind.
 
 Text (eras/ww2.js `text`): `loading` (the loading screen's lines), `spent` (the end screen's rounds line),
@@ -1444,7 +1448,8 @@ audio.ui(name);                       // 'click' | 'switch' | 'button' | 'alarm'
 audio.setVolume(v); audio.setMusicVolume(v); audio.toggleMute();
 // the WW2 era ("WW2 era", Render, fx and audio): its banks are rendered and its recordings fetched once it is set
 audio.setEra(id);                     // main.js at start and on every switch of era
-audio.shot(kind, pos);                // '88mm' | '37mm': one round, heard late with its distance
+audio.shot(kind, pos);                // '88mm' | '128mm' | '37mm': one round, heard late with its distance; a heavy one close by deafens
+audio.deafen(octaves, time);          // the world's highs (not the consoles') down `octaves` 30 ms on, back over about `time` s
 audio.rattle(id, on, pos, shell);     // a 2 cm gun ('20mm-flak38' | '20mm-vierling'), on and off as the sound arrives
 audio.stopRattles();                  // every 2 cm loop off (a new battle)
 audio.flak(pos); audio.pop(pos);      // an 8.8 cm burst; a 3.7 cm round's self-destruct
@@ -1579,3 +1584,4 @@ Reuse the maxgfx engine core (distance delay, air absorption, voice stealing, re
 - Shader warm-up (main.js `warmUp(full)`): the programs are compiled with the scene pass's HDR target bound (`post.scenePass.rt`). three.js keys a program on its target (tone mapping, output colour space), and the old `compileAsync` against the screen made variants the game never draws, so every material compiled again the first time the camera saw it (20 programs on the first move from the battery to the flak towers). On the loading card it then draws one frame with every object shown and none frustum culled (lights untouched: their count is in every program), which makes the shadow-depth programs and uploads the textures and geometry; it waits for the WW2 crews' module (`views.crewing`) first. In that frame every shadow caster's `onBeforeShadow` marks the depth material changed: three.js shares one depth material between the casters and sets its side and map per caster without a version bump, so otherwise which depth variants get made depends on the draw order (two were still made in play). `newBattle` compiles only. fx.js builds the crater decals' mesh in its constructor instead of with the first crater.
 - Quality presets (main.js `QUALITY`): `pixels`, the most the 3D view renders in megapixels (Low 0.6, Medium 1.1, High 2, Ultra 4.2); `basePixelRatio()` is the least of the device pixel ratio, the preset's `pixelRatio` and the ratio that fits the budget, so at native 4K (a 1920x2160 view) Medium renders about 990x1110 and the browser scales it up, at the cost of a 1080p screen. A resize reapplies it (`applyPixelRatio`).
 - Dynamic resolution is a ladder: over budget (`frameAvg` > 20 ms, checked every 1.5 s) the landscape gives up a step of detail first (terrain.js `SHED`, `terrain.setQuality(name, shed)`: half the grass (`grass.thin`), 0.6 of the preset's tree density (a replant), no tree shadows (`trees.setShadows`), a fifth of the grass), then the resolution drops 0.1 at a time to 0.5; under 13.5 ms the resolution comes back first (0.05 a step), then the landscape. The models are never simplified, so the guns stay sharp longest. F3 shows the step.
+- Audio (WW2): the 8.8 cm's report is built in layers from recordings (`heavyShots`, exported: InMotionAudio's field gun `fieldgun`, CC0, over Yle's 76 mm, a sub thump, the rolling echo; six takes), replacing the cannon shot and the 76 mm as they were. New `ears` low-pass between every bus but `uiBus` and the mix, `deafen(octaves, time)`, `SHOTS[kind].deafen` and `ring` for '88mm' and '128mm'. `/audio.html` has WW2 buttons (era, 8.8 cm and 12.8 cm at 20, 1500 and 6000 m, a salvo at 30 m) and keeps calling `update` once a button is pressed.
