@@ -7,7 +7,83 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 fill=%22%23111%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2211%22 fill=%22none%22 stroke=%22%2377e08a%22 stroke-width=%222.5%22/%3E%3Cpath d=%22M16 4v24M4 16h24%22 stroke=%22%2377e08a%22 stroke-width=%221.5%22/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body class="title">
+  <body>
+    <!-- the main menu (ui/menu.js): DOM only, nothing of the world is built until a game is started -->
+    <div id="menu" hidden>
+      <div id="title-screen">
+        <div class="brand">
+          <h1>ECHELON</h1>
+          <p class="sub" id="title-sub"></p>
+          <p class="blurb" id="title-blurb"></p>
+        </div>
+        <div id="options">
+          <div id="era-box">
+            <div id="era" role="radiogroup" aria-label="Era"></div>
+            <p id="era-desc"></p>
+          </div>
+          <div id="difficulty" role="radiogroup" aria-label="Difficulty">
+            <button type="button" role="radio" data-d="Easy">Easy</button>
+            <button type="button" role="radio" data-d="Normal">Normal</button>
+            <button type="button" role="radio" data-d="Hard">Hard</button>
+          </div>
+          <div id="loadout-box">
+            <div class="lo-head"><b>Loadout</b><span>each unit or an alternative of its class</span></div>
+            <div id="loadout"></div>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="play" type="button">Take command</button>
+          <button id="tutorials" type="button">Tutorials</button>
+        </div>
+        <ul class="keys">
+          <li><kbd>1</kbd>-<kbd>5</kbd> select unit</li>
+          <li><kbd>Drag</kbd> orbit</li>
+          <li><kbd>Wheel</kbd> zoom</li>
+          <li><kbd>F</kbd> chase the unit's latest missile</li>
+          <li><kbd>C</kbd> free camera</li>
+          <li><kbd>V</kbd> padlock the selected track</li>
+          <li><kbd>M</kbd> mute</li>
+          <li><kbd>[</kbd> <kbd>]</kbd> time compression</li>
+          <li><kbd>H</kbd> hide overlay</li>
+          <li><kbd>F3</kbd> stats</li>
+        </ul>
+      </div>
+
+      <div id="tut-menu">
+        <h2>Tutorials</h2>
+        <p class="tm-sub">Short guided lessons on a quiet range. Nothing is scored and nothing is destroyed.</p>
+        <div id="tut-list"></div>
+        <button id="tut-back" type="button">Back</button>
+      </div>
+    </div>
+
+    <!-- a game page's loading screen (ui/loading.js): what is being started, while the world builds behind it -->
+    <div id="loading" hidden>
+      <div class="ld-card">
+        <header class="ld-head"><small class="ld-kicker"></small><span class="ld-diff"></span></header>
+        <h2 class="ld-title"></h2>
+        <p class="ld-blurb"></p>
+        <ul class="ld-lines"></ul>
+        <div id="load-bar"><div id="load-bar-fill"></div></div>
+        <p id="status">Loading</p>
+        <footer class="ld-foot">
+          <ul class="keys">
+            <li><kbd>1</kbd>-<kbd>5</kbd> select unit</li>
+            <li><kbd>Drag</kbd> orbit</li>
+            <li><kbd>Wheel</kbd> zoom</li>
+            <li><kbd>F</kbd> chase the unit's latest missile</li>
+            <li><kbd>C</kbd> free camera</li>
+            <li><kbd>V</kbd> padlock the selected track</li>
+            <li><kbd>M</kbd> mute</li>
+            <li><kbd>[</kbd> <kbd>]</kbd> time compression</li>
+            <li><kbd>H</kbd> hide overlay</li>
+            <li><kbd>F3</kbd> stats</li>
+          </ul>
+          <a class="ld-back" href="/">Back to the menu</a>
+        </footer>
+      </div>
+    </div>
+
     <div id="view">
       <canvas id="c"></canvas>
 
@@ -29,58 +105,8 @@
           <h2 id="end-title">Airbase held</h2>
           <p id="end-sub"></p>
           <div id="end-stats"></div>
-          <button id="end-restart">Fight again</button>
+          <div class="end-actions"><button id="end-restart">Fight again</button><button id="end-menu" class="quiet">Main menu</button></div>
         </div>
-      </div>
-
-      <div id="title-screen">
-        <div class="brand">
-          <h1>ECHELON</h1>
-          <p class="sub" id="title-sub">Layered air defense</p>
-          <p class="blurb" id="title-blurb">An S-400 battalion, two Pantsir-S1, an Osa and a Strela-10 stand between the airbase and the raids, or the alternatives you pick for them. The long layer sees them first; the short layer catches what leaks through.</p>
-        </div>
-        <div class="loader">
-          <div id="load-bar"><div id="load-bar-fill"></div></div>
-          <p id="status">Surveying the steppe</p>
-        </div>
-        <div id="options">
-          <div id="era-box">
-            <div id="era" role="radiogroup" aria-label="Era"></div>
-            <p id="era-desc"></p>
-          </div>
-          <div id="difficulty">
-            <button data-d="Easy">Easy</button>
-            <button data-d="Normal" class="on">Normal</button>
-            <button data-d="Hard">Hard</button>
-          </div>
-          <div id="loadout-box">
-            <div class="lo-head"><b>Loadout</b><span>each unit or an alternative of its class</span></div>
-            <div id="loadout"></div>
-          </div>
-        </div>
-        <div class="actions">
-          <button id="play" disabled>Take command</button>
-          <button id="tutorials" disabled>Tutorials</button>
-        </div>
-        <ul class="keys">
-          <li><kbd>1</kbd>-<kbd>5</kbd> select unit</li>
-          <li><kbd>Drag</kbd> orbit</li>
-          <li><kbd>Wheel</kbd> zoom</li>
-          <li><kbd>F</kbd> chase the unit's latest missile</li>
-          <li><kbd>C</kbd> free camera</li>
-          <li><kbd>V</kbd> padlock the selected track</li>
-          <li><kbd>M</kbd> mute</li>
-          <li><kbd>[</kbd> <kbd>]</kbd> time compression</li>
-          <li><kbd>H</kbd> hide overlay</li>
-          <li><kbd>F3</kbd> stats</li>
-        </ul>
-      </div>
-
-      <div id="tut-menu">
-        <h2>Tutorials</h2>
-        <p class="tm-sub">Short guided lessons on a quiet range. Nothing is scored and nothing is destroyed.</p>
-        <div id="tut-list"></div>
-        <button id="tut-back">Back</button>
       </div>
 
       <div id="tut-card">
@@ -97,12 +123,13 @@
         </div>
       </div>
 
+      <button id="return-menu" type="button" title="Leave the battle for the main menu">Main menu</button>
       <button id="gear" title="Settings">&#9881;</button>
       <div id="gui-host"></div>
     </div>
 
     <div id="panel"><div class="placeholder">CONSOLE OFFLINE</div></div>
 
-    <script type="module" src="/src/main.js"></script>
+    <script type="module" src="/src/boot.js"></script>
   </body>
 </html>

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { crewGeometry, crewMaterial, crewDepthMaterial, ROW_W, T_TINT, T_MASK, T_BUILD, PART, TINT, JOINT, GRIP } from './figure44.js';
-import { spec, resetSpec, solve, writeBones, newBody, boneToRoot, propGrips } from './pose44.js';
-import { JOBS, ROLES, prepareRig } from './jobs44.js';
+import { spec, resetSpec, solve, writeBones, newBody, boneToRoot, propGrips, reachFix } from './pose44.js';
+import { JOBS, ROLES, REACT, prepareRig } from './jobs44.js';
 import { mulberry32 } from '../../../noise.js';
 
 // German flak crews for the WW2 era (Fliegerhorst Hopsten, February to March 1945): a man at every crew spot
@@ -42,6 +42,15 @@ import { mulberry32 } from '../../../noise.js';
 //                                              sight); pass the engaged aircraft for a livelier picture
 //   h.setVisible(on), h.setStance('action' | 'easy')  stand down between raids ('easy': at ease, props put
 //                                              away, the seated men sitting back)
+//   h.setGun(gun, dt, { barrelGun })           every frame: the gun's sim state (part.gun: shots, load,
+//                                              loaded, table, barrels[].change) and the sim's dt, for the
+//                                              loading drills and the flinch (jobs44.js); barrelGun maps a
+//                                              barrel to the rig's gun (the Vierling's). h.drill holds the
+//                                              clock: since (s since the last shot), load (0..1 the round
+//                                              into the breech or the clip onto the table, 1 when done),
+//                                              loading, done (s since the last loading ended), loads (how
+//                                              many have), change[gun] (0..1 a 2 cm magazine change, -1
+//                                              none), after[gun] (s since that gun's last change ended)
 //   h.man(job)                                 one man (below); h.men all of them
 //   h.remove() or crews.remove(h)              take the crew off (a new battle, a knocked-out gun)
 //   crews.clear(), crews.dispose(), crews.stats() -> { men, drawn, near, far, solved, draws, triangles }
@@ -59,16 +68,73 @@ import { mulberry32 } from '../../../noise.js';
 //   m.at = { x, y, z, heading }                stand him somewhere else (world; walking away from the spot)
 //   m.loop = { name, t }                       a cycle the scene drives (walk, sidestep), same as m.pose
 //   m.visible = false                          hide him (killed, gone for ammunition)
+// A job's pose may set S.turn (radians from his spot's facing): he turns there on his spot over the next
+// frames (the drills turn a loader from the man handing him a round to the breech).
 //   m.handWorld('L' | 'R', out), m.propPose(out: Matrix4)   where his hands and his prop are (world)
 
 export const NEAR = 42; // m: the near level of detail out to here
 export const FAR = 1600; // m: not drawn beyond
-const CAP = 256; // men the layer can hold (the battery and three platoons are 137)
+const CAP = 384; // men the layer can hold (the battery and three platoons are 137; with the flak towers 259)
 
 const V3 = THREE.Vector3;
 const _m = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _v = new V3(), _v2 = new V3(), _q = new THREE.Quaternion(), _s = new V3();
 const _frustum = new THREE.Frustum(), _sphere = new THREE.Sphere(), _pv = new THREE.Matrix4();
 const S = spec();
+const wrapAngle = (a) => { a = (a + Math.PI) % (Math.PI * 2); return (a < 0 ? a + Math.PI * 2 : a) - Math.PI; };
+const clampAbs = (x, k) => (x > k ? k : x < -k ? -k : x);
+
+// Secondary motion: the job's pose is the target, and the hips, the spine and chest, the neck and the head
+// follow it through damped springs ([stiffness rad/s, damping ratio]): the body trails the hands a little
+// and settles with a small overshoot, the head last. The arms are solved after it, so the hands still land
+// where the job puts them.
+const SPRING = { hips: [13, 0.8], torso: [15, 0.74], head: [10.5, 0.6] };
+const SPRING_DT = 1 / 60;
+const _qa = new THREE.Quaternion(), _qd = new THREE.Quaternion(), _w = new V3(), _dv = new V3();
+function springPose(m, S, dt) {
+  const T = [S.hipsQ, S.spineQ, S.chestQ, S.neckQ, S.headQ];
+  let sp = m.spr;
+  if (!sp) sp = m.spr = { hips: new V3(), hv: new V3(), q: T.map(() => new THREE.Quaternion()), w: T.map(() => new V3()), init: false };
+  // a jump (first solve, a far man solved seldom, a new placement): take the pose as it is
+  if (!sp.init || dt > 0.2) {
+    sp.hips.copy(S.hips); sp.hv.set(0, 0, 0);
+    T.forEach((q, i) => { sp.q[i].copy(q); sp.w[i].set(0, 0, 0); });
+    sp.init = true;
+    return;
+  }
+  const n = Math.max(1, Math.ceil(dt / SPRING_DT)), h = dt / n;
+  const [hk, hz] = SPRING.hips;
+  for (let k = 0; k < n; k++) {
+    _dv.subVectors(S.hips, sp.hips).multiplyScalar(hk * hk).addScaledVector(sp.hv, -2 * hz * hk);
+    sp.hv.addScaledVector(_dv, h);
+    sp.hips.addScaledVector(sp.hv, h);
+    for (let i = 0; i < T.length; i++) {
+      const [w0, z] = i === 0 ? SPRING.hips : i < 3 ? SPRING.torso : SPRING.head;
+      // the rotation still to go, as a vector (axis times angle), and the angular velocity toward it
+      _qd.copy(T[i]).multiply(_qa.copy(sp.q[i]).invert());
+      if (_qd.w < 0) { _qd.x = -_qd.x; _qd.y = -_qd.y; _qd.z = -_qd.z; _qd.w = -_qd.w; }
+      const sn = Math.sqrt(_qd.x * _qd.x + _qd.y * _qd.y + _qd.z * _qd.z), ang = 2 * Math.atan2(sn, _qd.w);
+      _w.set(_qd.x, _qd.y, _qd.z).multiplyScalar(sn > 1e-6 ? ang / sn : 2);
+      sp.w[i].addScaledVector(_w, w0 * w0 * h).multiplyScalar(1 - Math.min(1, 2 * z * w0 * h));
+      const a = sp.w[i].length() * h;
+      if (a > 1e-7) { _qa.setFromAxisAngle(_w.copy(sp.w[i]).normalize(), a); sp.q[i].premultiply(_qa); }
+    }
+  }
+  S.hips.copy(sp.hips);
+  T.forEach((q, i) => q.copy(sp.q[i]));
+}
+
+// Stepping while he turns on his spot: the feet lift in turn (a step about every 0.3 s), the hips dip a little
+// with each, instead of the whole man turning like a statue on a turntable
+function stepTurning(m, S, dt) {
+  const st = m.st, rate = Math.abs(st.turnRate ?? 0);
+  st.stepK = (st.stepK ?? 0) + ((rate > 0.35 ? 1 : 0) - (st.stepK ?? 0)) * Math.min(1, dt * 10);
+  if (st.stepK < 0.02) { st.stepPh = 0; return; }
+  st.stepPh = (st.stepPh ?? 0) + dt * 3.4 * Math.PI;
+  const c = Math.sin(st.stepPh), k = st.stepK;
+  S.feet[0].ankle.y += Math.max(0, c) * 0.07 * k;
+  S.feet[1].ankle.y += Math.max(0, -c) * 0.07 * k;
+  S.hips.y -= Math.abs(c) * 0.018 * k;
+}
 
 // ---------------------------------------------------------------- outfits
 
@@ -325,7 +391,10 @@ export class Crew44 {
     if (!done) {
       if (h.stance === 'easy' && m.def.easy) m.def.easy(ctx, m, S);
       else m.def.pose(ctx, m, S);
+      // how he takes a shot from his gun (jobs44.js REACT: a flinch at the heavy guns)
+      if (h.stance !== 'easy') REACT[h.kind]?.(ctx, m, S);
     }
+    m.st.turnTo = S.turn ?? 0;
     // what he holds shows only while a pose holds it (a library pose or the easy stance puts it away)
     const prop = S.prop.on ? want : null;
     if (prop !== m.propNow) { m.propNow = prop; this.writeLook(m); }
@@ -336,7 +405,10 @@ export class Crew44 {
       propGrips(S);
     }
     ctx.finishHands(S);
-    const blend = m.pose && m.pose.blend != null ? m.pose.blend : 1;
+    if (!m.loop && !m.spot.userData.seated) { stepTurning(m, S, dt); reachFix(S, m.body.g); }
+    springPose(m, S, dt);
+    // a drill man eases into each pose (def.ease, 1/s), so a drill that starts over mid-move does not jump
+    const blend = m.pose && m.pose.blend != null ? m.pose.blend : m.def.ease && m.last >= 0 ? 1 - Math.exp(-m.def.ease * dt) : 1;
     solve(S, m.body, blend);
     writeBones(m.body, this.data, m.row * ROW_W * 4);
     this.dirty.add(m.row);
@@ -353,11 +425,34 @@ class Handle {
   constructor(layer, rig, kind, R) {
     this.layer = layer; this.rig = rig; this.kind = kind; this.R = R; // R: the rig's prepared parts (jobs44.js)
     this.men = []; this.visible = true; this.stance = 'action'; this.target = null; this.ready = false;
+    this.drill = { shots: null, since: Infinity, load: 1, loading: false, done: Infinity, loads: 0, dur: 1, last: 0, change: [], after: [], cdur: [], clast: [] };
   }
   man(job) { return this.men.find((m) => m.job === job) || null; }
   setTarget(p) { this.target = p ? (this.target || new V3()).copy(p) : null; }
   setVisible(on) { this.visible = !!on; }
   setStance(s) { this.stance = s === 'easy' ? 'easy' : 'action'; }
+  // The drill clock from the gun's sim state (see the API above). A loading's or a change's length is the
+  // value its countdown started from (the sim varies it from one round to the next).
+  setGun(g, dt = 0, { barrelGun = null } = {}) {
+    const d = this.drill;
+    if (!g) return;
+    if (d.shots !== g.shots) { if (d.shots != null) d.since = 0; d.shots = g.shots; } else d.since += dt;
+    const load = g.load ?? 0;
+    if (load > d.last + 1e-6) d.dur = Math.max(0.1, load);
+    d.last = load;
+    if (load > 0) d.done = 0;
+    else { if (d.loading) d.loads++; d.done += dt; }
+    d.loading = load > 0;
+    d.load = d.loading ? Math.min(1, Math.max(0, 1 - load / d.dur)) : 1;
+    (g.barrels || []).forEach((b, k) => {
+      const i = barrelGun ? barrelGun[k] ?? k : k, c = b.change ?? 0;
+      if (c > (d.clast[i] ?? 0) + 1e-6) d.cdur[i] = Math.max(0.1, c);
+      if (c <= 0 && (d.clast[i] ?? 0) > 0) d.after[i] = 0;
+      else d.after[i] = (d.after[i] ?? Infinity) + dt;
+      d.clast[i] = c;
+      d.change[i] = c > 0 ? Math.min(1, Math.max(0, 1 - c / d.cdur[i])) : -1;
+    });
+  }
   remove() { this.layer.remove(this); }
   // the rig's matrices for this frame (only the nodes the jobs read)
   prepare() { this.R.update(this.rig); }
@@ -372,6 +467,13 @@ class Handle {
       const dy = this.R.dy.get(m.spot);
       if (dy) m.W.elements[13] += dy;
       if (m.def.place) m.def.place(this, m, dt); // follow the mount, turn toward the target
+      // a turn on his spot that his pose asked for (S.turn), at a walking pace
+      const st = m.st, to = st.turnTo ?? 0;
+      if (st.turn == null) st.turn = to;
+      const step = clampAbs(wrapAngle(to - st.turn), 3.2 * dt);
+      st.turn += step;
+      st.turnRate = dt > 0 ? step / dt : 0;
+      if (st.turn) m.W.multiply(_m.makeRotationY(st.turn));
       m.W.multiply(_m.makeScale(sc, sc, sc));
     }
     m.inv.copy(m.W).invert();

@@ -11,9 +11,10 @@ import { PostFX, GRADES } from './post.js';
 import { FX, SMOKE } from './fx.js';
 import { HUD } from './hud.js';
 import { ChaseCamera } from './camera.js';
-import { UNITS, SLOT_OPTIONS, DEFAULT_LOADOUT, ERA, setEra as deployEra } from './deploy.js';
-import { ERAS, eraById, playableEra, loadEra } from './eras/index.js';
-import { heightAt, los } from './terrain.js';
+import { UNITS, DEFAULT_LOADOUT, ERA, setEra as deployEra } from './deploy.js';
+import { ERAS, eraById, loadEra } from './eras/index.js';
+import { ERA_KEY, store, migrateLoadout, canPlay, startEra, validLoadout, keptLoadout, keepLoadout, keptDifficulty, menuHref } from './choices.js';
+import { heightAt, los, SHED_MAX } from './terrain.js';
 import { Sim } from './sim/sim.js';
 import { SYSTEMS, THREATS, MISSILES } from './sim/systems.js';
 import { buildInterceptor } from './models/threats.js';
@@ -22,13 +23,17 @@ import { Entities } from './render/entities.js';
 import { SightRenderer, sightPose } from './sight.js';
 import { Panel } from './ui/panel.js';
 import { AudioEngine } from './audio.js';
-import { Tutorials } from './tutorial.js';
+import { Tutorials, TUTORIALS } from './tutorial.js';
+import { hideLoading } from './ui/loading.js';
+import { setBakeRenderer } from './models/ao.js';
 
+// pixels: the most the 3D view renders, in megapixels (Medium about what it has on a 1080p screen, so a
+// 4K screen costs no more and is scaled up); pixelRatio caps it on small high-density screens
 const QUALITY = {
-  Low: { pixelRatio: 0.75, shadowMap: 2048, shadowExtent: 100, ao: false, raySamples: 16, dofSamples: 16, fx: 0.5, maxSmoke: 3500 },
-  Medium: { pixelRatio: 1, shadowMap: 2048, shadowExtent: 120, ao: true, raySamples: 32, dofSamples: 32, fx: 0.75, maxSmoke: 5500 },
-  High: { pixelRatio: 1.5, shadowMap: 4096, shadowExtent: 140, ao: true, raySamples: 48, dofSamples: 48, fx: 1, maxSmoke: 7000 },
-  Ultra: { pixelRatio: 2, shadowMap: 4096, shadowExtent: 160, ao: true, raySamples: 64, dofSamples: 64, fx: 1.25, maxSmoke: 9000 },
+  Low: { pixelRatio: 0.75, pixels: 0.6, shadowMap: 2048, shadowExtent: 100, ao: false, raySamples: 16, dofSamples: 16, fx: 0.5, maxSmoke: 3500 },
+  Medium: { pixelRatio: 1, pixels: 1.1, shadowMap: 2048, shadowExtent: 120, ao: true, raySamples: 32, dofSamples: 32, fx: 0.75, maxSmoke: 5500 },
+  High: { pixelRatio: 1.5, pixels: 2, shadowMap: 4096, shadowExtent: 140, ao: true, raySamples: 48, dofSamples: 48, fx: 1, maxSmoke: 7000 },
+  Ultra: { pixelRatio: 2, pixels: 4.2, shadowMap: 4096, shadowExtent: 160, ao: true, raySamples: 64, dofSamples: 64, fx: 1.25, maxSmoke: 9000 },
 };
 const TIME_SCALES = [0.25, 0.5, 1, 2, 4, 8];
 
@@ -38,11 +43,10 @@ const step = async (p, msg) => {
   hud.setLoading(p, msg);
   await tick();
 };
+// The page is a game (src/boot.js): a battle (?play=1) or a lesson (?tutorial=<id>), its era, difficulty
+// and loadout from the URL or as the main menu kept them (choices.js). It goes back to the menu to change
+// them (toMenu).
 const query = new URLSearchParams(location.search);
-// Development override: with ?dev=1 an era still in development (`available: false`) can be played, from
-// ?era=<id> or __iads.setEra(id); the menu still shows it greyed out and it is never kept in storage.
-const DEV = query.get('dev') === '1';
-const canPlay = (era) => !!era && (era.available || DEV);
 
 const KILL_NAME = { fighter: 'fighter', decoy: 'decoy', cruise: 'cruise missile', drone: 'drone', arm: 'ARM', glide: 'glide bomb', helo: 'helicopter', atgm: 'ATGM', tbm: 'ballistic missile' };
 const CLS_SHORT = { aircraft: 'AC', cruise: 'CM', drone: 'UAV', arm: 'ARM', tbm: 'TBM', helo: 'HELO', bomb: 'BOMB', decoy: 'DCY', atgm: 'ATGM', unknown: '?' };
@@ -83,54 +87,9 @@ const BRASS = {
 };
 
 // ---------------------------------------------------------------- era and loadout
-// The era (src/eras) and, for each era, the loadout the title screen's picker chose (one option per slot
-// of its SLOT_OPTIONS; the slots' classes, short names and trade-offs come from the era's `slots`) are
-// kept in local storage: `echelon.era` and `echelon.loadout.<era>`. Before there were eras the loadout
-// was kept under `echelon.loadout`: it was the modern era's and moves to its key.
-const ERA_KEY = 'echelon.era';
-const LOADOUT_KEY = 'echelon.loadout';
-const loadoutKey = (era) => `${LOADOUT_KEY}.${era}`;
-const stored = (key) => {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null; // private mode
-  }
-};
-const store = (key, value) => {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // private mode: the choice lasts until the page is reloaded
-  }
-};
-const migrateLoadout = () => {
-  try {
-    const old = localStorage.getItem(LOADOUT_KEY);
-    if (old === null) return;
-    if (localStorage.getItem(loadoutKey('modern')) === null) localStorage.setItem(loadoutKey('modern'), old);
-    localStorage.removeItem(LOADOUT_KEY);
-  } catch {
-    // private mode: nothing was kept
-  }
-};
-// one offered kind per slot of the era in play, the slot's default for anything else
-const validLoadout = (kinds) => SLOT_OPTIONS.map((opts, i) => (opts.some((o) => o.kind === kinds?.[i]) ? kinds[i] : opts[0].kind));
-// the loadout kept for the era in play; `q` (the ?loadout= parameter: kinds in slot order, or 'alt' for
-// every alternative) overrides it without being kept
-const savedLoadout = (q = null) => {
-  if (q) return validLoadout(q === 'alt' ? SLOT_OPTIONS.map((o) => o[1]?.kind) : q.split(','));
-  try {
-    return validLoadout(JSON.parse(stored(loadoutKey(ERA.id)) || 'null'));
-  } catch {
-    return [...DEFAULT_LOADOUT];
-  }
-};
-// The era's look on the page: the title screen's text and the class `era-<theme>` for its CSS (the
-// console panel takes the same class, Panel.setTheme).
+// The era's look on the page: the class `era-<theme>` for its CSS (the console panel takes the same
+// class, Panel.setTheme).
 const applyEraLook = () => {
-  document.getElementById('title-sub').textContent = ERA.text.sub;
-  document.getElementById('title-blurb').textContent = ERA.text.blurb;
   for (const c of [...document.body.classList]) if (c.startsWith('era-')) document.body.classList.remove(c);
   document.body.classList.add(`era-${ERA.theme}`);
 };
@@ -142,15 +101,22 @@ const LOADING = ['Painting the sky', 'Surveying the steppe', 'Laying out the air
 const _p = new THREE.Vector3();
 
 async function init() {
-  // The era: `?era=` (not kept), else the one kept, else the default; one still in development falls back
-  // to the default. Its own modules load first (none for the modern era, whose modules the registries
-  // import statically) and its layout is in place before the terrain levels its pads.
+  // The era: a lesson's own, else `?era=` (not kept), else the one kept, else the default; one still in
+  // development falls back to the default (choices.js startEra). Its own modules load first (none for the
+  // modern era, whose modules the registries import statically) and its layout is in place before the
+  // terrain levels its pads.
   migrateLoadout();
-  const asked = eraById(query.get('era'));
-  const startEra = DEV && asked ? asked.id : playableEra(query.get('era') ?? stored(ERA_KEY));
-  await loadEra(startEra);
-  deployEra(startEra);
+  const startId = startEra(query);
+  await loadEra(startId);
+  deployEra(startId);
   applyEraLook();
+  // the lesson this page runs (?tutorial=), one of the era's; an unknown one goes back to the menu's list
+  const lessonId = query.get('tutorial');
+  const lesson = lessonId ? TUTORIALS.find((d) => d.id === lessonId && ERA.tutorials.includes(d.id)) : null;
+  if (lessonId && !lesson) {
+    location.replace(menuHref(query, { lessons: true }));
+    return;
+  }
 
   const view = document.getElementById('view');
   const canvas = document.getElementById('c');
@@ -164,6 +130,7 @@ async function init() {
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.shadowMap.autoUpdate = false;
   renderer.info.autoReset = false;
+  setBakeRenderer(renderer); // baked occlusion for the rigs built from here on (models/ao.js)
 
   const scene = new THREE.Scene();
   // far enough for the ridges and the horizon haze; the near plane suits a camera 8 m from a vehicle
@@ -186,12 +153,13 @@ async function init() {
   const weather = new Weather(scene, null);
 
   // ---------------------------------------------------------------- the battle
-  // The sim runs a demonstration battle (attract mode: nothing scored, nothing destroyed) behind the
-  // title screen; Take command starts the real one. Vehicles, buildings and everything that flies are
-  // drawn from its state (src/render), its events drive fx, sound and the HUD.
+  // The sim is set up for the game this page plays (the battle, or the lesson's scripted range) so that
+  // the warm-up below builds and compiles its vehicles; start() or the lesson begins it afresh. Vehicles,
+  // buildings and everything that flies are drawn from its state (src/render), its events drive fx,
+  // sound and the HUD.
   const sim = new Sim({ heightAt, los, scene, seed: (Math.random() * 1e9) | 0 });
-  const loadout = savedLoadout(query.get('loadout'));
-  sim.newGame({ attract: true, loadout });
+  const loadout = keptLoadout(ERA, query.get('loadout'));
+  sim.newGame(lesson ? { scripted: true, loadout: lesson.loadout ?? DEFAULT_LOADOUT } : { difficulty: keptDifficulty(query), loadout });
   const views = new UnitViews(scene, sim);
   const entities = new Entities(scene);
   // the camera anchors by unit id (rebuilt with the rigs when the loadout changes)
@@ -223,7 +191,7 @@ async function init() {
     quality: startQuality,
     dynamicRes: true,
     timeScale: 1,
-    difficulty: 'Normal',
+    difficulty: keptDifficulty(query),
     era: ERA.id,
     loadout,
     fov: 50,
@@ -270,16 +238,19 @@ async function init() {
   };
   applySky();
   let resScale = 1;
-  let state = 'title'; // title | playing | ended | tutorial
+  let shed = 0; // steps of detail the landscape has given up (dynamic resolution, terrain.js SHED)
+  let state = 'loading'; // loading | playing | ended | tutorial
   let freeCam = false;
   let selected = 0;
   let padlock = false;
   let preDist = 28;
   let following = false; // the camera is on a missile (F)
-  let cineClock = 0; // title screen: seconds since the last cut
   let gunFlip = 0;
 
-  const basePixelRatio = () => Math.min(devicePixelRatio, QUALITY[params.quality].pixelRatio);
+  const basePixelRatio = () => {
+    const q = QUALITY[params.quality];
+    return Math.min(devicePixelRatio, q.pixelRatio, Math.sqrt((q.pixels * 1e6) / (vw * vh)));
+  };
   const applyPixelRatio = () => {
     renderer.setPixelRatio(basePixelRatio() * (params.dynamicRes ? resScale : 1));
     renderer.setSize(vw, vh, false);
@@ -288,6 +259,7 @@ async function init() {
   const applyQuality = (name) => {
     const q = QUALITY[name];
     resScale = 1;
+    shed = 0;
     applyPixelRatio();
     atmosphere.setShadowQuality(q.shadowMap, q.shadowExtent);
     params.ao = q.ao;
@@ -311,7 +283,9 @@ async function init() {
   gui.add(params, 'quality', Object.keys(QUALITY)).name('Quality preset').onChange(applyQuality);
   gui.add(params, 'dynamicRes').name('Dynamic resolution').onChange(() => {
     resScale = 1;
+    shed = 0;
     applyPixelRatio();
+    terrain.setQuality(params.quality);
   });
   const fPlay = gui.addFolder('Game');
   fPlay.add(params, 'difficulty', ['Easy', 'Normal', 'Hard']).name('Difficulty (next game)').listen();
@@ -406,7 +380,6 @@ async function init() {
   // F: chase the selected unit's most recent missile in flight; back to the unit when it ends
   const backToUnit = () => {
     following = false;
-    if (state === 'title') chase.cine(true);
     if (!freeCam) {
       camPart = launcherFor(UNITS[selected].id);
       chase.setTarget(views.eye(UNITS[selected].id, camPart));
@@ -432,18 +405,49 @@ async function init() {
   document.getElementById('ts-down').addEventListener('click', () => stepTime(-1));
   document.getElementById('ts-val').addEventListener('click', () => setTimeScale(1));
 
-  const playBtn = document.getElementById('play');
-  const diffBtns = [...document.querySelectorAll('#difficulty button')];
-  diffBtns.forEach((b) =>
-    b.addEventListener('click', () => {
-      params.difficulty = b.dataset.d;
-      diffBtns.forEach((o) => o.classList.toggle('on', o === b));
-    })
-  );
-  // A new battle (the real one, a tutorial's range or the demonstration): the sim's new game, then the
-  // vehicles stand again; when the loadout changed the vehicles are built anew and everything that
-  // holds onto units (the camera anchors, the console's tabs and consoles) is rebuilt with them. The
-  // caller selects a unit afterwards, which puts the camera on the new rigs.
+  // Shader warm-up: three.js makes a program per material and per kind of render target. The game draws
+  // the scene into the scene pass's HDR target (post.js), where a program has no tone mapping and linear
+  // output, so the programs are compiled against that target (against the screen they would be variants
+  // the game never draws, and every material would compile again the first time the camera saw it).
+  // `full` (the loading screen) then draws one frame with everything shown and nothing culled, into the
+  // view and the shadow map, so the shadow-depth programs, the textures and the geometry go to the GPU
+  // too. The lights stay as they are: their number is part of every program (fx.js keeps a fixed pool).
+  // three.js draws every shadow caster with one shared depth material and sets its side and map per
+  // caster without marking it changed, so which depth variants get made depends on the draw order: in
+  // this frame each caster marks it changed, and every variant in the scene is made.
+  const warmUp = async (full) => {
+    const rt = renderer.getRenderTarget();
+    renderer.setRenderTarget(post.scenePass.rt);
+    const ready = renderer.compileAsync(scene, camera);
+    renderer.setRenderTarget(rt);
+    await ready.catch(() => {});
+    if (!full) return;
+    const shown = [], culled = [], casters = [];
+    scene.traverse((o) => {
+      if (o.isLight) return;
+      if (!o.visible) { o.visible = true; shown.push(o); }
+      if (!(o.isMesh || o.isPoints || o.isLine || o.isSprite)) return;
+      if (o.frustumCulled) { o.frustumCulled = false; culled.push(o); }
+      if (o.castShadow) {
+        const own = Object.hasOwn(o, 'onBeforeShadow'), was = o.onBeforeShadow;
+        casters.push([o, own, was]);
+        o.onBeforeShadow = function (r, ob, cam, shadowCam, geo, depthMaterial, group) {
+          was.call(this, r, ob, cam, shadowCam, geo, depthMaterial, group);
+          depthMaterial.needsUpdate = true;
+        };
+      }
+    });
+    renderer.shadowMap.needsUpdate = true;
+    post.render(0.016);
+    for (const o of shown) o.visible = false;
+    for (const o of culled) o.frustumCulled = true;
+    for (const [o, own, was] of casters) { if (own) o.onBeforeShadow = was; else delete o.onBeforeShadow; }
+  };
+
+  // A new battle (the real one or a tutorial's range): the sim's new game, then the vehicles stand
+  // again; when the loadout changed the vehicles are built anew and everything that holds onto units (the
+  // camera anchors, the console's tabs and consoles) is rebuilt with them. The caller selects a unit
+  // afterwards, which puts the camera on the new rigs.
   const newBattle = (opts) => {
     for (const u of sim.units) if (u.weapons.gun) audio.gun(u.id, false, u.pos);
     audio.stopRattles?.();
@@ -456,140 +460,55 @@ async function init() {
     patchSceneFog(scene);
     takeEyes();
     panel.setUnits();
-    renderer.compileAsync(scene, camera).catch(() => {});
+    warmUp(false);
   };
 
   const start = () => {
     state = 'playing';
     hud.hideEnd();
-    hud.showTitle(false);
-    chase.autoOrbit = 0;
-    chase.cine(false);
     following = false;
     chase.goalDist = 28;
     newBattle({ difficulty: params.difficulty, loadout: params.loadout, seed: (Math.random() * 1e9) | 0 });
     selectUnit(selected);
     hud.toast('Echelon', ERA.text.sub, 3000);
     hud.setScore(0);
-    audio.start();
     audio.vehicle(UNITS[selected].kind);
     audio.mood('brief');
     hud.radio(ERA.text.orders, 'info');
     iads.events.start?.(params.difficulty);
   };
-  playBtn.addEventListener('click', start);
-
-  // The loadout picker, next to the difficulty: a row per slot of the era in play with its options and
-  // the chosen one's trade-off (another's while the pointer is on it). A change on the title screen
-  // rebuilds the demonstration battle with it and cuts to that slot's unit. Built again for another era.
-  const pickerEl = document.getElementById('loadout');
-  let pickRows = [];
-  const buildPicker = () => {
-    pickerEl.replaceChildren();
-    pickRows = ERA.slots.map(({ cls: slotClass, options: opts }, slot) => {
-      const row = document.createElement('div');
-      row.className = 'lo-slot';
-      const key = document.createElement('span');
-      key.className = 'lo-key';
-      key.textContent = String(slot + 1);
-      const cls = document.createElement('span');
-      cls.className = 'lo-class';
-      cls.textContent = slotClass;
-      const btns = document.createElement('span');
-      btns.className = 'lo-opts';
-      const desc = document.createElement('span');
-      desc.className = 'lo-desc';
-      const show = (kind) => (desc.textContent = opts.find((o) => o.kind === kind)?.info ?? '');
-      const buttons = opts.map((o) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.dataset.kind = o.kind;
-        b.textContent = o.label ?? o.name;
-        b.title = `${o.name}: ${o.info ?? ''}`;
-        b.addEventListener('click', () => pickOption(slot, o.kind));
-        b.addEventListener('pointerenter', () => show(o.kind));
-        b.addEventListener('pointerleave', () => show(params.loadout[slot]));
-        btns.appendChild(b);
-        return b;
-      });
-      row.append(key, cls, btns, desc);
-      pickerEl.appendChild(row);
-      return { buttons, show };
-    });
-    showLoadout();
+  // Sound starts on the first gesture on this page (browsers refuse it earlier, and the click that opened
+  // the game was on the menu's page), whichever it is; audio.start() puts the selected vehicle's engine on.
+  const wakeAudio = () => {
+    removeEventListener('pointerdown', wakeAudio, true);
+    removeEventListener('keydown', wakeAudio, true);
+    audio.start();
   };
-  const showLoadout = () =>
-    pickRows.forEach((r, slot) => {
-      for (const b of r.buttons) b.classList.toggle('on', b.dataset.kind === params.loadout[slot]);
-      r.show(params.loadout[slot]);
-    });
-  buildPicker();
-  // Sets the loadout for the next battles and keeps it (for the era in play). On the title screen the
-  // demonstration battle is rebuilt with it; during a battle (tests, the console) a new battle starts
-  // with it; during a tutorial it waits for the next Take command (the lessons run on the default units).
-  const setLoadout = (kinds, { save = true, cut = -1 } = {}) => {
-    params.loadout = validLoadout(kinds);
-    if (save) store(loadoutKey(ERA.id), JSON.stringify(params.loadout));
-    showLoadout();
-    if (state === 'title') {
-      following = false;
-      newBattle({ attract: true, loadout: params.loadout, seed: (Math.random() * 1e9) | 0 });
-      cineClock = 0;
-      selectUnit(cut >= 0 ? cut : selected);
-    } else if (state === 'playing' || state === 'ended') start();
+  addEventListener('pointerdown', wakeAudio, true);
+  addEventListener('keydown', wakeAudio, true);
+
+  // Back to the main menu (src/ui/menu.js): the game page is left; the menu builds nothing of the world.
+  // A lesson's way back opens the menu's tutorial list.
+  const toMenu = (lessons = false) => (location.href = menuHref(query, { era: ERA.id, lessons }));
+  document.getElementById('return-menu').addEventListener('click', () => toMenu(state === 'tutorial'));
+
+  // Sets the loadout and keeps it (for the era in play), and starts a new battle with it during a battle
+  // (tests, the console); during a lesson it waits for the next battle (the lessons run on their own units).
+  // To change it the player goes back to the menu.
+  const setLoadout = (kinds, { save = true } = {}) => {
+    params.loadout = validLoadout(ERA, kinds);
+    if (save) keepLoadout(ERA, params.loadout);
+    if (state === 'playing' || state === 'ended') start();
     return UNITS.map((u) => u.id);
   };
-  const pickOption = (slot, kind) => {
-    if (params.loadout[slot] === kind) return;
-    const next = [...params.loadout];
-    next[slot] = kind;
-    setLoadout(next, { cut: slot });
-  };
-
-  // The era toggle, the title screen's main control: a button per era (eras/index.js ERAS), the era's
-  // years under its name; an era still in development shows greyed out with its tag and cannot be
-  // picked. The line under it is the setting of the era in play (another's while the pointer is on it).
-  const eraEl = document.getElementById('era');
-  const eraDesc = document.getElementById('era-desc');
-  const showSetting = (era) => (eraDesc.textContent = era.text.setting ?? '');
-  const eraBtns = ERAS.map((era) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.dataset.era = era.id;
-    b.setAttribute('role', 'radio');
-    b.innerHTML = '<b></b><span><small></small></span>';
-    b.querySelector('b').textContent = era.name;
-    b.querySelector('small').textContent = era.years;
-    b.title = `${era.name}, ${era.years}`;
-    if (!era.available) {
-      b.classList.add('soon');
-      b.setAttribute('aria-disabled', 'true');
-      b.querySelector('span').insertAdjacentHTML('beforeend', '<em>In development</em>');
-      b.title += ': in development';
-    }
-    b.addEventListener('click', () => setEra(era.id));
-    b.addEventListener('pointerenter', () => showSetting(era));
-    b.addEventListener('pointerleave', () => showSetting(ERA));
-    eraEl.appendChild(b);
-    return b;
-  });
-  const showEras = () => {
-    for (const b of eraBtns) {
-      b.classList.toggle('on', b.dataset.era === ERA.id);
-      b.setAttribute('aria-checked', String(b.dataset.era === ERA.id));
-    }
-    showSetting(ERA);
-  };
-  showEras();
-  // Sets the era for the next battles and keeps it. Its modules load first (eras/index.js loadEra), then
-  // the layout (deploy.js), the terrain's pads, the vehicles and buildings, the title screen's text and
-  // theme, the loadout picker (with the loadout kept for that era) and the tutorial list follow it. On
-  // the title screen the demonstration battle is rebuilt in it; during a battle a new battle starts in it.
-  // Refused for an era still in development and during a tutorial. Resolves to the era's id, or false.
+  // Sets the era and keeps it (tests; the player picks it on the menu). Its modules load first
+  // (eras/index.js loadEra), then the layout (deploy.js), the terrain's pads, the vehicles and buildings,
+  // the theme and the loadout kept for that era follow it, and a new battle starts in it. Refused for an
+  // era still in development and during a tutorial. Resolves to the era's id, or false.
   let eraAsk = 0;
   const setEra = async (id, { save = true } = {}) => {
     const era = eraById(id);
-    if (!canPlay(era) || state === 'tutorial') return false;
+    if (!canPlay(era, query) || state === 'tutorial') return false;
     const ask = ++eraAsk;
     await loadEra(era.id);
     // a later pick overtook this one while its modules loaded
@@ -600,63 +519,37 @@ async function init() {
     audio.setEra(era.id);
     applySky();
     params.era = era.id;
-    params.loadout = savedLoadout();
+    params.loadout = keptLoadout(ERA);
     applyEraLook();
     panel.setTheme(ERA.theme);
     terrain.relayout(camera);
     entities.sync();
-    showEras();
-    buildPicker();
-    tutorial.buildMenu();
-    document.getElementById('tutorials').disabled = !ERA.tutorials.length;
     selected = 0;
-    if (state === 'title') {
-      following = false;
-      newBattle({ attract: true, loadout: params.loadout, seed: (Math.random() * 1e9) | 0 });
-      cineClock = 0;
-      selectUnit(0);
-    } else if (state === 'playing' || state === 'ended') start();
+    if (state === 'playing' || state === 'ended') start();
     return era.id;
   };
 
   // ---------------------------------------------------------------- tutorials (src/tutorial.js)
   // A tutorial runs the sim in scripted mode (no director, nothing destroyed); leaving it goes back to
-  // the demonstration battle behind the title screen.
+  // the menu's tutorial list.
   const tutorial = new Tutorials({
     sim,
     hud,
     host: {
       enter(def) {
         state = 'tutorial';
-        hud.showTitle(false);
         hud.hideEnd();
-        chase.autoOrbit = 0;
-        chase.cine(false);
         following = false;
         padlock = false;
         chase.goalDist = 28;
-        // the lessons run on the default units, or with their own vehicle swapped in (def.loadout); leave() puts the player's loadout back
+        // the lessons run on the default units, or with their own vehicle swapped in (def.loadout)
         newBattle({ scripted: true, loadout: def.loadout ?? DEFAULT_LOADOUT, seed: (Math.random() * 1e9) | 0 });
         setTimeScale(1);
         hud.setScore(0);
-        audio.start();
         audio.mood('wave');
         selectUnit(UNITS.findIndex((u) => u.id === def.unit));
       },
-      leave() {
-        following = false;
-        padlock = false;
-        setTimeScale(1);
-        newBattle({ attract: true, loadout: params.loadout, seed: (Math.random() * 1e9) | 0 });
-        state = 'title';
-        audio.mood('brief');
-        audio.ctx?.suspend?.();
-        hud.showTitle(true);
-        cineClock = 0;
-        chase.goalDist = 70;
-        chase.cine(true);
-        selectUnit(selected);
-      },
+      leave: () => toMenu(true),
       cam: () => ({ yaw: chase.goalYaw, dist: chase.goalDist }),
       scale: () => params.timeScale,
       setScale: (k) => setTimeScale(k),
@@ -666,7 +559,6 @@ async function init() {
       hint: (text) => hud.hint(text, 3500),
     },
   });
-  document.getElementById('tutorials').addEventListener('click', () => tutorial.openMenu());
 
   addEventListener('keydown', (e) => {
     if (e.code === 'Escape' && tutorial.escape()) return;
@@ -709,8 +601,7 @@ async function init() {
     ({ w: vw, h: vh } = size());
     camera.aspect = vw / vh;
     camera.updateProjectionMatrix();
-    renderer.setSize(vw, vh, false);
-    post.setSize(vw, vh);
+    applyPixelRatio(); // the pixel budget depends on the view's size
   }).observe(view);
 
   // ---------------------------------------------------------------- battle events
@@ -804,14 +695,6 @@ async function init() {
       launchHold = 5;
       if (m.part !== camPart) toLauncher(m.part);
     }
-    // the title screen's demonstration battle cuts to a launch now and then
-    if (sim.attract && state === 'title' && !following && cineClock > 6) {
-      const i = sim.units.indexOf(u);
-      if (i >= 0 && i !== selected) selectUnit(i);
-      cineClock = 0;
-      chase.cine(false);
-      followMissile(m);
-    }
   };
   // the cold-launched rounds light their motors once clear (the S-400's 20 to 30 m up, the Tor's 16 to
   // 21 m), at the nozzle
@@ -873,7 +756,6 @@ async function init() {
     const size = WSIZE[t.type] ?? 1;
     fx.explosion(t.pos, t.falling ? size * 0.7 : size * 0.8, { debris: true });
     audio.explosion(t.pos, size);
-    if (sim.attract) return;
     const u = sim.unitById.get(by.unitId);
     hud.kill(`${u?.callsign ?? by.unitId}: ${KILL_NAME[t.type]}, ${WEAPON_NAME[by.weapon] ?? by.weapon}`, THREATS[t.type].points, by.unitId !== UNITS[selected].id);
     hud.setScore(sim.score.points);
@@ -889,7 +771,7 @@ async function init() {
     fx.explosion(pos, size * 0.7, { debris: true });
     if (size >= 0.8) fx.burnSite(pos, size, 20 + size * 12);
     audio.impact(pos, size);
-    if (victim && !sim.attract) hud.setScore(sim.score.points);
+    if (victim) hud.setScore(sim.score.points);
   };
   // a vehicle blows up once: a dispersed unit's (the Buk's) one by one as they are knocked out, and
   // the ones still whole when the unit is out of action stand abandoned
@@ -909,16 +791,15 @@ async function init() {
   };
   ev.radio = (text, kind) => {
     tutorial.onRadio(text);
-    if (!sim.attract) hud.radio(text, kind);
+    hud.radio(text, kind);
   };
   ev.wave = (n, title, sub) => {
-    if (sim.attract) return;
     hud.toast(title, sub, 5000);
     audio.ui('alarm');
   };
   ev.state = (s) => {
     audio.mood(s);
-    if ((s === 'victory' || s === 'defeat') && !sim.attract && state === 'playing') endGame(s);
+    if ((s === 'victory' || s === 'defeat') && state === 'playing') endGame(s);
   };
   // ---------------------------------------------------------------- the WW2 era's flak and air attack
   // (sim/mounts.js, sim/planes.js; DESIGN.md "WW2 era", Events). The guns' flashes, the 8.8 cm's blast and
@@ -983,7 +864,7 @@ async function init() {
       audio.explosion(pos, s * 1.2);
     }
     if (victim && (t.type === 'gpbomb' || t.type === 'rp3')) fx.burnSite(pos, s, 25 + 20 * s);
-    if (victim && !sim.attract) hud.setScore(sim.score.points);
+    if (victim) hud.setScore(sim.score.points);
   };
   // every frame: each 2 cm gun's rattle while it fires (a loop per gun, on and off when the sound gets
   // here), and a falling bomb's whistle for its last seconds when it comes down near the camera
@@ -1035,7 +916,7 @@ async function init() {
           ['Units standing', `${sim.units.filter((u) => u.alive).length} / ${sim.units.length}`],
         ],
       },
-      { onRestart: () => start() }
+      { onRestart: () => start(), onMenu: () => toMenu() }
     );
   };
 
@@ -1045,20 +926,20 @@ async function init() {
   weather.set(params.weather);
   const azimuthOf = () => 180 - params.sunBearing;
   atmosphere.set(params.elevation, azimuthOf());
-  selectUnit(2);
-  chase.cine(true);
-  chase.goalDist = 70;
+  // the unit the game opens on: the lesson's, else ?unit=N, else the first
+  const qu = Number(query.get('unit') ?? 0);
+  const startUnit = lesson ? Math.max(0, UNITS.findIndex((u) => u.id === lesson.unit)) : Number.isInteger(qu) && qu >= 0 && qu < UNITS.length ? qu : 0;
+  selectUnit(startUnit);
+  chase.goalDist = 28;
   chase.goalPitch = 0.28;
   chase.update(1);
   terrain.update(camera, true);
-  await renderer.compileAsync(scene, camera);
   atmosphere.update(chase.focus, 0, camera);
+  await views.crewing; // the WW2 crews' module (fetched when their guns were built), so they warm up too
+  await warmUp(true);
   renderer.shadowMap.needsUpdate = true;
   post.render(0.016);
   hud.setLoading(1, '');
-  hud.ready();
-  playBtn.disabled = false;
-  document.getElementById('tutorials').disabled = !ERA.tutorials.length;
   hud.setTimeScale(1);
 
   // ---------------------------------------------------------------- loop
@@ -1111,14 +992,6 @@ async function init() {
     // camera
     camera.fov += (params.fov - camera.fov) * (1 - Math.exp(-rawDt * 10));
     camera.updateProjectionMatrix();
-    if (state === 'title') {
-      // title screen: cut to the next unit now and then
-      cineClock += rawDt;
-      if (!following && cineClock > 26) {
-        cineClock = 0;
-        selectUnit((selected + 1) % UNITS.length);
-      }
-    }
     launchHold -= rawDt;
     if (!freeCam && !following && launchHold <= 0) {
       const p = launcherFor(UNITS[selected].id);
@@ -1194,16 +1067,23 @@ async function init() {
     ww2Sound(dt);
     audio.update(rawDt, camera, { threats: sim.threats, timeScale: params.timeScale });
 
-    // dynamic resolution: keep frame time near 60 fps
+    // dynamic resolution: keep frame time near 60 fps. The landscape gives up detail first (terrain.js
+    // SHED: grass, trees, their shadows), the resolution only after it, so the guns stay sharp longest;
+    // they come back the other way round
     resTimer -= rawDt;
     if (params.dynamicRes && resTimer <= 0) {
       resTimer = 1.5;
-      let next = resScale;
-      if (frameAvg > 20) next = Math.max(0.5, resScale - 0.1);
-      else if (frameAvg < 13.5) next = Math.min(1, resScale + 0.05);
-      if (next !== resScale) {
-        resScale = next;
-        applyPixelRatio();
+      if (frameAvg > 20) {
+        if (shed < SHED_MAX) terrain.setQuality(params.quality, ++shed);
+        else if (resScale > 0.5) {
+          resScale = Math.max(0.5, resScale - 0.1);
+          applyPixelRatio();
+        }
+      } else if (frameAvg < 13.5) {
+        if (resScale < 1) {
+          resScale = Math.min(1, resScale + 0.05);
+          applyPixelRatio();
+        } else if (shed > 0) terrain.setQuality(params.quality, --shed);
       }
     }
 
@@ -1231,7 +1111,7 @@ async function init() {
           `state      ${state}  time x${params.timeScale}${freeCam ? '  free camera' : ''}\n` +
           `draw calls ${i.render.calls}\n` +
           `triangles  ${(i.render.triangles / 1e6).toFixed(2)}M\n` +
-          `resolution ${Math.round(vw * renderer.getPixelRatio())}x${Math.round(vh * renderer.getPixelRatio())} (${Math.round(resScale * 100)}%)\n` +
+          `resolution ${Math.round(vw * renderer.getPixelRatio())}x${Math.round(vh * renderer.getPixelRatio())} (${Math.round(resScale * 100)}%)  landscape -${shed}/${SHED_MAX}\n` +
           `trees      ${tc.map((c2) => c2.join('/')).join(' ')}  grass ${terrain.grass.count}\n` +
           `particles  ${c.smoke} smoke, ${c.glow} glow, ${c.debris} debris\n` +
           `battle     ${sim.state} wave ${sim.wave}  threats ${sim.threats.length}  missiles ${sim.missiles.length}  shells ${sim.ballistics.n}  drawn ${entities.counts()}\n` +
@@ -1241,15 +1121,11 @@ async function init() {
     }
   };
   renderer.setAnimationLoop(() => frame());
-  const qu = Number(query.get('unit') ?? 0);
-  const startUnit = Number.isInteger(qu) && qu >= 0 && qu < UNITS.length ? qu : 0;
 
-  if (query.get('play')) {
-    selectUnit(startUnit);
-    start();
-  } else selected = startUnit;
-
-  if (query.get('tutorial')) tutorial.start(query.get('tutorial'));
+  // straight into the lesson or the battle, then the loading screen goes
+  if (lesson) tutorial.start(lesson.id);
+  else start();
+  hideLoading();
 
   Object.assign(iads, {
     tutorial,

@@ -3,9 +3,40 @@ import * as THREE from 'three';
 // The consoles' sight pictures: the scene rendered a second time, small, from the unit's sight along
 // its sight line, read back and drawn into the panel's sight canvas (the console draws its reticle
 // over it). The Strela's is a direct-view optical sight (natural colour); the Pantsir's EO channel is
-// a monochrome TV picture. Linear HDR is read back and tone-mapped here, with its own exposure.
+// a monochrome TV picture. Linear HDR is read back and tone-mapped here, with its own exposure. The read
+// is asynchronous (the picture lands a frame or two after it was rendered): a blocking read would stall
+// the main thread until the GPU had finished the whole frame queued before it.
 
 const W = 320, H = 200;
+
+// The tone curve (ACES fit, then gamma) as a table over v = exposure x linear value, sampled on sqrt(v / VMAX) so
+// its steep foot near black is dense: within one level of 255 of the curve itself, about four times cheaper
+// than the curve per pixel. Above VMAX it is white.
+const toneCurve = (x) => {
+  x = (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14);
+  return Math.pow(Math.min(Math.max(x, 0), 1), 1 / 2.2) * 255;
+};
+const LUT_N = 4096, VMAX = 8, LUT = new Float32Array(LUT_N + 1);
+for (let i = 0; i <= LUT_N; i++) LUT[i] = toneCurve(VMAX * (i / LUT_N) ** 2);
+const LUT_S = LUT_N / Math.sqrt(VMAX);
+
+// the k-th smallest of a[0..n) (moves the others round), as a full sort would put there
+function select(a, k, n) {
+  let lo = 0, hi = n - 1;
+  while (hi > lo) {
+    const p = a[(lo + hi) >> 1];
+    let i = lo, j = hi;
+    while (i <= j) {
+      while (a[i] < p) i++;
+      while (a[j] > p) j--;
+      if (i <= j) { const t = a[i]; a[i] = a[j]; a[j] = t; i++; j--; }
+    }
+    if (k <= j) hi = j;
+    else if (k >= i) lo = i;
+    else break;
+  }
+  return a[k];
+}
 
 // Sight poses for units whose sim state has no `sight` of their own (the WW2 era's gun sights and the
 // predictor's telescope): an era's consoles register pose(unit) -> { az, el, fov, part } by unit kind
@@ -42,7 +73,8 @@ export class SightRenderer {
   update(rawDt, unit, pos, canvas, mono, entities = null, pose = null) {
     this.timer -= rawDt;
     const s = pose ?? unit?.sight;
-    if (this.timer > 0 || !s || !canvas || !pos) return;
+    // one picture in flight at a time: the next waits for it to land
+    if (this.timer > 0 || this.pending || !s || !canvas || !pos) return;
     this.timer = this.rate;
     // when this picture was taken, so a console can tell whether its sight is fed
     canvas._fedAt = performance.now();
@@ -63,10 +95,24 @@ export class SightRenderer {
     r.setRenderTarget(this.rt);
     r.render(this.scene, cam);
     entities?.plain(false);
-    r.readRenderTargetPixels(this.rt, 0, 0, W, H, this.buf);
     r.setRenderTarget(prev);
     r.shadowMap.needsUpdate = shadow;
+    if (!r.readRenderTargetPixelsAsync) {
+      r.readRenderTargetPixels(this.rt, 0, 0, W, H, this.buf);
+      this.present(canvas, mono);
+      return;
+    }
+    this.pending = true;
+    r.readRenderTargetPixelsAsync(this.rt, 0, 0, W, H, this.buf)
+      .catch(() => r.readRenderTargetPixels(this.rt, 0, 0, W, H, this.buf))
+      .then(() => {
+        this.pending = false;
+        this.present(canvas, mono);
+      });
+  }
 
+  // the read-back picture tone-mapped into the panel's canvas
+  present(canvas, mono) {
     // auto exposure from the log-average luminance, held down so the brightest tenth (usually the sky
     // along the horizon) stays short of white, eased
     const b = this.buf, d = this.img.data;
@@ -78,15 +124,16 @@ export class SightRenderer {
       sum += Math.log(1e-4 + L);
     }
     const avg = Math.exp(sum / n);
-    lum.sort();
-    const p90 = lum[Math.floor(n * 0.9)];
+    const p90 = select(lum, Math.floor(n * 0.9), n);
     const goal = Math.min(0.22 / Math.max(avg, 1e-3), 1.1 / Math.max(p90, 1e-3));
     this.exposure += (goal - this.exposure) * 0.25;
     const k = this.exposure;
     const tone = (x) => {
       x *= k;
-      x = (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14); // ACES fit
-      return Math.pow(Math.min(Math.max(x, 0), 1), 1 / 2.2) * 255;
+      const u = Math.sqrt(x > 0 ? x : 0) * LUT_S;
+      if (u >= LUT_N) return LUT[LUT_N];
+      const i = u | 0;
+      return LUT[i] + (LUT[i + 1] - LUT[i]) * (u - i);
     };
     for (let y = 0; y < H; y++) {
       const src = (H - 1 - y) * W * 4, dst = y * W * 4;

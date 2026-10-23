@@ -23,8 +23,8 @@ import { patchMaterial } from '../../../shaderlib.js';
 //              sidecap (the Fliegermuetze), or none (cropped hair)
 //   gear       headset (telephone earphones, layers and operators), gasmask (the fluted canister on the
 //              back), holster (NCOs), scarf (the helpers' white towel), binoChest (binoculars hanging)
-//   held       one prop on the 'prop' bone (round88, clip37, mag20, rangefinder, bino, handset) and a second
-//              20 mm magazine in the left hand (mag20L)
+//   held       one prop on the 'prop' bone (round88, round128, clip37, mag20, rangefinder, bino, handset) and
+//              a second 20 mm magazine in the left hand (mag20L)
 //
 // Skeleton (metres, a 1.78 m man in the bind pose, arms hanging; ground y = 0, facing -Z, right +X): the
 // joints of models/v/crew.js (the same proportions and bone lengths, so its IK numbers carry over) plus a
@@ -64,8 +64,9 @@ export const GRIP = SIDE.map((s) => new THREE.Vector3(-0.032 * s, -0.092, 0));
 export const PART = {
   blouse: 0, coat: 1, parka: 2, jackboots: 3, ankle: 4, helmet: 5, cap43: 6, sidecap: 7, headset: 8, gasmask: 9, holster: 10,
   scarf: 11, binoChest: 12, round88: 13, clip37: 14, mag20: 15, mag20L: 16, rangefinder: 17, bino: 18, handset: 19, belt: 20,
+  round128: 21,
 };
-export const PROPS = ['round88', 'clip37', 'mag20', 'rangefinder', 'bino', 'handset'];
+export const PROPS = ['round88', 'round128', 'clip37', 'mag20', 'rangefinder', 'bino', 'handset'];
 export const TINT = { none: 0, tunic: 1, trousers: 2, coat: 3, headgear: 4, skin: 5, hair: 6, hands: 7 };
 // surface classes: roughness, metalness (the shader's table)
 const SURF = { cloth: 0, leather: 1, skin: 2, helmet: 3, metal: 4, brass: 5, paint: 6, bakelite: 7, glass: 8, wool: 9 };
@@ -199,17 +200,35 @@ const COL = {
   glass: 0x18252c, rf: 0x5b6158,
 };
 
+// The face's shading in the vertex colours (sRGB factors on the skin tint): soft dark sockets round the eyes
+// and the shadow under the brows, warmer cheeks, a stubble shadow under the jaw and chin, so a face reads at a
+// few metres without a texture
+const sRGB = (r, g, b) => (Math.round(Math.min(1, Math.max(0, r)) * 255) << 16) | (Math.round(Math.min(1, Math.max(0, g)) * 255) << 8) | Math.round(Math.min(1, Math.max(0, b)) * 255);
+function faceCol(x, y, z) {
+  let r = 1, g = 1, b = 1;
+  if (z < -0.035) {
+    for (const s of SIDE) {
+      const eye = Math.max(0, 1 - Math.hypot((x - s * 0.032) / 0.027, (y - 1.671) / 0.02));
+      r -= eye * 0.3; g -= eye * 0.34; b -= eye * 0.3;
+      const cheek = Math.max(0, 1 - Math.hypot((x - s * 0.046) / 0.032, (y - 1.622) / 0.026));
+      g -= cheek * 0.1; b -= cheek * 0.12;
+    }
+  }
+  if (y < 1.588) { const k = Math.min(1, (1.588 - y) / 0.035) * 0.16; r -= k; g -= k * 1.02; b -= k * 0.92; }
+  return sRGB(r, g, b);
+}
+
 // head and neck: skull with the cropped hair, jaw, face details
 function head(F) {
   const near = F.near;
   const hair = (x, y, z) => y > 1.735 - 0.9 * Math.max(0, z + 0.02) || (z > -0.02 && y > 1.652);
   const skull = ellipsoid(0.078, 0.102, 0.098, 0, 1.678, 0.008, near ? 11 : 7, near ? 8 : 5);
-  F.add(skull, { bone: 'head', tint: (x, y, z) => (hair(x, y, z) ? TINT.hair : TINT.skin), surf: SURF.skin });
-  F.add(ellipsoid(0.069, 0.07, 0.076, 0, 1.606, -0.02, near ? 8 : 5, near ? 5 : 3), { bone: 'head', tint: TINT.skin, surf: SURF.skin });
+  F.add(skull, { bone: 'head', tint: (x, y, z) => (hair(x, y, z) ? TINT.hair : TINT.skin), surf: SURF.skin, col: near ? faceCol : 0xffffff });
+  F.add(ellipsoid(0.069, 0.07, 0.076, 0, 1.606, -0.02, near ? 8 : 5, near ? 5 : 3), { bone: 'head', tint: TINT.skin, surf: SURF.skin, col: near ? faceCol : 0xffffff });
   if (near) {
-    F.add(ellipsoid(0.012, 0.021, 0.016, 0, 1.642, -0.093, 5, 4), { bone: 'head', tint: TINT.skin, surf: SURF.skin }); // nose
+    F.add(ellipsoid(0.012, 0.021, 0.016, 0, 1.642, -0.093, 5, 4), { bone: 'head', tint: TINT.skin, surf: SURF.skin, col: (x, y) => sRGB(1, 0.93 + (1.642 - y) * 2, 0.92 + (1.642 - y) * 2) }); // nose, its tip warmer
     for (const s of SIDE) {
-      F.add(ellipsoid(0.013, 0.029, 0.02, s * 0.078, 1.656, 0.012, 5, 4), { bone: 'head', tint: TINT.skin, surf: SURF.skin, col: 0xf0e6e0 }); // ears
+      F.add(ellipsoid(0.013, 0.029, 0.02, s * 0.078, 1.656, 0.012, 5, 4), { bone: 'head', tint: TINT.skin, surf: SURF.skin, col: 0xf4dcd2 }); // ears
       F.add(ellipsoid(0.014, 0.007, 0.006, s * 0.032, 1.674, -0.082, 5, 3), { bone: 'head', col: COL.eye, surf: SURF.skin });
       F.add(box(0.032, 0.006, 0.01, s * 0.032, 1.688, -0.084, 0, 0, s * -0.12), { bone: 'head', tint: TINT.hair, surf: SURF.wool, col: 0xe0d8d0 });
     }
@@ -479,6 +498,18 @@ function round88(F) {
   F.add(along(fuzeP), { ...o, col: COL.fuze, surf: SURF.metal });
 }
 
+// 12.8 cm round, prop space as round88's: the case head at the origin, the nose toward -Z; 1.488 m, a fixed
+// round of 48 kg (refs/ww2/flak128 sec. 8: the cartridge 17.4 kg, so the case about two thirds of the length, E)
+const R128 = { caseP: [[0, 0], [0, 0.083], [0.012, 0.083], [0.015, 0.075], [0.86, 0.072], [0.9, 0.067], [0.95, 0.067]],
+  shellP: [[0.95, 0.064], [1.2, 0.064], [1.26, 0.06], [1.33, 0.046], [1.42, 0.022]], fuzeP: [[1.42, 0.022], [1.46, 0.016], [1.482, 0.008], [1.488, 0]] };
+function round128(F) {
+  const near = F.near, seg = near ? 10 : 6, o = { bone: 'prop', part: PART.round128 };
+  const along = (prof) => xform(lathe(prof, seg, 0, 0, 0), 0, 0, 0, -Math.PI / 2, 0, 0);
+  F.add(along(R128.caseP), { ...o, col: COL.brass, surf: SURF.brass });
+  F.add(along(R128.shellP), { ...o, col: COL.shell, surf: SURF.paint });
+  F.add(along(R128.fuzeP), { ...o, col: COL.fuze, surf: SURF.metal });
+}
+
 // 3.7 cm clip of eight (refs/ww2/flak43 sec. 8): the plate's middle at the origin, rounds along -Z noses forward
 // side by side along X at 0.049 m, the case heads at z = +0.13 against the plate's rear ridge
 function clip37(F) {
@@ -581,6 +612,9 @@ function farFigure(F) {
   const o88 = { bone: 'prop', part: PART.round88 };
   F.add(xform(lathe([[0, 0], [0, 0.056], [0.57, 0.046]], 5, 0, 0, 0), 0, 0, 0, -Math.PI / 2, 0, 0), { ...o88, col: COL.brass, surf: SURF.brass });
   F.add(xform(lathe([[0.57, 0.044], [0.75, 0.044], [0.932, 0]], 5, 0, 0, 0), 0, 0, 0, -Math.PI / 2, 0, 0), { ...o88, col: COL.shell, surf: SURF.paint });
+  const o128 = { bone: 'prop', part: PART.round128 };
+  F.add(xform(lathe([[0, 0], [0, 0.083], [0.95, 0.068]], 5, 0, 0, 0), 0, 0, 0, -Math.PI / 2, 0, 0), { ...o128, col: COL.brass, surf: SURF.brass });
+  F.add(xform(lathe([[0.95, 0.064], [1.2, 0.064], [1.488, 0]], 5, 0, 0, 0), 0, 0, 0, -Math.PI / 2, 0, 0), { ...o128, col: COL.shell, surf: SURF.paint });
   F.add(box(0.39, 0.05, 0.37, 0, 0, -0.05), { bone: 'prop', part: PART.clip37, col: (x, y, z) => (z > -0.12 ? COL.brass : COL.shell), surf: SURF.brass });
   F.add(box(0.31, 0.12, 0.085, 0, 0, 0), { bone: 'prop', part: PART.mag20, col: COL.mag, surf: SURF.paint });
   const wy = SH_Y - L_UA - L_FA;
@@ -606,7 +640,7 @@ export function crewGeometry(lod = 'near') {
   outerBody(F); blouse(F); greatcoat(F); parka(F);
   helmet(F); cap43(F); sidecap(F);
   gear(F);
-  round88(F); clip37(F); rangefinder(F); handset(F);
+  round88(F); round128(F); clip37(F); rangefinder(F); handset(F);
   binoculars(F, 'prop', PART.bino, new THREE.Matrix4());
   mag20(F, 'prop', PART.mag20, new THREE.Matrix4());
   // the second magazine in the left hand: held by its upper rear edge, hanging along the forearm's line
@@ -692,7 +726,24 @@ float crewNoise(vec3 x) {
   vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(mix(crewHash(i), crewHash(i + vec3(1, 0, 0)), f.x), mix(crewHash(i + vec3(0, 1, 0)), crewHash(i + vec3(1, 1, 0)), f.x), f.y),
              mix(mix(crewHash(i + vec3(0, 0, 1)), crewHash(i + vec3(1, 0, 1)), f.x), mix(crewHash(i + vec3(0, 1, 1)), crewHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+// a bump from a height field (metres) by its screen derivatives, without tangents (Mikkelsen, as three's
+// bump map does)
+vec3 crewBump(vec3 pos, vec3 n, float h) {
+  vec3 sx = dFdx(pos), sy = dFdy(pos);
+  vec3 r1 = cross(sy, n), r2 = cross(n, sx);
+  float det = dot(sx, r1);
+  vec3 grad = sign(det) * (dFdx(h) * r1 + dFdy(h) * r2);
+  return normalize(abs(det) * n - grad);
 }`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+  // cloth and wool: soft wrinkles running round the limbs and the body (stretched along them), and a finer
+  // weave, a few millimetres deep, so a uniform is not a smooth shell
+  if (vCrewRM.x > 0.8) {
+    vec3 cq = vCrewP.xyz + vCrewP.w * 13.0;
+    float crewH = crewNoise(cq * vec3(11.0, 3.6, 11.0)) * 0.011 + crewNoise(cq * vec3(26.0, 9.0, 26.0)) * 0.004 + crewNoise(cq * vec3(60.0, 48.0, 60.0)) * 0.0012;
+    normal = crewBump(-vViewPosition, normal, crewH);
+  }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
   diffuseColor.rgb *= vCrewTint;
   vec3 crewQ = vCrewP.xyz * 7.0 + vCrewP.w * 31.0;

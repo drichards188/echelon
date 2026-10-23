@@ -406,8 +406,16 @@ export class FX {
     // whole lids in flight or on the ground: { obj, vel, axis, w, age, rest, life }
     this.lids = [];
 
-    // bomb craters: flat decals in a ring buffer, one instanced mesh made with the first crater (crater())
-    this.craters = { next: 0, n: 0, mesh: null };
+    // bomb craters: flat decals in a ring buffer, one instanced mesh (made here, so the loading screen's
+    // warm-up compiles it and the first bomb does not)
+    const craterMat = patchMaterial(new THREE.MeshStandardMaterial({ map: craterTexture(), roughness: 0.95, metalness: 0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }), 'fog');
+    const craterMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), craterMat, MAX_CRATERS);
+    craterMesh.count = 0;
+    craterMesh.frustumCulled = false;
+    craterMesh.receiveShadow = true;
+    craterMesh.renderOrder = 1;
+    scene.add(craterMesh);
+    this.craters = { next: 0, n: 0, mesh: craterMesh };
 
     // a fixed pool of point lights for nearby blasts and muzzle flashes (never added/removed at runtime)
     this.lights = [];
@@ -811,7 +819,7 @@ export class FX {
     this.lids.length = 0;
     this.cases.life.fill(0);
     this.craters.n = this.craters.next = 0;
-    if (this.craters.mesh) this.craters.mesh.count = 0;
+    this.craters.mesh.count = 0;
   }
 
   /**
@@ -1038,15 +1046,6 @@ export class FX {
    */
   crater(p, r = 8) {
     const C = this.craters;
-    if (!C.mesh) {
-      const mat = patchMaterial(new THREE.MeshStandardMaterial({ map: craterTexture(), roughness: 0.95, metalness: 0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }), 'fog');
-      C.mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), mat, MAX_CRATERS);
-      C.mesh.count = 0;
-      C.mesh.frustumCulled = false;
-      C.mesh.receiveShadow = true;
-      C.mesh.renderOrder = 1;
-      this.scene.add(C.mesh);
-    }
     const e = Math.max(1, r * 0.5), x = p.x, z = p.z;
     _cn.set(this.ground(x - e, z) - this.ground(x + e, z), 2 * e, this.ground(x, z - e) - this.ground(x, z + e)).normalize();
     _cq.setFromUnitVectors(_cu, _cn).multiply(_cq2.setFromAxisAngle(_cu, rand() * 6.283));

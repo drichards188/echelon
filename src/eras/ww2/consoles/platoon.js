@@ -216,6 +216,8 @@ export function mountPlatoon(ctx, kind, o = {}) {
   function buildCards(unit) {
     pg.replaceChildren();
     cards.length = 0;
+    // more guns than fit a row (the flak towers' eight Vierlinge): two rows of smaller cards
+    pg.classList.toggle('many', unit.parts.filter((p) => p.gun && keep(p)).length > 4);
     unit.parts.forEach((p, i) => {
       if (!p.gun || !keep(p)) return;
       const nm = nameOf(unit, i);

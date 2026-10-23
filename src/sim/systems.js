@@ -307,10 +307,10 @@ const FLAK88 = {
 // the two barrels fire together about every 5 s; both shells leave on the one salvo (`twin`: the barrels'
 // half spacing, m)
 const FLAK128 = {
-  shell: '128mm', barrels: 2, twin: 0.48, rate: 1,
+  shell: '128mm', barrels: 2, twin: 0.675, rate: 1,
   feed: { hand: true, load: 5, loadVar: 0.4 },
   rounds: 260, // the tower's magazines feed the guns by hoist (E)
-  turnAz: 0.26, turnEl: 0.17, minEl: -0.05, maxEl: 1.53, height: 2.3, muzzle: 6.8,
+  turnAz: 0.26, turnEl: 0.17, minEl: -0.05, maxEl: 1.53, height: 2.55, muzzle: 7.4,
   err: 0.0012,
 };
 
@@ -362,27 +362,40 @@ Object.assign(SYSTEMS, {
     react: 3,
     guns: { flakvierling: FLAKVIERLING, 'flakvierling-tower': { ...FLAKVIERLING, height: 10.4 } },
   },
-  // A flak tower (Flakturm, a G-tower; not historical at Hopsten, a what-if): one concrete block with every
-  // calibre on it. Four Flakzwilling 40 on the corner turrets of the roof fire together by salvo from the
-  // Kommandogeraet on the roof (laid with the Wuerzburg beside it), as the heavy battery's guns; two 3.7 cm
-  // Flak 43 on the roof and four Flakvierlinge on the galleries fight as a platoon's guns. `groups`: the gun
-  // kinds the player can take command of one at a time (the console's gun selector, the `group` command);
-  // the others stay with their crews. Parts with `deck` stand that high on the tower (eras/ww2.js); the
-  // tower itself (role 'tower') has no hit points: bombs on the ground below hardly reach the guns 26 to
-  // 36 m up.
+  // A flak tower pair (Flakturm of the first type, a gun tower and its fire control tower 420 m away; not
+  // historical at Hopsten, a what-if; refs/ww2/flakturm): four Flakzwilling 40 in the gun tower's corner pits fire
+  // together by salvo from the Kommandogeraet on the roof's backup post, laid with the Wuerzburg-Riese on the fire
+  // control tower, as the heavy battery's guns; four 3.7 cm Flak 43 and eight Flakvierlinge (four in the gun
+  // tower's nests, four on the fire control tower's corners) fight as a platoon's guns. `groups`: the gun kinds
+  // the player can take command of one at a time (the console's gun selector, the `group` command); the others
+  // stay with their crews. Parts with `deck` stand that high on a tower (eras/ww2.js); the towers themselves
+  // (role 'tower') have no hit points: bombs on the ground below hardly reach the guns 30 to 37 m up.
   flakturm: {
     mounts: 'battery', core: 'gun', stocks: {},
-    dispersed: { flak128: 90, kdo40: 40, wurzburg: 35, flak43: 45, flakvierling: 40 },
+    dispersed: { flak128: 90, kdo40: 40, wurzburgriese: 45, flak43: 45, flakvierling: 40 },
     roles: { flak43: 'close', flakvierling: 'close' },
     groups: ['flak128', 'flak43', 'flakvierling'],
-    // the concrete a light gun cannot fire through (its masked arcs, sim/mounts.js masked): boxes in the
-    // unit's frame (m, -z toward its bearing, y over the ground at the site), from the tower's model
-    // (eras/ww2/models/flakturm.js FLAKTURM): the block, the roof parapet, the corner turrets
-    structure: [
-      [-20, 0, -20, 20, 32, 20],
-      [-20, 32, -20, 20, 33.2, -19.2], [-20, 32, 19.2, 20, 33.2, 20], [-20, 32, -20, -19.2, 33.2, 20], [19.2, 32, -20, 20, 33.2, 20],
-      ...[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz]) => [sx * 15 - 6.8, 0, sz * 15 - 6.8, sx * 15 + 6.8, 37.4, sz * 15 + 6.8]),
-    ],
+    // the concrete a gun cannot fire through (its masked arcs, sim/mounts.js masked), per tower: boxes in the
+    // tower's frame (m, -z toward the unit's bearing, y over the ground at the tower), from the models
+    // (eras/ww2/models/flakturm.js FLAKTURM, LEITTURM); no box may hold a gun's trunnion
+    structure: {
+      // the gun tower: the block with its roof parapet, the corner towers, the slabs cantilevered round their
+      // tops (over the nests), the gun tubs
+      flakturm: [
+        [-31.75, 0, -31.75, 31.75, 34.7, 31.75],
+        ...[[-1, -1], [1, -1], [1, 1], [-1, 1]].flatMap(([sx, sz]) => [
+          [sx * 24 - 11.25, 0, sz * 24 - 11.25, sx * 24 + 11.25, 33.5, sz * 24 + 11.25],
+          [sx * 24 - 14.05, 31.9, sz * 24 - 14.05, sx * 24 + 14.05, 34.6, sz * 24 + 14.05],
+          [sx * 24 - 9.6, 33.5, sz * 24 - 9.6, sx * 24 + 9.6, 39.0, sz * 24 + 9.6],
+        ]),
+      ],
+      // the fire control tower: the block, its parapets between the corner bastions, the house on the roof
+      leitturm: [
+        [-25, 0, -11.5, 25, 34, 11.5],
+        [-21, 34, -11.5, 21, 35.2, -10.9], [-21, 34, 10.9, 21, 35.2, 11.5], [-25, 34, -7.5, -24.4, 35.2, 7.5], [24.4, 34, -7.5, 25, 35.2, 7.5],
+        [-17, 34, -6, 3, 39, 6],
+      ],
+    },
     // the lookouts on the roof see far
     search: { range: 34000, period: 2, height: 4, low: 0.7, optical: true },
     radar: { range: 32000, beam: 0.1, gate: 500 },
@@ -408,12 +421,13 @@ Object.assign(SYSTEMS, {
 // attackers' radar-hunting raids aim at), 'search' (a search antenna), 'cp' (command post: the data
 // link stands with it), 'telar' (launcher with its own tracking radar), 'loader' (loader-launcher).
 // Single-vehicle units are 'main'. WW2: 'gun' (a gun of a battery or platoon), 'predictor' (the heavy
-// battery's Kommandogeraet), 'radar' (its Wuerzburg), 'close' (the battery's 2 cm, SYSTEMS roles).
+// battery's Kommandogeraet), 'radar' (its Wuerzburg), 'close' (the battery's 2 cm, SYSTEMS roles), 'tower'
+// (a flak tower: the structure the guns stand on).
 export const PART_ROLE = {
   's400-tel': 'launcher', 's400-radar': 'radar', 's400-search': 'search', 's400-cp': 'cp',
   'buk-telar': 'telar', 'buk-loader': 'loader', 'buk-radar': 'radar', 'buk-cp': 'cp',
   flak88: 'gun', kdo40: 'predictor', wurzburg: 'radar', flak43: 'gun', flakvierling: 'gun', 'flakvierling-tower': 'gun', flak38: 'gun',
-  flak128: 'gun', flakturm: 'tower',
+  flak128: 'gun', flakturm: 'tower', leitturm: 'tower', wurzburgriese: 'radar',
 };
 
 // How many missiles each part's slot holds (the render layer shows a slot while it holds any).

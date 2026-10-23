@@ -5,14 +5,14 @@ import { el, setText, setCls, fmtKm, fmtAlt, fmtTti } from './widgets.js';
 const CLS_CODE = { aircraft: 'AIR', cruise: 'CM', drone: 'UAV', arm: 'ARM', tbm: 'BM', helo: 'HEL', bomb: 'BMB', unknown: 'UNK' };
 
 const COLS = {
-  id: { h: 'ЦЕЛЬ', w: 44, get: (t) => String(t.id).padStart(3, '0'), key: (t) => Number(t.id) || 0 },
-  cls: { h: 'КЛАСС', w: 46, get: (t) => CLS_CODE[t.cls] || t.cls, key: (t) => t.cls },
-  rng: { h: 'ДАЛЬ,км', w: 56, get: (t) => fmtKm(t.range), key: (t) => t.range },
-  brg: { h: 'АЗ,°', w: 40, get: (t) => String(Math.round(t.bearing) % 360).padStart(3, '0'), key: (t) => t.bearing },
-  alt: { h: 'ВЫС,м', w: 48, get: (t) => fmtAlt(t.alt), key: (t) => t.alt },
-  spd: { h: 'СКОР,км/ч', w: 62, get: (t) => String(Math.round(t.speed * 3.6)), key: (t) => t.speed },
-  tti: { h: 'ВРЕМЯ', w: 46, get: (t) => fmtTti(t.tti), key: (t) => (t.tti == null || !isFinite(t.tti) ? 1e9 : t.tti) },
-  eng: { h: 'ОБСТРЕЛ', w: 84, get: (t, ab) => (t.engagedBy && t.engagedBy.length ? t.engagedBy.map((i) => ab(i)).join(' ') : ''), key: (t) => (t.engagedBy ? t.engagedBy.length : 0) },
+  id: { h: 'ЦЕЛЬ', en: 'Target: its track number', w: 44, get: (t) => String(t.id).padStart(3, '0'), key: (t) => Number(t.id) || 0 },
+  cls: { h: 'КЛАСС', en: 'Class: AIR aircraft, CM cruise missile, UAV drone, ARM anti-radar missile, BM ballistic missile, HEL helicopter, UNK unknown', w: 46, get: (t) => CLS_CODE[t.cls] || t.cls, key: (t) => t.cls },
+  rng: { h: 'ДАЛЬ,км', en: 'Range, km', w: 56, get: (t) => fmtKm(t.range), key: (t) => t.range },
+  brg: { h: 'АЗ,°', en: 'Azimuth: compass bearing, degrees', w: 40, get: (t) => String(Math.round(t.bearing) % 360).padStart(3, '0'), key: (t) => t.bearing },
+  alt: { h: 'ВЫС,м', en: 'Altitude, m', w: 48, get: (t) => fmtAlt(t.alt), key: (t) => t.alt },
+  spd: { h: 'СКОР,км/ч', en: 'Speed, km/h', w: 62, get: (t) => String(Math.round(t.speed * 3.6)), key: (t) => t.speed },
+  tti: { h: 'ВРЕМЯ', en: 'Time: until it reaches what it is attacking', w: 46, get: (t) => fmtTti(t.tti), key: (t) => (t.tti == null || !isFinite(t.tti) ? 1e9 : t.tti) },
+  eng: { h: 'ОБСТРЕЛ', en: 'Engaged: the units firing at it', w: 84, get: (t, ab) => (t.engagedBy && t.engagedBy.length ? t.engagedBy.map((i) => ab(i)).join(' ') : ''), key: (t) => (t.engagedBy ? t.engagedBy.length : 0) },
 };
 
 export class TrackTable {
@@ -29,6 +29,7 @@ export class TrackTable {
       const d = COLS[c];
       const h = el('span', 'td c-' + c, d.h);
       h.style.width = d.w + 'px';
+      h.title = `${d.en}\n(click to sort)`;
       h.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         if (this.sortKey === c) this.dir = -this.dir; else { this.sortKey = c; this.dir = 1; }

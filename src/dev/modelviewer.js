@@ -7,6 +7,7 @@ import { buildAsset } from '../models/site.js';
 import { ASSETS, setEra } from '../deploy.js';
 import { eraById, loadEra } from '../eras/index.js';
 import { buildCrewman, CREW_POSES, CREW_GAITS, CREW_OUTFITS } from '../models/v/crew.js';
+import { setBakeRenderer } from '../models/ao.js';
 
 // Standalone model viewer. ?kind=pantsir | cruise | 48N6 | asset:runway ; ?all=vehicles|threats|interceptors|assets ;
 // &anim=1 animates pivots and spinning parts ; &cam=az,el,dist (az 0 = from the front, 90 = from the right) ;
@@ -30,6 +31,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.85;
 document.body.appendChild(renderer.domElement);
+setBakeRenderer(renderer); // baked occlusion (models/ao.js), as in the game
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9db4c6);
@@ -148,6 +150,12 @@ function addItem(kind, x) {
     if (rig.pivots[k]) rig.pivots[k].rotation[axis || (YAW.has(k) ? 'y' : 'x')] = v;
   }
   if (rig && rig.setLoaded && q.get('loaded') === '0') for (let i = 0; i < 16; i++) rig.setLoaded(i, false);
+  // &flat=1: only the vertex colours (tints, dirt and the baked occlusion), unlit
+  if (q.get('flat') === '1') { const vc = new THREE.MeshBasicMaterial({ vertexColors: true }); root.traverse((o) => { if (o.isMesh && !o.isInstancedMesh && o.geometry.attributes.color) o.material = vc; }); }
+  // &drill=<0..1>: a gun's loading machine at that phase of a load (the 12.8 cm twin's trays and hoists)
+  if (rig?.setDrill && q.get('drill') != null) { root.updateMatrixWorld(true); rig.setDrill({ loading: true, load: Number(q.get('drill')) }); }
+  // &pit=0: the gun without its emplacement (rig.emplacement)
+  if (rig?.emplacement && q.get('pit') === '0') rig.emplacement.visible = false;
   const label = document.createElement('div');
   label.className = 'label';
   label.textContent = `${kind}  ${Math.round(tris)} tris, ${draws} draws`;

@@ -4,20 +4,22 @@ Back to the [README](../README.md).
 
 ## The screen
 
-The left half of the screen is a third-person view of the unit you have selected; the right half is that unit's console. The units you are not operating fight on their own, in whatever mode you left them.
+The left half of the screen is a third-person view of the unit you have selected; the right half is that unit's console. The units you are not operating fight on their own, in whatever mode you left them. The consoles are labelled in the crews' own language (Russian or German); point at a column title of the target table to read it in English, click one to sort by it and click it again to reverse the order.
 
-## The title screen
+## The main menu
 
-A demonstration battle runs behind it. Its camera drifts slowly and cuts to another unit about every 26 s, and now and then to a missile launch. Pick an era, a difficulty and a loadout and click **Take command**.
+The menu comes up at once: nothing of the battlefield is built until you start a battle or a lesson. Behind it, pictures from the game show the units of your loadout firing. Pick an era, a difficulty and a loadout and click **Take command**.
 
-- **Era.** The toggle at the top of the options picks **Modern** (2020s) or **WW2** (1944 to 1945). The line under it gives the era's setting (point at the other era to read its own). An era brings its own map, units, raids and consoles; the loadout picker, the tutorials and the demonstration battle follow it. The era is kept in the browser for the next visit.
+- **Era.** The toggle at the top of the options picks **Modern** (2020s) or **WW2** (1944 to 1945). The line under it gives the era's setting (point at the other era to read its own). An era brings its own map, units, raids and consoles; the loadout picker and the tutorials follow it.
 - **Difficulty.** **Easy**, **Normal** or **Hard** change the size of the raids, the hit chances of your missiles and shells, the damage that gets through (less on Easy) and, in WW2, how well the gun crews and the Allied aircraft aim.
-- **Loadout.** Under the difficulty the title screen lists the five slots (the number keys) with their options, the default first: two each in the modern era, and in WW2 so far only slot 5 has a choice. The line under a slot gives the chosen option's trade-off (point at the other option to read its own).
-- **Trying a loadout.** Picking an option rebuilds the demonstration battle with it and cuts to that unit, so you see what you chose; **Take command** fights with it. The choice is kept in the browser for the next visit, one loadout per era.
+- **Loadout.** Under the difficulty the menu lists the five slots (the number keys) with their options, the default first: two each in the modern era, and in WW2 so far only slot 5 has a choice. The line under a slot gives the chosen option's trade-off (point at the other option to read its own). Picking an option shows that unit behind the menu.
+- **Kept.** The era, the difficulty and the loadout (one per era) are kept in the browser for the next visit.
+- **Loading.** **Take command** opens the battle: a card names the era, the difficulty and your units while the world is built, then the battle starts.
+- **Back to the menu.** **Main menu** at the bottom right of the 3D view (beside the ⚙) or on the end screen leaves the battle; **Fight again** on the end screen starts a new one at once.
 
 ## The battle
 
-- **The first raid** comes about 15 s after Take command, called on the radio.
+- **The first raid** comes about 15 s after the battle starts, called on the radio.
 - **Between raids** (40 s of quiet) a supply column refills the reserves. Launchers still have to reload, which takes from half a minute to two minutes and keeps that launcher out of action, so start them as the raid ends.
 - **In WW2** the guns' ammunition is brought up the same way, and the runway, if it still stands, gets back a quarter of its strength.
 - **You win** when every raid has been beaten off.
@@ -82,7 +84,7 @@ You command the German flak at Hopsten, a jet airfield in north-west Germany, in
 | 2 medium, Flak lane | 3.7 cm Flak 43 platoon (Martha): three guns on their own sights, fed clip by clip, reach to about 3 km | none yet |
 | 3 medium, dispersal | 3.7 cm Flak 43 platoon (Nordpol) | none yet |
 | 4 light, quadruple | 2 cm Flakvierling 38 platoon (Otto): three quadruple mounts, one on a wooden tower, a wall of fire inside 1.5 km | none yet |
-| 5 light | Flak tower (Paula; a what-if, the real ones stood in Berlin, Hamburg and Vienna): four twin 12.8 cm on its corner turrets laid from the predictor on its roof, two 3.7 cm on the roof and four Vierlinge on the galleries | 2 cm Flak 38 platoon: three single guns, short reach, quick to swing onto a diving attacker |
+| 5 light | Flak towers (Paula; a what-if, the real ones stood in Berlin, Hamburg and Vienna): a gun tower 70 m square with four twin 12.8 cm in the pits on its corners, laid from the predictor on its roof, four 3.7 cm and four Vierlinge in the nests hung on its corner towers, and a fire control tower 420 m away with the Wuerzburg-Riese and four more Vierlinge | 2 cm Flak 38 platoon: three single guns, short reach, quick to swing onto a diving attacker |
 
 Alternatives for slots 1 to 4 come later (`DESIGN.md`, "WW2 era").
 
@@ -106,14 +108,14 @@ Alternatives for slots 1 to 4 come later (`DESIGN.md`, "WW2 era").
 
 - **Gun selector.** GESCHÜTZWAHL (or W) picks the ones you command: the twin 12.8 cm on the predictor as a battery, or the 3.7 cm or the Vierlinge as a platoon.
 - **The rest** fight on with their crews unless the mode is HALT.
-- **Masking.** The tower's own walls mask its light guns, so a gun that would fire through the concrete holds (VERDECKT).
+- **Masking.** The towers' concrete masks their guns, so a gun that would fire through it holds (VERDECKT).
 
 ## Controls
 
 | Key | Action |
 |---|---|
-| Click an era | title screen: switch between Modern and WW2 |
-| Click a loadout option | title screen: swap that slot's unit for the next battle |
+| Click an era | main menu: switch between Modern and WW2 |
+| Click a loadout option | main menu: swap that slot's unit for the next battle |
 | `1`-`5` | select a unit (or click its tab above the console) |
 | Drag, wheel | orbit and zoom the camera |
 | `V` | padlock: the camera keeps the selected track in view |
@@ -123,7 +125,7 @@ Alternatives for slots 1 to 4 come later (`DESIGN.md`, "WW2 era").
 | `M` | mute |
 | `H` | hide the overlay |
 | `F3` | FPS, draw calls, battle counters |
-| `Esc` | in a lesson: back to the lesson list; again: back to the title |
+| `Esc` | in a lesson: back to the menu's lesson list; on the list: back to the menu |
 | ⚙ (bottom right) | settings: quality, difficulty, field of view, sun and weather, post-processing |
 
 The console keys act on the selected unit. Click a track on a scope, plot or table to select it.
@@ -145,14 +147,14 @@ The console keys act on the selected unit. Click a track on a scope, plot or tab
 
 ## Tutorials
 
-**Tutorials** on the title screen opens a list of short guided lessons for the era in play: one for each vehicle or gun unit, the loadout alternatives included, and in the modern era one for the basics. A tick shows the ones you have finished (kept in the browser's local storage).
+**Tutorials** on the main menu opens a list of short guided lessons for the era in play: one for each vehicle or gun unit, the loadout alternatives included, and in the modern era one for the basics. A tick shows the ones you have finished (kept in the browser's local storage).
 
 - **A quiet range.** Each lesson runs with the raids off: nothing is scored, nothing can be destroyed, and the other units stand down.
 - **Steps.** A card over the 3D view gives the step, a pulsing amber frame marks the console control it is about, and the step completes when you do the thing.
 - **Next and Skip.** Steps that only explain go on with **Next**; **Skip step** passes one you cannot complete.
 - **Time compression** stays in your hands: the + and - buttons by the time readout, or [ and ].
-- **Leaving.** Esc or **Exit** goes back to the list, Esc again to the title.
-- **Your loadout.** A lesson runs on the default units with its own vehicle swapped in (the Buk, Tunguska, Tor and Shilka lessons, and the WW2 2 cm Flak 38 lesson) and puts your loadout back when it ends.
+- **Leaving.** Esc or **Exit** goes back to the menu's list, Esc again to the menu.
+- **Your loadout.** A lesson runs on the default units with its own vehicle swapped in (the Buk, Tunguska, Tor and Shilka lessons, and the WW2 2 cm Flak 38 lesson) and leaves your loadout as it was.
 
 ### The lessons
 

@@ -106,6 +106,9 @@ export function partPlacements(unit) {
     x: unit.x + p.dx * c + p.dz * s,
     z: unit.z - p.dx * s + p.dz * c,
     heading: h,
+    // the structure a part on a deck stands on (`base`, its offset; default the unit's site): where its deck
+    // is measured from
+    ...(p.deck != null ? { bx: unit.x + (p.base?.[0] ?? 0) * c + (p.base?.[1] ?? 0) * s, bz: unit.z - (p.base?.[0] ?? 0) * s + (p.base?.[1] ?? 0) * c } : {}),
   }));
 }
 
@@ -118,8 +121,9 @@ export function flatPads() {
   const defs = buildUnits();
   SLOT_OPTIONS.forEach((opts, slot) => opts.slice(1).forEach((o) => defs.push({ ...o, ...SITES[slot] })));
   for (const u of defs) for (const p of partPlacements(u)) {
-    if (pads.some((q) => Math.abs(q.x - p.x) < 1 && Math.abs(q.z - p.z) < 1)) continue;
-    pads.push({ x: p.x, z: p.z, rx: 22, rz: 22, heading: p.heading, blend: 40 });
+    // a part on a structure's deck needs no ground of its own; a structure says how much it needs (`pad`)
+    if (p.deck != null || pads.some((q) => Math.abs(q.x - p.x) < 1 && Math.abs(q.z - p.z) < 1)) continue;
+    pads.push({ x: p.x, z: p.z, rx: p.pad?.[0] ?? 22, rz: p.pad?.[1] ?? 22, heading: p.heading, blend: 40 });
   }
   for (const a of ASSETS) {
     if (a.kind === 'runway') pads.push({ x: a.x, z: a.z, rx: a.width / 2 + 60, rz: a.length / 2 + 150, heading: headingFor(a.bearing), blend: 250 });

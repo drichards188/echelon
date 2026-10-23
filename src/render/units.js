@@ -42,13 +42,14 @@ const RAISED = new Set(['buk-radar', 'tor', 'tunguska', 'shilka']);
 // (m) and the times of the stroke and of the run-out (s): the 8.8 cm 1.05 m at 0 degrees to 0.70 m at 85
 // (rig.recoilLength), back fast and run out by its recuperator over most of a second; the 3.7 cm 0.127 m
 // and the 2 cm 0.053 m (the Vierling's 0.085 m a gun) inside their cyclic periods (0.24 and 0.13 s).
-const RECOIL = { flak88: [0, 0.06, 0.9], flak43: [0.127, 0.02, 0.14], flak38: [0.053, 0.012, 0.08], flakvierling: [0.085, 0.01, 0.07], flak128: [0.9, 0.07, 1.1] };
+const RECOIL = { flak88: [0, 0.06, 0.9], flak43: [0.127, 0.02, 0.14], flak38: [0.053, 0.012, 0.08], flakvierling: [0.085, 0.01, 0.07], flak128: [1.0, 0.07, 1.1] };
 RECOIL['flakvierling-tower'] = RECOIL.flakvierling;
 // each model's elevation limits (rad, from its header)
-const ELEV = { flak88: [-0.052, 1.484], flak43: [-0.175, 1.571], flak38: [-0.349, 1.571], flakvierling: [-0.175, 1.745], 'flakvierling-tower': [-0.175, 1.745], kdo40: [0, 1.571], wurzburg: [0, 1.571], flak128: [-0.05, 1.53] };
+const ELEV = { flak88: [-0.052, 1.484], flak43: [-0.175, 1.571], flak38: [-0.349, 1.571], flakvierling: [-0.175, 1.745], 'flakvierling-tower': [-0.175, 1.745], kdo40: [0, 1.571], wurzburg: [0, 1.571], wurzburgriese: [0, 1.31], flak128: [-0.05, 1.53] };
 // the sim's Vierling barrels (0 upper left, 1 upper right, 2 lower left, 3 lower right) on the model's guns
 // (0 1L upper left, 1 2R upper right, 2 3R lower right, 3 4L lower left)
 const VIER_GUN = [0, 1, 3, 2];
+const VIER_OPTS = { barrelGun: VIER_GUN };
 // one or two of the six heavy guns in Dunkelgelb, the rest Dunkelgrau (refs/ww2/markings 1.2), by letter
 const YELLOW_GUNS = new Set(['B', 'E']);
 // muzzle flashes (fx.muzzle size) and spent cases (fx.brass: diameter and length, m); the light guns'
@@ -64,8 +65,8 @@ const CASES_NEAR = 70;
 // layer 1 (no camera renders it), as the models switch their own meshes' `visible`.
 const LOD = [[600, 1], [1500, 2]];
 const RIG_FAR = 3000;
-// a structure seen from anywhere on the field (the flak tower): never culled, no distance levels
-const WHOLE = new Set(['flakturm']);
+// a structure seen from anywhere on the field (the flak towers): never culled, no distance levels
+const WHOLE = new Set(['flakturm', 'leitturm']);
 // the stroke, then the run-out: 0..1 of the full stroke `t` s after the shot
 const recoilCurve = (t, rise, back) => {
   if (t < 0) return 0;
@@ -767,6 +768,10 @@ export class UnitViews {
         }
         const id = part.gun?.target ?? (part.role === 'predictor' || part.role === 'radar' ? u.predictor?.target : null);
         h.setTarget(id != null ? sim.threatById.get(id)?.pos ?? null : null);
+        // the gun's loading and its shots drive the crew's drill and their flinch (the Vierling's barrels by gun)
+        if (part.gun) h.setGun(part.gun, dt, part.kind.startsWith('flakvierling') ? VIER_OPTS : undefined);
+        // a gun's loading machine moves on the same clock (the 12.8 cm twin's trays, hoists: flak128.js)
+        v.rigs[i].setDrill?.(h.drill);
       });
     }
     this.stance = stance;

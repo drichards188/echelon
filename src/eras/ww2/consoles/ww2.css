@@ -170,6 +170,9 @@
 .tlr { display: flex; height: 16px; align-items: center; padding: 0 3px; cursor: pointer; border-bottom: 1px solid rgba(60,90,140,.22); }
 .tlr:hover { background: rgba(179,36,26,.08); }
 .tlh { cursor: default; height: 16px; font: 700 8px/1 var(--stencil, sans-serif); letter-spacing: .05em; color: #3c5a8c; border-bottom: 1px solid rgba(60,90,140,.5); }
+.tlh .tlc { cursor: pointer; }
+.tlh .tlc.sorted { color: #b3241a; }
+.tlh .tlc.sorted::after { content: attr(data-dir); margin-left: 1px; font-size: 6px; }
 .tlc { flex: none; padding: 0 2px; white-space: nowrap; overflow: hidden; text-align: right; }
 .tlc.c-cls, .tlc.c-src, .tlc.c-eng { text-align: left; }
 .tlr.link { color: #6c5d4b; }
@@ -238,6 +241,11 @@
 .gcard44.view { box-shadow: inset 0 0 0 2px rgba(255,220,140,.55), 0 2px 5px rgba(0,0,0,.55); }
 .gcard44.dead { opacity: .6; filter: grayscale(.6); }
 .gcard44 .pbody { gap: 4px; width: 100%; }
+.guns44.many { flex-wrap: wrap; gap: 5px; }
+.guns44.many .gcard44 { flex: 1 1 calc(25% - 5px); padding: 17px 6px 5px; }
+/* compact: the feed's caption and the counters left out, so two rows take little more than one */
+.guns44.many .gcard44 .feed44 > .cap, .guns44.many .gcard44 .gdrums { display: none; }
+.guns44.many .gcard44 .pbody { gap: 2px; }
 .gcard44 .glamps { gap: 8px; flex-wrap: nowrap; }
 .gcard44 .glamps .lamp44.mini { flex-direction: row; gap: 4px; }
 .gcard44 .glamps .lamp44.mini .lbl { display: flex; align-items: flex-start; text-align: left; padding: 0; background: none; box-shadow: none; }

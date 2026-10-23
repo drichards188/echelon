@@ -58,7 +58,10 @@ function cabinet(T) {
     wins.push(x);
   }
   // the front face (toward the target): the big round black covers of the upper tier, doors below
-  for (const x of [-0.35, 0.38]) add(T, 'black', zTube(-0.5, -0.55, 0.12, 0.12, 20, x, 1.02));
+  for (const x of [-0.35, 0.38]) {
+    add(T, 'black', zTube(-0.5, -0.55, 0.12, 0.12, 20, x, 1.02));
+    add(T, 'paint', zTube(-0.5, -0.56, 0.135, 0.135, 20, x, 1.02, true), 0xd0d0d0); // its rim
+  }
   paint(box(0.56, 0.5, 0.02, -0.35, 0.42, -0.505), 0xd6d6d6);
   paint(box(0.5, 0.32, 0.02, 0.35, 0.3, -0.505), 0xd6d6d6);
   for (const s of [-1, 1]) paint(box(0.02, 0.55, 0.7, s * 0.755, 0.42, 0.02), 0xd6d6d6);
@@ -81,8 +84,27 @@ function cabinet(T) {
     paint(rbox(0.14, 0.22, 0.3, 0.03, s * 0.64, 1.27, -0.02), 0xdcdcdc);
     paint(xTube(s * 0.58, s * 0.7, 0.21, 0.21, 22, K.axis, 0), 0xe4e4e4);
   }
-  // the trackers' handwheels' gear housings on both sides of the upper tier
-  for (const s of [-1, 1]) paint(rbox(0.1, 0.2, 0.2, 0.02, s * 0.79, 1.0, 0.2), 0xd8d8d8);
+  // the trackers' handwheels' gear housings on both sides of the upper tier, their shafts
+  for (const s of [-1, 1]) {
+    paint(rbox(0.12, 0.26, 0.26, 0.03, s * 0.8, 1.0, 0.2), 0xd8d8d8);
+    add(T, 'metal', xTube(s * 0.86, s * 0.92, 0.025, 0.025, 8, 1.0, 0.2), 0x8a8a8a);
+  }
+  // the doors of the lower box as inset frames (kg40_02: tall doors on the sides, two on the front), their
+  // hinges and handles; the maker's data plate on the front; cable glands under the panel
+  const frame = (w, h, x, y, z, nx, nz) => {
+    const t = 0.025, d = 0.012;
+    const bar = (bw, bh, ox, oy) => paint(nz ? box(bw, bh, d, x + ox, y + oy, z + nz * d / 2) : box(d, bh, bw, x + nx * d / 2, y + oy, z + ox), 0xc4c4c4);
+    bar(w, t, 0, h / 2); bar(w, t, 0, -h / 2); bar(t, h, -w / 2, 0); bar(t, h, w / 2, 0);
+    add(T, 'black', nz ? box(0.02, 0.07, 0.015, x + w / 2 - 0.06, y, z + nz * 0.02) : box(0.015, 0.07, 0.02, x + nx * 0.02, y, z + w / 2 - 0.06), 0x202020);
+  };
+  for (const s of [-1, 1]) frame(0.62, 0.6, 0.0, 0.42, 0.0, s, 0);
+  for (const s of [-1, 1]) frame(0.025, 0.6, 0.0, 0.42, s * 0.33, 0, 0); // (the side doors' split)
+  frame(0.5, 0.42, -0.35, 0.42, -0.5, 0, -1);
+  frame(0.46, 0.28, 0.35, 0.3, -0.5, 0, -1);
+  add(T, 'white', box(0.16, 0.09, 0.01, 0.35, 0.58, -0.508), 0xd8d2c0); // data plate
+  for (const x of [-0.45, -0.15, 0.15, 0.45]) add(T, 'black', yTube(0.0, 0.06, 0.03, 0.03, 10, x, 0.83, 0.5), 0x222222);
+  // the step between the tiers, a lighter rubbing strip along the upper tier's top edge
+  paint(rbox(1.52, 0.04, 0.64, 0.015, 0, 1.24, -0.19), 0xe2e2e2);
   return { panelM, wins };
 }
 
@@ -97,10 +119,13 @@ function tube(E) {
     paint(xTube(s * 0.72, s * 1.15, 0.15, 0.125, 22, 0, 0));
     paint(xTube(s * 1.15, s * 1.2, 0.135, 0.135, 20, 0, 0), 0xd8d8d8);
     paint(xTube(s * 1.2, s * 1.95, 0.12, 0.115, 20, 0, 0));
-    paint(rbox(0.5, 0.33, 0.3, 0.03, s * 2.15, 0.0, 0.0));
-    paint(box(0.1, 0.3, 0.27, s * 2.37, 0.0, 0.0), 0xd8d8d8);
-    add(E, 'glass', box(0.16, 0.14, 0.01, s * 2.15, 0.0, -0.152)); // entrance window
-    add(E, 'black', box(0.18, 0.16, 0.008, s * 2.15, 0.0, -0.149));
+    paint(rbox(0.5, 0.33, 0.3, 0.04, s * 2.15, 0.0, 0.0));
+    paint(rbox(0.1, 0.3, 0.27, 0.02, s * 2.37, 0.0, 0.0), 0xd8d8d8);
+    add(E, 'glass', box(0.16, 0.14, 0.01, s * 2.15, 0.0, -0.162)); // entrance window
+    add(E, 'black', box(0.22, 0.2, 0.02, s * 2.15, 0.0, -0.155), 0x1a1a1a); // its bezel
+    paint(box(0.26, 0.03, 0.08, s * 2.15, 0.12, -0.18), 0xcfcfcf); // the hood over it
+    // clamp bands where the arm meets the end box and halfway along it, dark oiled steel
+    for (const x of [s * 1.94, s * 1.55]) add(E, 'metal', xTube(x - 0.025, x + 0.025, 0.128, 0.128, 20, 0, 0), 0x70726e);
     // U-shaped carrying handle
     for (const x of [s * 1.35, s * 1.65]) add(E, 'metal', rod(V(x, 0.1, 0), V(x, 0.26, 0.02), 0.012, 6), 0xb0b0b0);
     add(E, 'metal', rod(V(s * 1.35, 0.26, 0.02), V(s * 1.65, 0.26, 0.02), 0.012, 6), 0xb0b0b0);
@@ -111,12 +136,15 @@ function tube(E) {
   // the rangetaker's stereo eyepiece out on the left arm (kg40_01, kg40_arm_05)
   eyecups(E, -1.65, 0.11, 0.06, 0.22);
 }
-// an eyecup block (kg40_arm_05): a housing on the tube with two big black rubber cups raised toward the rear
+// an eyecup block (kg40_arm_05, kg40_02): a housing on the tube, the binocular body over it in black with a
+// red band round each barrel (the Helsinki set), two big black rubber cups raised toward the rear
 function eyecups(E, x, y, z, w = 0.2) {
-  add(E, 'paint', rbox(w + 0.04, 0.1, 0.18, 0.02, x, y, z), 0xd0d0d0);
+  add(E, 'paint', rbox(w + 0.06, 0.1, 0.2, 0.02, x, y, z), 0xd0d0d0);
+  add(E, 'black', rbox(w + 0.02, 0.09, 0.16, 0.025, x, y + 0.09, z + 0.03), 0x262626);
   for (const dx of [-w * 0.27, w * 0.27]) {
-    add(E, 'black', zTube(z + 0.05, z + 0.12, 0.035, 0.042, 12, x + dx, y + 0.08));
-    add(E, 'black', box(0.085, 0.09, 0.05, x + dx, y + 0.12, z + 0.12, 0.3, 0, 0));
+    add(E, 'black', zTube(z + 0.08, z + 0.17, 0.038, 0.046, 14, x + dx, y + 0.11), 0x1c1c1c);
+    add(E, 'white', zTube(z + 0.06, z + 0.08, 0.041, 0.041, 14, x + dx, y + 0.11), 0xa82820); // red band
+    add(E, 'black', rbox(0.095, 0.1, 0.06, 0.02, x + dx, y + 0.15, z + 0.18, 0.3, 0, 0), 0x141414); // rubber cup
   }
 }
 
@@ -175,8 +203,8 @@ export function buildKdo40() {
   for (const x of cb.wins) D.add('dial', cellQuad(0.25, 0.172, DIAL_CELLS.plate).applyMatrix4(cb.panelM.clone().multiply(xf(x, 0.062, 0, -Math.PI / 2, 0, 0))), { uv: true });
   for (const m of build(D, tur, K.platY, 0)) noShadow(m);
   // trackers' handwheels on the sides (azimuth left, elevation right)
-  const hwL = node(tur, 'wheelAz', -0.86, 1.0, 0.2), hwR = node(tur, 'wheelEl', 0.86, 1.0, 0.2);
-  wheelSet(root, [hwL, hwR].map((node, i) => ({ node, R: 0.13, M: xf(0, 0, 0, 0, (Math.PI / 2) * (i ? 1 : -1), 0) })), mats.black, { spokes: 4 });
+  const hwL = node(tur, 'wheelAz', -0.93, 1.0, 0.2), hwR = node(tur, 'wheelEl', 0.93, 1.0, 0.2);
+  wheelSet(root, [hwL, hwR].map((node, i) => ({ node, R: 0.16, M: xf(0, 0, 0, 0, (Math.PI / 2) * (i ? 1 : -1), 0) })), mats.black, { spokes: 4 });
 
   // ---- the rangefinder tube
   const el = pivotAt(rig, tur, 'elevation', 0, K.axis, 0);

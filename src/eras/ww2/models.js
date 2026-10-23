@@ -4,6 +4,7 @@
 // rigs (pivots, anchors, paint, markings) and the photos they were matched to.
 import { registerVehicles } from '../../models/vehicles.js';
 import { registerAssets } from '../../models/site.js';
+import { bakeKinds } from '../../models/ao.js';
 import { buildFlak88 } from './models/flak88.js';
 import { buildKdo40 } from './models/kdo40.js';
 import { buildWurzburg } from './models/wurzburg.js';
@@ -11,7 +12,8 @@ import { buildFlak43 } from './models/flak43.js';
 import { buildFlakvierling, buildFlakvierlingTower } from './models/flakvierling.js';
 import { buildFlak38 } from './models/flak38.js';
 import { buildFlak128 } from './models/flak128.js';
-import { buildFlakturm } from './models/flakturm.js';
+import { buildFlakturm, buildLeitturm } from './models/flakturm.js';
+import { buildWurzburgRiese } from './models/riese.js';
 import { ASSETS44 } from './models/assets44.js';
 import './models/markings44.js';
 
@@ -25,9 +27,14 @@ registerVehicles({
   flak38: buildFlak38,
   flak128: buildFlak128,
   flakturm: buildFlakturm,
+  leitturm: buildLeitturm,
+  wurzburgriese: buildWurzburgRiese,
 });
 
 registerAssets(ASSETS44);
+
+// every WW2 rig gets baked occlusion (models/ao.js): built from primitives, they need it most
+bakeKinds(['flak88', 'kdo40', 'wurzburg', 'flak43', 'flakvierling', 'flakvierling-tower', 'flak38', 'flak128', 'flakturm', 'leitturm', 'wurzburgriese']);
 
 // The gun crews (models/crew44.js, its figure figure44.js, poses pose44.js and jobs jobs44.js): one Crew44 layer
 // on the scene, place(rig, kind) for every rig of the kinds above; the API is in crew44.js's header.

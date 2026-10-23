@@ -48,29 +48,47 @@ body { display: flex; }
 
 #c { display: block; width: 100%; height: 100%; }
 #hud { position: absolute; inset: 0; pointer-events: none; transition: opacity 0.6s; }
-body.title #hud { opacity: 0; }
 body.ui-hidden #hud { opacity: 0; }
 
-/* ---------------------------------------------------------- title */
+/* ---------------------------------------------------------- the main menu (ui/menu.js) and a game page's
+   loading screen (ui/loading.js). Neither draws the world: stills from the game behind them (ui/backdrop.js),
+   the menu's title and options over the left, the loading screen's card in the middle. */
+#menu[hidden], #loading[hidden] { display: none; }
+body.menu #view, body.menu #panel { display: none; }
+#menu, #loading { position: fixed; inset: 0; background: #0b0d0b; }
+#menu { z-index: 50; }
 #title-screen {
   position: absolute;
   left: 7%;
-  bottom: 12%;
-  z-index: 10;
-  max-width: min(520px, 86%);
-  opacity: 0;
-  transform: translateY(12px);
-  pointer-events: none;
-  transition: opacity 0.9s ease, transform 0.9s ease;
+  bottom: 10%;
+  z-index: 2;
+  max-width: min(560px, 86%);
+  transition: opacity 0.6s ease, transform 0.6s ease;
 }
-body.title #title-screen { opacity: 1; transform: none; pointer-events: auto; }
-body.title #view::after {
-  content: '';
+/* the stills: two layers crossfading, each drifting slowly its own way, under a shade darkest behind the
+   menu on the left */
+.bd { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.bd-still {
+  position: absolute;
+  inset: -4%;
+  background: center / cover no-repeat;
+  opacity: 0;
+  transition: opacity 1.4s ease;
+  animation: bd-drift-a 26s ease-in-out infinite alternate;
+  will-change: transform, opacity;
+}
+.bd-still + .bd-still { animation-name: bd-drift-b; }
+.bd-still.on { opacity: 1; }
+.bd-shade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.55), transparent 70%), linear-gradient(0deg, rgba(0, 0, 0, 0.5), transparent 50%);
-  pointer-events: none;
-  z-index: 5;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.5) 34%, rgba(0, 0, 0, 0.1) 64%, rgba(0, 0, 0, 0.3) 100%), linear-gradient(0deg, rgba(0, 0, 0, 0.55), transparent 50%);
+}
+#loading .bd-shade { background: radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.75)); }
+@keyframes bd-drift-a { from { transform: scale(1) translate(0, 0); } to { transform: scale(1.07) translate(-1.6%, -0.8%); } }
+@keyframes bd-drift-b { from { transform: scale(1.07) translate(1.4%, 0.6%); } to { transform: scale(1) translate(0, 0); } }
+@media (prefers-reduced-motion: reduce) {
+  .bd-still { animation: none; transition: none; }
 }
 .brand h1 {
   font-size: clamp(44px, 7vw, 96px);
@@ -88,13 +106,7 @@ body.title #view::after {
   text-shadow: var(--shadow);
 }
 .brand .blurb { margin: 0 0 20px 4px; max-width: 440px; font-size: 14px; line-height: 1.55; text-shadow: var(--shadow); }
-.loader { margin: 0 0 20px 4px; transition: opacity 0.6s; }
-body.ready .loader { opacity: 0; height: 0; margin: 0; overflow: hidden; }
-#load-bar { width: 260px; height: 2px; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
-#load-bar-fill { height: 100%; width: 0; background: var(--accent); transition: width 0.3s ease; }
-#status { font-size: 12px; letter-spacing: 0.1em; color: var(--ui-dim); margin-top: 10px; min-height: 1.2em; }
-#options { display: none; margin: 0 0 16px 4px; }
-body.ready #options { display: block; }
+#options { margin: 0 0 16px 4px; }
 /* the era toggle, the menu's main control: a button per era (src/eras), the era's years under its name;
    one still in development is greyed out with a tag and cannot be picked. The line under it is the
    setting of the era in play, or of the one under the pointer. */
@@ -146,7 +158,7 @@ body.ready #options { display: block; }
 #loadout { display: grid; gap: 3px; }
 .lo-slot {
   display: grid;
-  grid-template-columns: 12px 128px auto;
+  grid-template-columns: 12px 168px auto;
   column-gap: 8px;
   align-items: center;
   padding: 3px 8px;
@@ -185,8 +197,7 @@ body.ready #options { display: block; }
   cursor: pointer;
   transition: background 0.25s, letter-spacing 0.25s, opacity 0.4s;
 }
-#play:hover:not(:disabled), #end button:hover { background: rgba(143, 227, 154, 0.3); letter-spacing: 0.38em; }
-#play:disabled { opacity: 0; pointer-events: none; }
+#play:hover, #end button:hover { background: rgba(143, 227, 154, 0.3); letter-spacing: 0.38em; }
 .keys { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 22px; font-size: 11px; color: var(--ui-dim); text-shadow: var(--shadow); }
 kbd { font-family: var(--mono); font-size: 10px; padding: 2px 6px; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 3px; margin-right: 4px; color: var(--ui); }
 
@@ -286,7 +297,7 @@ kbd { font-family: var(--mono); font-size: 10px; padding: 2px 6px; border: 1px s
 
 #debug { display: none; position: absolute; left: 22px; bottom: 16px; font: 11px/1.45 var(--mono); color: #cfe8d2; text-shadow: var(--shadow); white-space: pre; }
 body.debug #debug { display: block; }
-.stats { left: auto !important; right: 56px !important; top: auto !important; bottom: 12px !important; display: none !important; }
+.stats { left: auto !important; right: 160px !important; top: auto !important; bottom: 12px !important; display: none !important; }
 body.debug .stats { display: block !important; position: absolute !important; }
 
 /* ---------------------------------------------------------- end screen */
@@ -301,6 +312,10 @@ body.ended #end { display: grid; }
 #end-stats span { flex: 1; font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ui-dim); }
 #end-stats b { font: 700 16px var(--mono); }
 #end-stats small { font-size: 10px; color: var(--ui-dim); }
+.end-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+#end .end-actions button { padding: 13px 22px 13px 26px; }
+#end button.quiet { border-color: rgba(255, 255, 255, 0.35); background: rgba(0, 0, 0, 0.35); color: var(--ui); }
+#end button.quiet:hover { background: rgba(255, 255, 255, 0.14); }
 
 /* ---------------------------------------------------------- settings */
 #gear {
@@ -319,9 +334,54 @@ body.ended #end { display: grid; }
   cursor: pointer;
 }
 #gear:hover { color: var(--ui); border-color: rgba(255, 255, 255, 0.6); }
+/* the way back to the main menu, beside the gear */
+#return-menu {
+  position: absolute;
+  bottom: 16px;
+  right: 54px;
+  z-index: 30;
+  height: 30px;
+  padding: 0 12px;
+  font: 600 10px var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ui-dim);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  cursor: pointer;
+}
+#return-menu:hover { color: var(--ui); border-color: rgba(255, 255, 255, 0.6); }
 #gui-host { position: absolute; bottom: 54px; right: 16px; z-index: 29; }
 #gui-host .lil-gui.root { position: relative; max-height: calc(100vh - 110px); overflow-y: auto; }
 #gui-host.hidden { display: none; }
+
+/* ---------------------------------------------------------- the loading screen: what is being started */
+#loading { z-index: 60; display: grid; place-items: center; padding: 24px; overflow-y: auto; transition: opacity 0.6s ease; }
+body.loaded #loading { opacity: 0; pointer-events: none; }
+.ld-card {
+  position: relative;
+  width: min(580px, 100%);
+  padding: 24px 30px 18px;
+  background: rgba(10, 14, 10, 0.86);
+  border: 1px solid rgba(143, 227, 154, 0.3);
+  border-top: 3px solid var(--accent);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+.ld-head { display: flex; justify-content: space-between; gap: 16px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.12); font: 600 10px var(--mono); letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); }
+.ld-diff { color: var(--ui-dim); }
+.ld-title { margin: 18px 0 8px; font-size: 28px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+.ld-blurb { font-size: 13.5px; line-height: 1.55; color: rgba(255, 255, 255, 0.78); }
+.ld-blurb:empty, .ld-lines:empty { display: none; }
+.ld-lines { list-style: none; margin-top: 14px; display: grid; gap: 4px; font: 12px var(--mono); color: var(--ui-dim); white-space: pre; }
+#load-bar { margin-top: 20px; height: 2px; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
+#load-bar-fill { height: 100%; width: 0; background: var(--accent); transition: width 0.3s ease; }
+#status { font-size: 12px; letter-spacing: 0.1em; color: var(--ui-dim); margin-top: 10px; min-height: 1.2em; }
+.ld-foot { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.12); }
+.ld-foot .keys { margin: 0; gap: 6px 12px; font-size: 10px; text-shadow: none; }
+.ld-back { font: 10px var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); text-decoration: none; white-space: nowrap; }
+.ld-back:hover { text-decoration: underline; }
 
 /* ---------------------------------------------------------- tutorials */
 .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
@@ -355,8 +415,8 @@ body.ended #end { display: grid; }
   pointer-events: none;
   transition: opacity 0.5s ease, transform 0.5s ease;
 }
-body.title.tut-menu #tut-menu { opacity: 1; transform: none; pointer-events: auto; }
-body.title.tut-menu #title-screen { opacity: 0; transform: translateY(12px); pointer-events: none; }
+body.tut-menu #tut-menu { opacity: 1; transform: none; pointer-events: auto; }
+body.tut-menu #title-screen { opacity: 0; transform: translateY(12px); pointer-events: none; }
 #tut-menu h2 { font-size: 34px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; text-shadow: var(--shadow); }
 .tm-sub { margin: 6px 0 16px; font-size: 13px; line-height: 1.5; color: var(--ui-dim); text-shadow: var(--shadow); }
 #tut-list { display: grid; gap: 8px; margin-bottom: 16px; min-height: 0; overflow-y: auto; scrollbar-width: thin; }

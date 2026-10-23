@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { SK, SIDE } from './figure44.js';
-import { eyeSolve, look, eul, setIKv, POSES, GAITS, eyeOf, gripOnProp } from './pose44.js';
+import { eyeSolve, look, eul, setIKv, POSES, GAITS, eyeOf, gripOnProp, spec, resetSpec, lerpSpec } from './pose44.js';
 
 // The crews' jobs: for every WW2 gun rig (src/eras/ww2/models) and every crew spot in its anchors.crew, what
 // the man does there (his pose, his prop, his gear, the kind of man), with the hands and eyes put on the rig's
@@ -11,11 +11,12 @@ import { eyeSolve, look, eul, setIKv, POSES, GAITS, eyeOf, gripOnProp } from './
 // (flak88_crew_karow_01, _layers_karow_02, _loading_ba_06; markings_crew_laying_07, _loading_08,
 // _crew_2cm_09; flak38_tower_21; flakvierling_rangefinder_17) and refs/ww2/markings 5 for who manned them.
 //
-// A job: { role, pose(ctx, m, S), prop?(ctx, m), kit?, busy?, gloves?, place?(h, m, dt), easy?(ctx, m, S) }.
+// A job: { role, pose(ctx, m, S), prop?(ctx, m), kit?, busy?, gloves?, place?(h, m, dt), easy?(ctx, m, S), ease? }.
 //   role   'gunner' | 'tech' (technical posts: half Luftwaffenhelfer) | 'helper' | 'carrier' (older men,
 //          Hiwis) | 'nco' (gun and instrument commanders), weighted in ROLES
 //   pose   fills the pose44.js specification S in the man's root space through ctx's helpers (below)
 //   place  moves his root matrix m.W (world) before the pose: turning to the target, following the mount
+//   ease   1/s: he eases into each pose rather than taking it at once (the drill men, see "the loading drills")
 // Where a rig's spot does not fit the man, the crew layer corrects it here rather than in the rig (the guns'
 // files belong to their builder): every spot is stood on the surface found under it (prepareRig raycasts the
 // rig once, the median of five points under the feet: the Kommandogeraet's spots sit 0.1 m under its grating,
@@ -57,12 +58,13 @@ const xf = (x, y, z, rx = 0, ry = 0, rz = 0) => new THREE.Matrix4().compose(new 
 // it (axle +Z, knob at 90 degrees round the rim) and the radius, as the rigs build them (wheelSet calls).
 const WHEELS = {
   flak88: { wheelAz: [0, Math.PI / 2, 0, 0.15], wheelEl: [0, Math.PI / 2, 0, 0.15], wheelFz: [0, Math.PI, 0, 0.11] },
-  kdo40: { wheelAz: [0, -Math.PI / 2, 0, 0.13], wheelEl: [0, Math.PI / 2, 0, 0.13] },
+  kdo40: { wheelAz: [0, -Math.PI / 2, 0, 0.16], wheelEl: [0, Math.PI / 2, 0, 0.16] },
   wurzburg: { wheelEl: [0, Math.PI / 2, 0, 0.14], wheelAz: [Math.PI / 2, 0, 0, 0.19], wheelRange: [0, Math.PI / 2, 0, 0.09] },
   flak43: { wheelEl: [0, Math.PI / 2, 0, 0.12], wheelTr: [Math.PI / 2, 0, 0, 0.12] },
   flakvierling: { wheelEl: [0, Math.PI / 2, 0, 0.11], wheelTr: [Math.PI / 2, 0, 0, 0.11] },
   'flakvierling-tower': { wheelEl: [0, Math.PI / 2, 0, 0.11], wheelTr: [Math.PI / 2, 0, 0, 0.11] },
   flak38: { wheelEl: [0, Math.PI / 2, 0, 0.13], wheelTr: [Math.PI / 2, 0, 0, 0.15] },
+  flak128: { wheelEl: [0, 0, 0, 0.2], wheelAz: [0, 0, 0, 0.2] },
 };
 const KNOB = 0.31; // the knob's grip along the axle, in wheel radii (kit44.js handwheel)
 
@@ -110,7 +112,7 @@ export function prepareRig(rig, kind) {
   }
   const piv = rig.pivots;
   const nodes = [piv.turret, piv.elevation, piv.recoil, ...Object.values(wheels).map((w) => w.node), rig.anchors.sight, rig.anchors.breech, rig.anchors.feed, rig.anchors.magazine,
-    ...(rig.anchors.fuzeCups || []), ...(rig.anchors.magazines || []), ...(rig.anchors.muzzles || [])].filter(Boolean);
+    ...(rig.anchors.fuzeCups || []), ...(rig.anchors.magazines || []), ...(rig.anchors.muzzles || []), ...(rig.anchors.drillNodes || []), ...(rig.anchors.breeches || [])].filter(Boolean);
   // the standing heights under the spots (once: the platforms turn with their spots)
   const dy = new Map();
   for (const spot of Object.values(rig.anchors.crew || {})) dy.set(spot, surfaceUnder(rig, spot));
@@ -414,6 +416,486 @@ function crank(c, m, S, wheel, side, dial, lean = 0.18, feetZ = 0) {
   lookAt(S, dial, 0.9);
 }
 
+// ---------------------------------------------------------------- the loading drills
+
+// What a crew does between two shots, from its gun's drill clock (crew44.js setGun: h.drill). A drill job moves
+// through key poses along a phase: keys [[p, fill], ...] in order, each fill an ordinary pose function; between
+// two keys the man moves from one to the next (eased), before the first and after the last he holds them
+// (keyed). A round, clip or magazine passes from hand to hand at a point both men work out the same way
+// (between their spots): the key that takes it shows the prop there, the one that gives it hides it (pose44.js
+// lerpSpec), so one is seen at a time. A man turns on his spot to face his work (S.turn) and steps toward it
+// when it is out of reach. Sources: the 8.8 cm drill is refs/ww2/flak88 sec. 6 and 12 (K5 thrusts the round
+// into the setter's cup and pulls it out when it is set, K4 takes it to the loader, K3 pushes it home by hand
+// once the breech has thrown the case, steps clear and fires); the 12.8 cm twin's power rammer, its fixed 48 kg
+// rounds from the hoist and "the left gun loads from the left" are refs/ww2/flak128 sec. 5, 8, 12 and 16; the
+// 3.7 cm's clips onto the loading table and the 2 cm's magazine changes their sheets' sec. 6. The timing is
+// the sim's: a drill is laid over the gun's own loading (h.drill.load) or magazine change (h.drill.change).
+const SA = spec(), SB = spec();
+const D8 = Array.from({ length: 8 }, () => new V3()); // the drills' scratch points
+const ease = (t) => t * t * (3 - 2 * t);
+function keyed(c, m, S, p, keys) {
+  let i = 0;
+  while (i < keys.length - 1 && p >= keys[i + 1][0]) i++;
+  if (i === keys.length - 1 || p <= keys[i][0]) { keys[i][1](c, m, S); return; }
+  const t = ease((p - keys[i][0]) / (keys[i + 1][0] - keys[i][0]));
+  resetSpec(SA); SA.prop.s = S.prop.s; keys[i][1](c, m, SA);
+  resetSpec(SB); SB.prop.s = S.prop.s; keys[i + 1][1](c, m, SB);
+  lerpSpec(S, SA, SB, t);
+}
+// the turn (from his spot's facing) that puts root-space point W in front of him
+const faceTurn = (c, W, max = 1.8) => (c.m.st.turn ?? 0) + clamp(Math.atan2(-W.x, -W.z), -max, max);
+// A standing man working with his hands at root-space point W: turned to it, leaning and bending his knees
+// the lower it is, a step toward it when it is out of reach; looks at it.
+function workAt(c, m, S, W, { lean = 0.06, look: k = 0.85 } = {}) {
+  POSES.stand(S, c.t / 4);
+  const yaw = Math.atan2(-W.x, -W.z);
+  S.turn = faceTurn(c, W);
+  const low = clamp((1.12 - W.y) / 0.75, 0, 1);
+  const far = clamp(Math.hypot(W.x, W.z) - 0.55, 0, 0.45);
+  torsoStand(S, c, lean + 0.5 * low + 0.3 * far, 0.968 - 0.24 * low, 0.03 - 0.5 * far, clamp(yaw, -0.7, 0.7) * 0.4);
+  plant(S, -0.16, 0.06 - 0.5 * far, 0.15, -0.06 - 0.9 * far);
+  lookAt(S, W, k);
+}
+// down on his heels at root-space point W (taking something off the floor or out of a box)
+function pickAt(c, m, S, W) {
+  POSES.crouch(S, c.t / 4);
+  S.turn = faceTurn(c, W);
+  lookAt(S, W, 0.9);
+}
+// seated, reaching to root-space point W (a loader on the Vierling's seat)
+function seatAt(c, m, S, W, lean = 0.25) {
+  torsoSeat(S, c, lean + clamp((0.35 - W.y) * 0.8, 0, 0.45), clamp(Math.atan2(-W.x, -W.z), -0.8, 0.8) * 0.6, 0.03);
+  seatFeet(S, -0.15, -0.4, -0.4, 0.15, -0.4, -0.4);
+  S.turn = c.m.st.turn ?? 0;
+  lookAt(S, W, 0.85);
+}
+// a hand hanging at the thigh, as an IK grip so that a drill can carry it to a grip and back
+function restHand(S, i) { const s = SIDE[i]; setIKv(S.arms[i], s * 0.2, 0.83, 0.0, 0, -1, -0.1, -s, 0, 0, s * 0.5, -0.3, 1); }
+const restHands = (S) => { restHand(S, 0); restHand(S, 1); };
+// the round (its case head at the prop's origin, its nose along prop -Z) with its middle at W and its nose
+// along D (root space); L its length, m. `toward`: where its +Y should face (else up)
+function roundMid(S, W, D, L, toward = _up) {
+  D8[7].copy(D).normalize();
+  propAt(S, D8[6].copy(W).addScaledVector(D8[7], -0.5 * L * S.prop.s), aimQ(_q, D8[7], toward));
+}
+// both hands under a held round, r its radius: the hand on the side of its base at zBase from the case head,
+// the other at zOther
+function underRound(S, zBase, zOther, r) {
+  propPt(S, 0, 0, zBase, D8[4]); propPt(S, 0, 0, zOther, D8[5]);
+  const b = D8[4].x > D8[5].x ? 1 : 0;
+  gripProp(S, b, 0, -r, zBase, [0, 0.3, -1], [0, 1, 0], [SIDE[b], -1, 0.3]);
+  gripProp(S, 1 - b, 0, -r, zOther, [0, 0.3, -1], [0, 1, 0], [SIDE[1 - b], -1, 0.3]);
+}
+// a crew spot's place in its gun's turret frame (a man on the ground who follows the mount round keeps his
+// place in that frame); the point k of the way from spot a to spot b, h m over the lower floor, root space;
+// the level direction across the line from a to b (a load handed over lies across it, its nose to a's left)
+function spotT(c, name, out) {
+  const o = c.rig.anchors.crew[name], T = c.rig.pivots.turret;
+  return o.parent === T ? out.copy(o.position) : out.copy(o.position).sub(T.position);
+}
+function between(c, a, b, k, h, out) {
+  spotT(c, a, D8[0]); spotT(c, b, D8[1]);
+  return c.p(c.rig.pivots.turret, lerp(D8[0].x, D8[1].x, k), Math.min(D8[0].y, D8[1].y) + h, lerp(D8[0].z, D8[1].z, k), out);
+}
+function across(c, a, b, out) {
+  spotT(c, a, D8[0]); spotT(c, b, D8[1]);
+  return c.d(c.rig.pivots.turret, D8[1].z - D8[0].z, 0, D8[0].x - D8[1].x, out).normalize();
+}
+// a point on a gun with its barrel run out (recoil pivot rc at rest; a an anchor on it, offsets in its space)
+function atRest(c, rc, a, x, y, z, out) {
+  return c.p(rc.parent, rc.position.x + a.position.x + x, rc.position.y + a.position.y + y, a.position.z + z, out);
+}
+
+// -------- the 8.8 cm: K5 at the setter's cup, K4 between, K3 at the breech (refs/ww2/flak88 sec. 6, 12)
+const R88 = 0.932;
+// K3 at the breech: the round along the bore, its nose s m past the chamber mouth (-0.1 just short of it, R88
+// home), the right hand at its base, the left under the case until it goes in, then on the breech ring
+function k3Bore(c, m, S, s, has = true) {
+  const rc = c.rig.pivots.recoil, br = c.rig.anchors.breech;
+  const M = atRest(c, rc, br, 0, 0, 0, D8[2]), D = c.d(br, 0, 0, -1, D8[3]);
+  roundMid(S, D8[4].copy(M).addScaledVector(D, (s - 0.5 * R88) * S.prop.s), D, R88);
+  S.prop.on = has;
+  workAt(c, m, S, propPt(S, 0, 0, -0.3, D8[5]), { lean: 0.1 });
+  gripProp(S, 1, 0.0, -0.045, -0.06, [0, 0.3, -1], [0, 1, 0], [1, -1, 0.5]);
+  if (s < 0.3) gripProp(S, 0, 0.0, -0.05, -0.45, [1, 0.2, 0], [0, 1, 0], [-1, -1, 0.2]);
+  else hand(S, 0, atRest(c, rc, br, -0.24, 0.12, -0.2, D8[5]), 0, -1, -0.3, 0, -1, 0, -0.8, -1, 0.3);
+  lookAt(S, atRest(c, rc, br, 0, 0, 0, D8[2]), 0.9);
+}
+// clear of the breech, the right hand on the firing lever at the cradle's rear left, eyes on the breech
+function k3Lever(c, m, S) {
+  const rc = c.rig.pivots.recoil, br = c.rig.anchors.breech;
+  atRest(c, rc, br, -0.3, -0.06, -0.4, D8[2]);
+  workAt(c, m, S, D8[2], { lean: 0.04 });
+  hand(S, 1, D8[2], 0, -1, -0.2, -1, 0, 0, 0.8, -1, 0.3);
+  restHand(S, 0);
+  lookAt(S, atRest(c, rc, br, 0, 0, 0, D8[3]), 0.6);
+}
+// a round handed over between the men at spots a and b (halfway, 1 m up, across the line from a to b); this
+// man's hands under it at zBase and zOther from the case head
+function handed(c, m, S, a, b, L, r, zBase, zOther, has) {
+  between(c, a, b, 0.5, 1.0, D8[2]);
+  roundMid(S, D8[2], across(c, a, b, D8[3]), L);
+  S.prop.on = has;
+  workAt(c, m, S, between(c, a, b, 0.5, 1.0, D8[2]), { lean: 0.1 });
+  underRound(S, zBase, zOther, r);
+}
+const K3_88 = [
+  [0, k3Lever],
+  [0.16, (c, m, S) => handed(c, m, S, 'k3', 'k4', R88, 0.05, -0.12, -0.42, false)],
+  [0.28, (c, m, S) => handed(c, m, S, 'k3', 'k4', R88, 0.05, -0.12, -0.42, true)],
+  [0.46, (c, m, S) => k3Bore(c, m, S, -0.1)],
+  [0.6, (c, m, S) => k3Bore(c, m, S, 0)],
+  [0.8, (c, m, S) => k3Bore(c, m, S, 0.62)],
+  [0.89, (c, m, S) => k3Bore(c, m, S, R88)],
+  [0.9, (c, m, S) => k3Bore(c, m, S, R88, false)],
+  [0.98, k3Lever],
+];
+// K4: a round cradled, turned to the man he hands it to (or takes it from); empty-handed, turned to him
+function k4Cradle(c, m, S, to) {
+  between(c, 'k4', to, 0.5, 1.0, D8[6]);
+  cradle88(c, m, S, -1);
+  S.turn = faceTurn(c, D8[6]);
+}
+const k4Empty = (to) => (c, m, S) => { workAt(c, m, S, between(c, 'k4', to, 0.5, 1.0, D8[6])); restHands(S); };
+const K4_88 = [
+  [0, (c, m, S) => k4Cradle(c, m, S, 'k3')],
+  [0.18, (c, m, S) => handed(c, m, S, 'k3', 'k4', R88, 0.05, -0.58, -0.8, true)],
+  [0.28, (c, m, S) => handed(c, m, S, 'k3', 'k4', R88, 0.05, -0.58, -0.8, true)],
+  [0.38, k4Empty('k5')],
+  [0.46, (c, m, S) => handed(c, m, S, 'k5', 'k4', R88, 0.05, -0.14, -0.42, false)],
+  [0.54, (c, m, S) => handed(c, m, S, 'k5', 'k4', R88, 0.05, -0.14, -0.42, true)],
+  [0.7, (c, m, S) => k4Cradle(c, m, S, 'k3')],
+];
+// K5: the round nose down in the setter's outer cup, lifted `up` m out of it, his hands round the case
+function k5Cup(c, m, S, up, has = true) {
+  const cup = c.rig.anchors.fuzeCups ? c.rig.anchors.fuzeCups[1] : null;
+  if (cup) c.p(cup, 0, -0.08 + up, 0, D8[2]); else D8[2].set(0, 1.0 + up, -0.6);
+  c.d(cup || c.rig.root, 0, -1, 0, D8[3]);
+  propAt(S, D8[4].copy(D8[2]).addScaledVector(D8[3], -R88 * S.prop.s), aimQ(_q, D8[3], _z));
+  S.prop.on = has;
+  POSES.stand(S, c.t / 4);
+  torsoStand(S, c, 0.12, 0.968, 0.02, clamp(Math.atan2(-D8[2].x, -D8[2].z), -0.5, 0.5));
+  S.turn = faceTurn(c, D8[2], 0.6);
+  plant(S, -0.15, 0.02, 0.13, -0.08);
+  gripProp(S, 1, 0.03, 0.05, -0.22, [-1, 0, 0], [0, -1, 0], [1, -0.6, 0.4]);
+  gripProp(S, 0, -0.03, 0.05, -0.44, [1, 0, 0], [0, -1, 0], [-1, -0.6, 0.4]);
+  lookAt(S, D8[2], 0.8);
+}
+// the ready rounds K5 draws from: the rack on the setter housing beside him (flak88.js anchors.rack); his
+// hands under the round (`grip`) or still at his sides, the round shown in the slot or not (`has`)
+function k5Basket(c, m, S, has, grip = true) {
+  const rk = c.rig.anchors.rack;
+  c.p(rk, 0, 0, 0, D8[2]);
+  roundMid(S, D8[2], c.d(rk, 0, 0, -1, D8[3]), R88);
+  S.prop.on = has;
+  workAt(c, m, S, D8[2], { lean: 0.12 });
+  if (grip) underRound(S, -0.12, -0.5, 0.05); else restHands(S);
+}
+const K5_88 = [
+  [0, (c, m, S) => k5Cup(c, m, S, 0)],
+  [0.38, (c, m, S) => k5Cup(c, m, S, 0)],
+  [0.46, (c, m, S) => k5Cup(c, m, S, 0.45)],
+  [0.54, (c, m, S) => handed(c, m, S, 'k5', 'k4', R88, 0.05, -0.55, -0.8, true)],
+  [0.58, (c, m, S) => k5Basket(c, m, S, false, false)],
+  [0.6, (c, m, S) => k5Basket(c, m, S, true, false)],
+  [0.68, (c, m, S) => k5Basket(c, m, S, true, false)],
+  [0.74, (c, m, S) => k5Basket(c, m, S, true)],
+  [0.84, (c, m, S) => { cradle88(c, m, S, 1); S.turn = 0; }],
+  [0.92, (c, m, S) => k5Cup(c, m, S, 0.45)],
+  [0.98, (c, m, S) => k5Cup(c, m, S, 0)],
+];
+
+// -------- the 12.8 cm twin (flak128.js LOAD, LOAD_PHASES; refs/ww2/flak128 sec. 5, 8, 12; flak105 sec. 5):
+// at each gun its ammunition number takes the next round as it comes up the hoist, carries it cradled and hands
+// it to the loader, both men's hands on it; the loader lays it in the gun's loading tray at rest beside him and
+// pulls the release lever; the tray swings the round in behind the breech, the rollers ram it home and the tray
+// swings back empty. A round no hand holds lies in the tray or stands in the hoist: the rig's machine (rig.load)
+// places it, so the men's props follow the machine exactly while it moves.
+const R128 = 1.488, RAD128 = 0.075;
+// side -1: the left gun's loader K3 and his number K5; +1: the right gun's K4 and K6
+const T128 = { '-1': { me: 'k3', ammo: 'k5', gun: 0 }, 1: { me: 'k4', ammo: 'k6', gun: 1 } };
+const g128 = (side) => T128[side].gun;
+// a 12.8 cm round on a rig node: its middle at the node's local (0, dy, dz), its nose along the node's -Z
+function roundOn(c, S, node, dz = 0, dy = 0) {
+  c.p(node, 0, dy, dz, D8[2]); c.d(node, 0, 0, -1, D8[3]); c.d(node, 0, 1, 0, D8[4]);
+  roundMid(S, D8[2], D8[3], R128, D8[4]);
+}
+// the round in its tray as the machine has it: swinging in, then rammed (its middle moves a round's length
+// forward, base at the chamber mouth); `has`: shown
+function roundInTray(c, S, side, has = true) {
+  roundOn(c, S, c.rig.anchors.trays[g128(side)], -R128 * c.rig.load.ram);
+  S.prop.on = has && c.rig.load.ram < 1;
+}
+// where the round is handed over: on the platform between the two men, 1 m up, a little inboard; it lies
+// across their line, its nose inboard
+function handOverAt(c, side, out) {
+  spotT(c, T128[side].me, D8[0]); spotT(c, T128[side].ammo, D8[1]);
+  return c.p(c.rig.pivots.turret, (D8[0].x + D8[1].x) / 2 - side * 0.08, D8[0].y + 1.0, (D8[0].z + D8[1].z) / 2, out);
+}
+function roundHanded(c, S, side) {
+  handOverAt(c, side, D8[5]);
+  c.d(c.rig.pivots.turret, -side, 0, 0, D8[1]);
+  roundMid(S, D8[5], D8[1], R128);
+}
+// the ammunition number's hands under the base half of a round handed over, the loader's under the nose half
+const giverHands = (S) => underRound(S, -0.28, -0.62, RAD128);
+const takerHands = (S) => underRound(S, -0.86, -1.16, RAD128);
+// K3/K4, the loader: facing the hand-over, empty-handed
+function loaderReady(c, m, S, side) {
+  workAt(c, m, S, handOverAt(c, side, D8[5]), { lean: 0.04 });
+  restHands(S);
+}
+// reaching for the round the number holds out (has false: still the number's), or holding it with him
+function loaderTake(c, m, S, side, has) {
+  roundHanded(c, S, side);
+  S.prop.on = has;
+  workAt(c, m, S, propPt(S, 0, 0, -1.08, D8[5]), { lean: 0.1 });
+  takerHands(S);
+}
+// the round over the tray at rest (up m above it) or in it: the base hand under the overhanging base end, the
+// other on the round's top at its middle
+function loaderLay(c, m, S, side, up, has = true) {
+  roundOn(c, S, c.rig.anchors.trayRest[g128(side)], 0, up);
+  S.prop.on = has;
+  workAt(c, m, S, propPt(S, 0, 0, -0.4, D8[5]), { lean: 0.16 });
+  propPt(S, 0, 0, -0.2, D8[4]); propPt(S, 0, 0, -0.75, D8[5]);
+  const b = side < 0 ? 1 : 0; // the hand nearer the base end
+  gripProp(S, b, 0, -RAD128, -0.16, [0, 0.3, -1], [0, 1, 0], [SIDE[b], -1, 0.3]);
+  gripProp(S, 1 - b, 0, RAD128 * 0.9, -0.6, [-side, -0.3, 0], [0, -1, 0], [SIDE[1 - b], 0.3, 0.8]);
+}
+// his hand on the release lever's knob (the round in the tray, the machine's), the other at rest
+function loaderLever(c, m, S, side, pull) {
+  const lv = c.rig.anchors.levers[g128(side)];
+  c.p(lv, side * 0.04 * pull, 0.05 - 0.06 * pull, 0.04 * pull, D8[6]);
+  workAt(c, m, S, D8[6], { lean: 0.12 });
+  const i = side < 0 ? 0 : 1; // the hand on the gun's side
+  hand(S, i, D8[6], 0, -1, -0.2, -side, 0, 0, SIDE[i] * 0.6, -1, 0.3);
+  restHand(S, 1 - i);
+  roundInTray(c, S, side);
+}
+// clear of the swinging tray, watching the breech; the round the machine's while it is still out of the bore
+function loaderWatch(c, m, S, side) {
+  const br = c.rig.anchors.breeches[g128(side)];
+  c.p(br, 0, 0, 0, D8[6]);
+  workAt(c, m, S, c.p(c.rig.anchors.trayRest[g128(side)], 0, 0, 0, D8[5]), { lean: 0.02, look: 0 });
+  restHands(S);
+  lookAt(S, D8[6], 0.8);
+  roundInTray(c, S, side);
+}
+const LOADER128 = Object.fromEntries([-1, 1].map((side) => [side, [
+  [0, (c, m, S) => loaderReady(c, m, S, side)],
+  [0.12, (c, m, S) => loaderTake(c, m, S, side, false)],
+  [0.22, (c, m, S) => loaderTake(c, m, S, side, true)],
+  [0.36, (c, m, S) => loaderLay(c, m, S, side, 0.14)],
+  [0.44, (c, m, S) => loaderLay(c, m, S, side, 0)],
+  [0.47, (c, m, S) => loaderLever(c, m, S, side, 0)],
+  [0.53, (c, m, S) => loaderLever(c, m, S, side, 1)],
+  [0.58, (c, m, S) => loaderWatch(c, m, S, side)],
+  [0.9, (c, m, S) => loaderWatch(c, m, S, side)],
+  [0.98, (c, m, S) => loaderReady(c, m, S, side)],
+]]));
+// K5/K6, the ammunition number: the round cradled across him at the waist, turned to the hand-over
+function numberCradle(c, m, S, side) {
+  POSES.carry(S, c.t / 4);
+  torsoStand(S, c, -0.06, 0.94, 0.04);
+  S.turn = faceTurn(c, handOverAt(c, side, D8[2]), 3.2);
+  plant(S, -0.17, 0.02, 0.16, -0.04);
+  roundMid(S, D8[2].set(0, 0.97, -0.3), D8[3].set(-side, 0, 0), R128);
+  S.prop.on = true;
+  underRound(S, -0.35, -1.1, RAD128);
+  glance(S, c, m, 0.4);
+}
+// holding it out at the hand-over (has false: the loader has it now, his hands still near it)
+function numberGive(c, m, S, side, has) {
+  roundHanded(c, S, side);
+  S.prop.on = has;
+  workAt(c, m, S, propPt(S, 0, 0, -0.4, D8[5]), { lean: 0.1 });
+  if (has) giverHands(S); else restHands(S);
+}
+// at the hoist: the round coming up it (the machine's, rig.load.rise), his hands on its upper part once he
+// takes it (`grip`), lifted `up` m out of the mouth
+function numberHoist(c, m, S, side, grip, up = 0) {
+  const ho = c.rig.anchors.hoists[g128(side)];
+  const drop = grip ? 0 : (1 - c.rig.load.rise) * 1.7;
+  c.p(ho, 0, R128 / 2 - drop + up, 0, D8[2]);
+  c.d(ho, 0, 1, 0, D8[3]);
+  D8[4].set(-D8[2].x, 0, -D8[2].z).normalize(); // its +Y toward him
+  roundMid(S, D8[2], D8[3], R128, D8[4]);
+  S.prop.on = true;
+  c.p(ho, 0, 1.0, 0, D8[5]);
+  workAt(c, m, S, D8[5], { lean: 0.1 });
+  if (grip) {
+    gripProp(S, 1, 0.05, RAD128 * 0.8, -0.85, [-1, 0, 0], [0, -1, 0], [1, -0.6, 0.4]);
+    gripProp(S, 0, -0.05, RAD128 * 0.8, -1.1, [1, 0, 0], [0, -1, 0], [-1, -0.6, 0.4]);
+  } else restHands(S);
+}
+// turned away to the hoist, the round not up yet (nothing shown)
+function numberToHoist(c, m, S, side) {
+  workAt(c, m, S, c.p(c.rig.anchors.hoists[g128(side)], 0, 1.0, 0, D8[5]), { lean: 0.02 });
+  restHands(S);
+}
+const AMMO128 = Object.fromEntries([-1, 1].map((side) => [side, [
+  [0, (c, m, S) => numberCradle(c, m, S, side)],
+  [0.12, (c, m, S) => numberGive(c, m, S, side, true)],
+  [0.22, (c, m, S) => numberGive(c, m, S, side, true)],
+  [0.26, (c, m, S) => numberGive(c, m, S, side, false)],
+  [0.32, (c, m, S) => numberToHoist(c, m, S, side)],
+  [0.33, (c, m, S) => numberHoist(c, m, S, side, false)],
+  [0.47, (c, m, S) => numberHoist(c, m, S, side, false)],
+  [0.52, (c, m, S) => numberHoist(c, m, S, side, true)],
+  [0.62, (c, m, S) => numberHoist(c, m, S, side, true, 0.25)],
+  [0.76, (c, m, S) => numberCradle(c, m, S, side)],
+]]));
+
+// -------- the 3.7 cm: the loader lays the clips on the table, the two ammunition numbers bring them in turn
+// K3 with a clip over the table's left end, `down` of the way from 6 cm over it to laid on it
+function k3Clip(c, m, S, down, has = true) {
+  POSES.stand(S, c.t / 4);
+  const feed = c.rig.anchors.feed;
+  c.p(feed, -0.12 + 0.06 * down, 0.06 - 0.055 * down, 0.02, D8[2]);
+  c.d(feed, 0, 0, -1, D8[3]); c.d(feed, 0, 1, 0, D8[4]);
+  propAt(S, D8[2], aimQ(_q, D8[3], D8[4]));
+  S.prop.on = has;
+  propPt(S, 0, 0, 0, D8[5]);
+  const low = clamp((1.1 - D8[5].y) / 0.5, 0, 1);
+  torsoStand(S, c, 0.2 + 0.35 * low, 0.968 - 0.12 * low, 0.03, clamp(Math.atan2(-D8[5].x, -D8[5].z), -0.6, 0.6));
+  S.turn = faceTurn(c, D8[5], 0.5);
+  plant(S, -0.15, 0.06, 0.15, -0.06);
+  gripProp(S, 0, -0.19, -0.03, 0.0, [0, 0.3, -1], [0.3, 1, 0], [-1, -1, 0.3]);
+  gripProp(S, 1, 0.19, -0.03, 0.0, [0, 0.3, -1], [-0.3, 1, 0], [1, -1, 0.3]);
+  lookAt(S, D8[5], 0.9);
+}
+// the ammunition number whose turn it is to hand the loader his next clip (they take turns)
+const clipBy = (h) => (h.drill.loads % 2 ? 'k4' : 'k5');
+// a clip handed to the loader by `from`: halfway between them 1 m up, the rounds' noses toward the loader; the
+// giver holds it by its rear, the loader takes it by its front
+function handedClip(c, m, S, from, giver, has) {
+  spotT(c, 'k3', D8[0]); spotT(c, from, D8[1]);
+  c.d(c.rig.pivots.turret, D8[0].x - D8[1].x, 0, D8[0].z - D8[1].z, D8[3]).normalize();
+  propAt(S, between(c, 'k3', from, 0.5, 1.0, D8[2]), aimQ(_q, D8[3]));
+  S.prop.on = has;
+  workAt(c, m, S, D8[2], { lean: 0.08 });
+  const z = giver ? 0.1 : -0.12, f = giver ? -1 : 1, x = giver ? 0.19 : -0.19;
+  gripProp(S, 1, x, -0.03, z, [0, 0.3, f], [0, 1, 0], [1, -1, 0.3]);
+  gripProp(S, 0, -x, -0.03, z, [0, 0.3, f], [0, 1, 0], [-1, -1, 0.3]);
+}
+const K3_37_LAY = [[0, (c, m, S) => k3Clip(c, m, S, 0)], [0.8, (c, m, S) => k3Clip(c, m, S, 1)]];
+const K3_37_FETCH = [
+  [0, (c, m, S) => k3Clip(c, m, S, 1, false)],
+  [0.4, (c, m, S) => handedClip(c, m, S, clipBy(c.h), false, false)],
+  [0.7, (c, m, S) => handedClip(c, m, S, clipBy(c.h), false, true)],
+  [1.3, (c, m, S) => k3Clip(c, m, S, 0)],
+];
+// an ammunition number: a clip ready at his belt, turned to the loader; on his turn he hands it over and
+// fetches the next from the ready box at his right
+function clipReady(c, m, S) {
+  between(c, 'k3', m.job, 0.5, 1.0, D8[6]);
+  cradleClip(c, m, S);
+  S.turn = faceTurn(c, D8[6]);
+}
+function clipBox(c, m, S, has) {
+  propAt(S, D8[2].set(0.5, 0.32, -0.15), eul(_q, 0, -Math.PI / 2, 0));
+  S.prop.on = has;
+  pickAt(c, m, S, D8[2]);
+  gripProp(S, 0, -0.17, -0.03, 0.0, [0, 0.3, -1], [0.2, 1, 0], [-1, -1, 0.3]);
+  gripProp(S, 1, 0.17, -0.03, 0.0, [0, 0.3, -1], [-0.2, 1, 0], [1, -1, 0.3]);
+}
+const CARRIER_37 = [
+  [0, clipReady],
+  [0.4, (c, m, S) => handedClip(c, m, S, m.job, true, true)],
+  [0.7, (c, m, S) => handedClip(c, m, S, m.job, true, true)],
+  [0.85, (c, m, S) => { clipBox(c, m, S, false); POSES.stand(S, c.t / 4); torsoStand(S, c, 0.1, 0.96, 0.03); plant(S, -0.15, 0.04, 0.14, -0.06); restHands(S); }],
+  [1.4, (c, m, S) => clipBox(c, m, S, false)],
+  [1.55, (c, m, S) => clipBox(c, m, S, true)],
+  [2.3, clipReady],
+];
+
+// -------- the 2 cm: a magazine change (the empty one off, a full one into the well), then the next to hand
+// which way gun i's magazine sticks out from its well (the Flak 38's to its left; the Vierling's outboard)
+const magSide = (c, i) => (c.rig.anchors.magazines ? (i === 0 || i === 3 ? -1 : 1) : -1);
+// the middle of gun i's magazine in its well, `out` m further out along it (root space); the well's frame into
+// D8[3] (forward) and D8[4] (up)
+function magPoint(c, i, out, out3) {
+  const a = c.rig.anchors.magazines ? c.rig.anchors.magazines[i] : c.rig.anchors.magazine;
+  c.d(a, 0, 0, -1, D8[3]); c.d(a, 0, 1, 0, D8[4]);
+  return c.p(a, magSide(c, i) * ((c.rig.anchors.magazines ? 0.15 : 0.2) + out), -0.01, 0, out3);
+}
+// stage 0: the left hand on the empty magazine (in it: mag20L), the full one held low; 1: the empty one pulled
+// away and dropped; 2: the full one at the well's mouth; 3: home in the well. Standing, or seated.
+function magChange(c, m, S, i, stage, seated) {
+  if (stage >= 2) {
+    const W = magPoint(c, i, stage >= 3 ? 0 : 0.3, D8[2]);
+    propAt(S, W, aimQ(_q, D8[3], D8[4]));
+    S.prop.on = true;
+    if (seated) seatAt(c, m, S, W); else workAt(c, m, S, W, { lean: 0.1 });
+    const s = magSide(c, i);
+    gripProp(S, s < 0 ? 0 : 1, s * 0.13, 0.04, 0.0, [s, -0.4, 0], [0, -1, 0], [SIDE[s < 0 ? 0 : 1], -1, 0.3]);
+    gripProp(S, s < 0 ? 1 : 0, s * 0.02, 0.0, 0.05, [0, -0.3, -1], [0, 0, -1], [SIDE[s < 0 ? 1 : 0], -1, 0.3]);
+    return;
+  }
+  const W = magPoint(c, i, 0, D8[2]);
+  if (seated) seatAt(c, m, S, W); else workAt(c, m, S, W, { lean: 0.1 });
+  S.prop.on = true;
+  if (seated) { propAt(S, D8[5].set(0, 0.26, -0.4), eul(_q, 0, 0, 0)); gripProp(S, 1, 0.13, 0.04, 0.0, [0, -0.3, -1], [-0.3, -0.2, 1], [1, -1, 0.3]); }
+  else { propAt(S, D8[5].set(0.25, 0.62, -0.03), eul(_q, 0, Math.PI / 2, Math.PI / 2)); gripProp(S, 1, 0.155, 0.0, 0.0, [0, -1, 0], [-1, 0, 0], [1, -0.3, 0.8]); }
+  if (stage === 0) hand(S, 0, W, 0, -1, 0, 0, 0, 1, -0.8, -1, 0.3);
+  else hand(S, 0, D8[6].set(-0.5, seated ? 0.15 : 0.6, -0.05), 0, -1, 0, 1, 0, 0, -1, -0.3, 0.6);
+}
+// the change keys (the magazine prop: mag20pair while he has the empty one, see magProp) and after it: the
+// hands off the well, then the next full one from the box at his feet (standing) or the rack in front (seated)
+const MAG_DROP = 0.33;
+const magProp = (h, i) => (h.drill.change[i] >= 0 && h.drill.change[i] < MAG_DROP ? 'mag20pair' : 'mag20');
+const changeKeys = (i, seated) => [
+  [0, (c, m, S) => magChange(c, m, S, i, 0, seated)],
+  [0.3, (c, m, S) => magChange(c, m, S, i, 1, seated)],
+  [0.38, (c, m, S) => magChange(c, m, S, i, 1, seated)],
+  [0.55, (c, m, S) => magChange(c, m, S, i, 2, seated)],
+  [0.85, (c, m, S) => magChange(c, m, S, i, 3, seated)],
+];
+function magFetch(c, m, S, seated, has) {
+  if (seated) {
+    // the rack on the platform in front of his seat (flakvierling.js: eight a side, lips down)
+    c.p(c.rig.pivots.turret, (m.job === 'k2' ? -1 : 1) * 0.8, 0.31, 0.08, D8[2]);
+    propAt(S, D8[2], eul(_q, 0, Math.PI / 2, Math.PI / 2));
+    seatAt(c, m, S, D8[2], 0.4);
+  } else {
+    propAt(S, D8[2].set(-0.35, 0.18, 0.2), eul(_q, 0, 0, 0));
+    pickAt(c, m, S, D8[2]);
+  }
+  S.prop.on = has;
+  gripProp(S, 0, -0.12, 0.05, 0.0, [0, -0.3, -1], [0, -1, 0], [-1, -1, 0.3]);
+  gripProp(S, 1, 0.12, 0.05, 0.0, [0, -0.3, -1], [0, -1, 0], [1, -1, 0.3]);
+}
+const afterKeys = (i, seated, ready) => [
+  [0, (c, m, S) => { magChange(c, m, S, i, 3, seated); S.prop.on = false; }],
+  [0.35, (c, m, S) => { magFetch(c, m, S, seated, false); if (!seated) { POSES.stand(S, c.t / 4); torsoStand(S, c, 0.1, 0.96, 0.03); plant(S, -0.15, 0.04, 0.14, -0.06); restHands(S); } }],
+  [0.75, (c, m, S) => magFetch(c, m, S, seated, false)],
+  [0.9, (c, m, S) => magFetch(c, m, S, seated, true)],
+  [1.5, (c, m, S) => { ready(c, m, S); S.turn = 0; }],
+];
+
+// -------- how the men take a shot: at the heavy guns all of them flinch from the blast (the head ducks, the
+// shoulders come up) for a moment, a man at the binoculars or the rangefinder less; at the light guns the layer
+// is shaken by the gun while it fires
+const blast = (s) => (s < 0.06 ? s / 0.06 : Math.exp(-(s - 0.06) / 0.3));
+function flinch(c, m, S) {
+  const d = c.h.drill;
+  if (!(d.since < 1.6)) return;
+  const k = blast(d.since) * (m.propNow === 'bino' || m.propNow === 'rangefinder' ? 0.3 : 1);
+  S.shrug[0] += 0.035 * k; S.shrug[1] += 0.035 * k;
+  S.headQ.multiply(eul(_q, -0.3 * k, (m.seed > 0.5 ? 0.15 : -0.15) * k, 0));
+  S.chestQ.multiply(eul(_q, -0.06 * k, 0, 0));
+  S.hips.y -= 0.025 * k;
+}
+function shaken(c, m, S) {
+  const d = c.h.drill;
+  if (m.job !== 'k1' || !(d.since < 0.2)) return;
+  const k = 1 - d.since / 0.2, ph = c.t * 70;
+  S.hips.x += 0.006 * k * Math.sin(ph); S.hips.z += 0.008 * k * Math.sin(ph * 1.3);
+  S.headQ.multiply(eul(_q, 0.02 * k * Math.sin(ph * 0.9), 0.015 * k * Math.sin(ph * 1.1), 0));
+}
+export const REACT = { flak88: flinch, flak128: flinch, flak43: shaken, flak38: shaken, flakvierling: shaken, 'flakvierling-tower': shaken };
+
 // ---------------------------------------------------------------- the jobs, by rig kind
 
 // turret-space points of the 88's right-side receivers (dial faces) and the fuze receiver
@@ -450,53 +932,11 @@ const flak88 = {
     },
     easy: sitEasy,
   },
-  // K3: the loader at the left rear of the breech with a round ready at his right hip, pointing at the chamber
-  // mouth; a thick loading glove (LeMO Bienert). Loading itself is for the scenes (m.propWorld on the bore).
-  k3: {
-    role: 'gunner', busy: true, gloves: true, prop: () => 'round88',
-    pose(c, m, S) {
-      POSES.stand(S, c.t / 4);
-      c.p(c.rig.anchors.breech, 0, 0, 0, P[0]); // the chamber mouth
-      // the base at the right hip, lower when the breech is low; the round pointing at the mouth, its nose
-      // stopping 0.1 m short of it
-      const B = P[1].set(0.17, clamp(P[0].y - 0.25, 0.78, 1.0), -0.24);
-      const D = P[2].subVectors(P[0], B);
-      const L = D.length();
-      D.normalize();
-      const need = 1.03 * S.prop.s; // the round and its gap, in his root space
-      if (L < need) B.addScaledVector(D, L - need);
-      propAt(S, B, aimQ(_q, D));
-      const low = clamp((1.1 - P[0].y) / 0.5, 0, 1);
-      torsoStand(S, c, 0.12 + 0.3 * low, 0.968 - 0.08 * low, 0.04, clamp(Math.atan2(-P[0].x, -P[0].z) * 0.5, -0.5, 0.5));
-      plant(S, -0.17, 0.1, 0.14, -0.14);
-      // the right hand round the case near its head, the left under the case at its shoulder
-      gripProp(S, 1, 0.0, -0.04, -0.07, [0, 0.3, -1], [0, 1, 0], [1, -1, 0.5]);
-      gripProp(S, 0, 0.0, -0.05, -0.45, [1, 0.2, 0], [0, 1, 0], [-1, -1, 0.2]);
-      lookAt(S, P[0], 0.9);
-    },
-    easy: atEase,
-  },
-  // K4: the ammunition number between setter and loader, a round cradled ready
-  k4: { role: 'gunner', busy: true, prop: () => 'round88', pose: (c, m, S) => cradle88(c, m, S, -1), easy: atEase },
-  // K5: thrusts the rounds nose down into the setter's outer cup; holds one there, arms up on the case
-  k5: {
-    role: 'tech', busy: true, prop: () => 'round88', place: stepIn(0.22),
-    pose(c, m, S) {
-      POSES.stand(S, c.t / 4);
-      const cup = c.rig.anchors.fuzeCups ? c.rig.anchors.fuzeCups[1] : null;
-      if (cup) c.p(cup, 0, -0.08, 0, P[0]); else P[0].set(0, 1.0, -0.6);
-      c.d(cup || c.rig.root, 0, -1, 0, P[1]);
-      // the round upright, nose in the cup, its case head up
-      propAt(S, P[2].copy(P[0]).addScaledVector(P[1], -0.932 * S.prop.s), aimQ(_q, P[1], _z));
-      torsoStand(S, c, 0.12, 0.968, 0.02, clamp(Math.atan2(-P[0].x, -P[0].z), -0.5, 0.5));
-      plant(S, -0.15, 0.02, 0.13, -0.08);
-      // both hands round the case from his side (the prop's +Y faces him), the right near the head
-      gripProp(S, 1, 0.03, 0.05, -0.22, [-1, 0, 0], [0, -1, 0], [1, -0.6, 0.4]);
-      gripProp(S, 0, -0.03, 0.05, -0.44, [1, 0, 0], [0, -1, 0], [-1, -0.6, 0.4]);
-      lookAt(S, P[0], 0.8);
-    },
-    easy: atEase,
-  },
+  // K3 the loader at the left rear of the breech (a thick loading glove, LeMO Bienert), K4 between the setter
+  // and him, K5 at the setter's outer cup: the loading drill (K3_88, K4_88, K5_88), one cycle per round
+  k3: { role: 'gunner', busy: true, gloves: true, ease: 14, prop: () => 'round88', pose: (c, m, S) => keyed(c, m, S, c.h.drill.load, K3_88), easy: atEase },
+  k4: { role: 'gunner', busy: true, ease: 14, prop: () => 'round88', pose: (c, m, S) => keyed(c, m, S, c.h.drill.load, K4_88), easy: atEase },
+  k5: { role: 'tech', busy: true, ease: 14, prop: () => 'round88', place: stepIn(0.22), pose: (c, m, S) => keyed(c, m, S, c.h.drill.load, K5_88), easy: atEase },
   // the gun commander, at the pit's left rear, headset and binoculars
   gf: { role: 'nco', kit: binoKit, prop: binoProp, pose: commander, place: turnObserver, easy: atEase },
   // K7, K8: the ammunition carriers at their niches: one kneels to draw a round, the other holds one ready
@@ -676,29 +1116,22 @@ const flak43 = {
     },
     easy: sitEasy,
   },
-  // K3: holds the next 8-round clip just over the table's left end, ready to lay it
+  // K3: lays the 8-round clips on the table's left end as it empties, and takes the next from an ammunition
+  // number (K3_37_LAY while the gun is loading, K3_37_FETCH after)
   k3: {
-    role: 'gunner', busy: true, gloves: true, prop: () => 'clip37',
-    pose(c, m, S) {
-      POSES.stand(S, c.t / 4);
-      const feed = c.rig.anchors.feed;
-      c.p(feed, -0.12, 0.06, 0.02, P[0]);
-      c.d(feed, 0, 0, -1, P[1]); c.d(feed, 0, 1, 0, P[2]);
-      propAt(S, P[0], aimQ(_q, P[1], P[2]));
-      propPt(S, 0, 0, 0, P[3]);
-      const low = clamp((1.1 - P[3].y) / 0.5, 0, 1);
-      torsoStand(S, c, 0.2 + 0.35 * low, 0.968 - 0.12 * low, 0.03, clamp(Math.atan2(-P[3].x, -P[3].z), -0.6, 0.6));
-      plant(S, -0.15, 0.06, 0.15, -0.06);
-      gripProp(S, 0, -0.19, -0.03, 0.0, [0, 0.3, -1], [0.3, 1, 0], [-1, -1, 0.3]);
-      gripProp(S, 1, 0.19, -0.03, 0.0, [0, 0.3, -1], [-0.3, 1, 0], [1, -1, 0.3]);
-      lookAt(S, P[3], 0.9);
-    },
+    role: 'gunner', busy: true, gloves: true, ease: 14, prop: () => 'clip37',
+    pose: (c, m, S) => (c.h.drill.loading ? keyed(c, m, S, c.h.drill.load, K3_37_LAY) : keyed(c, m, S, c.h.drill.done, K3_37_FETCH)),
     easy: atEase,
   },
-  k4: { role: 'carrier', busy: true, gloves: true, prop: () => 'clip37', pose: cradleClip, place: faceGun, easy: atEase },
-  k5: { role: 'carrier', busy: true, gloves: true, prop: () => 'clip37', pose: cradleClip, place: faceGun, easy: atEase },
+  // K4 and K5 hand him the clips in turn, keeping their places as the mount turns
+  k4: { role: 'carrier', busy: true, gloves: true, ease: 14, prop: () => 'clip37', pose: carrier37, place: followMount, easy: atEase },
+  k5: { role: 'carrier', busy: true, gloves: true, ease: 14, prop: () => 'clip37', pose: carrier37, place: followMount, easy: atEase },
   gf: { role: 'nco', kit: binoKit, prop: binoProp, pose: commander, place: turnObserver, easy: atEase },
 };
+function carrier37(c, m, S) {
+  if (clipBy(c.h) === m.job) keyed(c, m, S, c.h.drill.done, CARRIER_37); else clipReady(c, m, S);
+  stepping(c, m, S);
+}
 // a man on the ground near the gun faces the mount (the rigs' facings for some of these point away)
 function faceGun(h, m) {
   const e = m.W.elements, p = _v.setFromMatrixPosition(h.rig.pivots.turret.matrixWorld);
@@ -731,10 +1164,25 @@ function vierlingLoader(c, m, S) {
   if (mags) { c.p(mags[m.job === 'k2' ? 0 : 1], 0, 0, 0, P[1]); lookAt(S, P[1], 0.8); }
   glance(S, c, m, 0.3);
 }
+// the loaders change their guns' magazines as they empty: K2 the left guns 1L and 4L, K3 the right 2R and 3R
+const VLOAD = { k2: [0, 3], k3: [1, 2] };
+// which of his guns the loader is busy with: one being changed, else the one changed last
+function vGun(h, job) {
+  const d = h.drill, [a, b] = VLOAD[job];
+  if (d.change[a] >= 0) return a;
+  if (d.change[b] >= 0) return b;
+  return (d.after[a] ?? Infinity) <= (d.after[b] ?? Infinity) ? a : b;
+}
+const V_CHANGE = [0, 1, 2, 3].map((i) => changeKeys(i, true)), V_AFTER = [0, 1, 2, 3].map((i) => afterKeys(i, true, vierlingLoader));
+function vierlingDrill(c, m, S) {
+  const i = vGun(c.h, m.job), d = c.h.drill;
+  if (d.change[i] >= 0) keyed(c, m, S, d.change[i], V_CHANGE[i]); else keyed(c, m, S, d.after[i] ?? Infinity, V_AFTER[i]);
+}
+const vLoader = { role: 'gunner', busy: true, gloves: true, ease: 14, prop: (c, m) => magProp(c.h, vGun(c.h, m.job)), pose: vierlingDrill, easy: sitEasy };
 const vierling = {
   k1: { role: 'gunner', pose: vierlingLayer, easy: sitEasy },
-  k2: { role: 'gunner', busy: true, gloves: true, prop: () => 'mag20', pose: vierlingLoader, easy: sitEasy },
-  k3: { role: 'gunner', busy: true, gloves: true, prop: () => 'mag20', pose: vierlingLoader, easy: sitEasy },
+  k2: vLoader,
+  k3: vLoader,
   gf: { role: 'nco', kit: binoKit, prop: binoProp, pose: commander, easy: atEase },
   k4: {
     role: 'tech', place: faceGun,
@@ -814,38 +1262,59 @@ const flak38 = {
     easy: atEase,
   },
   k3: { role: 'helper', busy: true, prop: () => 'mag20pair', pose: carryMags, place: faceGun, easy: atEase },
-  // the loader at the gun's left: a full magazine held ready beside the one on the gun
+  // the loader at the gun's left: a full magazine held ready beside the one on the gun; he changes it as it
+  // empties (CHANGE_38) and takes the next from the box at his feet (AFTER_38)
   k4: {
-    role: 'helper', busy: true, gloves: true, prop: () => 'mag20', place: followMount,
+    role: 'helper', busy: true, gloves: true, ease: 14, prop: (c) => magProp(c.h, 0), place: followMount,
     pose(c, m, S) {
-      POSES.stand(S, c.t / 4);
-      const mg = c.rig.anchors.magazine;
-      // the magazine on the gun sticks out to the left from the well; hold the next one just behind it
-      c.p(mg, -0.2, 0.0, 0.18, P[0]);
-      c.d(mg, -1, 0, 0, P[1]); c.d(mg, 0, 1, 0, P[2]);
-      _v3.crossVectors(P[1], P[2]); // the gun's magazine's -Z
-      propAt(S, P[0], aimQ(_q, _v3, P[2]));
-      propPt(S, 0, 0, 0, P[3]);
-      const low = clamp((1.05 - P[3].y) / 0.5, 0, 1);
-      torsoStand(S, c, 0.15 + 0.3 * low, 0.968 - 0.1 * low, 0.03, clamp(Math.atan2(-P[3].x, -P[3].z), -0.6, 0.6));
-      plant(S, -0.15, 0.04, 0.14, -0.05);
+      const d = c.h.drill;
+      if (d.change[0] >= 0) keyed(c, m, S, d.change[0], CHANGE_38); else keyed(c, m, S, d.after[0] ?? Infinity, AFTER_38);
       stepping(c, m, S);
-      gripProp(S, 0, -0.12, 0.06, 0.0, [0, -1, 0], [0, 0, -1], [-1, -1, 0.3]);
-      gripProp(S, 1, 0.1, -0.06, 0.0, [0, 1, 0], [0, 0, -1], [1, -1, 0.3]);
-      c.p(mg, 0, 0, 0, P[4]); lookAt(S, P[4], 0.9);
     },
     easy: atEase,
   },
   k5: { role: 'helper', prop: () => 'rangefinder', pose: rangefinder, place: turnObserver, easy: atEase },
   gf: { role: 'nco', kit: binoKit, prop: binoProp, pose: commander, place: turnObserver, easy: atEase },
 };
+// the Flak 38 loader's ready pose: the next magazine held just behind the one on the gun
+function k4Mag38(c, m, S) {
+  POSES.stand(S, c.t / 4);
+  const mg = c.rig.anchors.magazine;
+  // the magazine on the gun sticks out to the left from the well; hold the next one just behind it
+  c.p(mg, -0.2, 0.0, 0.18, P[0]);
+  c.d(mg, -1, 0, 0, P[1]); c.d(mg, 0, 1, 0, P[2]);
+  _v3.crossVectors(P[1], P[2]); // the gun's magazine's -Z
+  propAt(S, P[0], aimQ(_q, _v3, P[2]));
+  propPt(S, 0, 0, 0, P[3]);
+  const low = clamp((1.05 - P[3].y) / 0.5, 0, 1);
+  torsoStand(S, c, 0.15 + 0.3 * low, 0.968 - 0.1 * low, 0.03, clamp(Math.atan2(-P[3].x, -P[3].z), -0.6, 0.6));
+  plant(S, -0.15, 0.04, 0.14, -0.05);
+  gripProp(S, 0, -0.12, 0.06, 0.0, [0, -1, 0], [0, 0, -1], [-1, -1, 0.3]);
+  gripProp(S, 1, 0.1, -0.06, 0.0, [0, 1, 0], [0, 0, -1], [1, -1, 0.3]);
+  c.p(mg, 0, 0, 0, P[4]); lookAt(S, P[4], 0.9);
+}
+const CHANGE_38 = changeKeys(0, false), AFTER_38 = afterKeys(0, false, k4Mag38);
 
-// the flak tower's 12.8 cm twin (flak128.js; a sketch, so its men stand to their posts without hand work on
-// the mount): the layers in their cabins and the loaders and ammunition numbers at the trays and the hoist
-const post = (role, kit = []) => ({ role, kit, pose: atEase, easy: atEase });
+// the flak tower's 12.8 cm twin (flak128.js): the layers K1 and K2 seated at the right wall, each with his
+// handwheel and his eyes on his receiver's dial (follow the pointer); beside each gun its loader at the tray and
+// behind him on the platform his ammunition number at the hoist (the left gun's K3 and K5, the right's K4 and
+// K6: LOADER128, AMMO128), the gun commander on the left platform
+const layer128 = (wheel, dz) => ({
+  role: 'tech', kit: ['headset'],
+  pose(c, m, S) {
+    torsoSeat(S, c, 0.32, 0, 0.04);
+    seatFeet(S, -0.15, -0.42, -0.3, 0.15, -0.42, -0.3);
+    onKnob(S, c, 1, wheel);
+    onRim(S, c, 0, wheel, 0, 0.6, 0.6);
+    lookAt(S, c.p(c.rig.pivots.turret, 1.47, 1.6, dz, P[1]), 0.9);
+  },
+  easy: sitEasy,
+});
+const loader128 = (side) => ({ role: 'gunner', busy: true, gloves: true, ease: 12, prop: () => 'round128', pose: (c, m, S) => keyed(c, m, S, c.h.drill.loading ? c.h.drill.load : 1, LOADER128[side]), easy: atEase });
+const ammo128 = (side) => ({ role: 'carrier', busy: true, gloves: true, ease: 12, prop: () => 'round128', pose: (c, m, S) => keyed(c, m, S, c.h.drill.loading ? c.h.drill.load : 1, AMMO128[side]), easy: atEase });
 const flak128 = {
-  k1: post('tech', ['headset']), k2: post('tech', ['headset']), k3: post('gunner'), k4: post('gunner'),
-  k5: post('carrier'), k6: post('carrier'),
+  k1: layer128('wheelEl', -0.85), k2: layer128('wheelAz', -0.45),
+  k3: loader128(-1), k4: loader128(1), k5: ammo128(-1), k6: ammo128(1),
   gf: { role: 'nco', kit: binoKit, prop: binoProp, pose: commander, place: turnObserver, easy: atEase },
 };
 

@@ -77,7 +77,8 @@ function line(u, data) {
 }
 
 // o (the flak tower's console, turm.js): title [de, en], heavyOnly (the gun reports list the heavy guns
-// only: the light ones have their own pages), cal (the heavy guns' calibre on the plot), keys (more help)
+// only: the light ones have their own pages), cal (the heavy guns' calibre on the plot), radar [de, en, set] (its
+// plate's title and the switch's set: the tower's Wuerzburg-Riese), keys (more help)
 export function mountBattery(ctx, o = {}) {
   const { send, memo } = ctx;
   const root = el('div', 'con c44 battery44');
@@ -140,7 +141,7 @@ export function mountBattery(ctx, o = {}) {
   });
   const knobs = el('div', 'rowc knobs');
   knobs.append(mode.el, art.el, rng.el);
-  const radar = new Toggle({ ru: 'FuMG 62', en: 'WÜRZBURG ON', color: 'green', onChange: (on) => send('radar', { on }) });
+  const radar = new Toggle({ ru: o.radar?.[2] ?? 'FuMG 62', en: 'WÜRZBURG ON', color: 'green', onChange: (on) => send('radar', { on }) });
   const trig = new Btn({ ru: 'FEUER', en: 'SALVOS (HOLD)', color: 'red', hold: true, cls: 'big trig44', onDown: () => trigger(true), onUp: () => trigger(false) });
   const single = new Btn({ ru: 'EINZEL', en: 'ONE GUN', color: 'amber', onClick: () => { takeManual(u, send, true); send('fire', {}); } });
   const stop = new Btn({ ru: 'STOPFEN', en: 'CEASE ON TARGET', color: 'white', onClick: () => { if (u) send('cease', { trackId: u.selected }); } });
@@ -168,7 +169,7 @@ export function mountBattery(ctx, o = {}) {
   const pgSub = pg.el.querySelector('.ptitle i');
 
   // ---------------------------------------------------------------- Wuerzburg, plot, targets
-  const pw = plate('WÜRZBURG D', 'FuMG 62 RADAR', 'pl-wz');
+  const pw = plate(...(o.radar?.slice(0, 2) ?? ['WÜRZBURG D', 'FuMG 62 RADAR']), 'pl-wz');
   const wz = new Wurzburg44({ size: 136, strip: 20 });
   pw.body.append(wz.el);
   tut(pw.el, 'wurzburg');

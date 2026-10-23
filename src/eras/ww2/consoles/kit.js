@@ -399,17 +399,43 @@ export class Dial {
 
 // ---------------------------------------------------------------------------------------------------
 // The target list (Zielliste): the unit's own sightings and the reporting service's plots, nearest first;
-// a click designates. Pooled rows keyed by track id, as ui/tracktable.js.
+// a click on a row designates, on a column title sorts by it (again: the other way). Pooled rows keyed by
+// track id, as ui/tracktable.js. Each column's English on hover; the sort key per column.
 const COLS = [
-  ['id', 'NR', 30], ['cls', 'ART', 34], ['rng', 'ENTF', 40], ['alt', 'HÖHE', 44], ['brg', 'SEITE', 38], ['src', 'MELD.', 40], ['eng', 'FEUER', 54],
+  ['id', 'NR', 30, 'Nummer: the target\'s number', (t) => Number(t.id) || 0],
+  ['cls', 'ART', 34, 'Art (type): BOM bomber, JAG fighter, AUF reconnaissance, DÜP Window (chaff), ? unidentified', (t) => clsOf(t.cls)[2]],
+  ['rng', 'ENTF', 40, 'Entfernung: range, km', (t) => t.range],
+  ['alt', 'HÖHE', 44, 'Höhe: altitude, m', (t) => t.alt],
+  ['brg', 'SEITE', 38, 'Seite: bearing, degrees', (t) => t.bearing],
+  ['src', 'MELD.', 40, 'Meldung (report): EIGEN our own sighting, NACHB from a neighbouring unit, FluMe from the aircraft reporting service', (t, data) => srcOf(t, data)],
+  ['eng', 'FEUER', 54, 'Feuer: the units firing at it', (t) => (t.engagedBy || []).length],
 ];
+const SORT = Object.fromEntries(COLS.map(([k, , , , key]) => [k, key]));
+// who reported it: our own sighting, a neighbouring unit's, or the reporting service's plot
+function srcOf(t, data) {
+  if (t.source !== 'link') return 'EIGEN';
+  return (data.picture || []).some((p) => p.id === t.id && p.reporter) ? 'NACHB' : 'FluMe';
+}
 export class TargetList {
   constructor({ onPick, rows = 8 }) {
     this.el = el('div', 'tlist44');
     const head = el('div', 'tlr tlh');
-    for (const [k, h, w] of COLS) {
+    this.sortKey = 'rng';
+    this.dir = 1;
+    this.heads = {};
+    for (const [k, h, w, en] of COLS) {
       const c = el('span', 'tlc c-' + k, h);
       c.style.width = w + 'px';
+      c.title = `${en}\n(click to sort)`;
+      c.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        snd('click');
+        if (this.sortKey === k) this.dir = -this.dir; else { this.sortKey = k; this.dir = 1; }
+        this.sorted();
+        this.tick = 1;
+        this.key = '';
+      });
+      this.heads[k] = c;
       head.append(c);
     }
     this.body = el('div', 'tlb');
@@ -420,13 +446,25 @@ export class TargetList {
     this.max = rows;
     this.tick = 1;
     this.key = '';
+    this.sorted();
+  }
+  // the sorted column's title marked, with its direction
+  sorted() {
+    for (const [k, c] of Object.entries(this.heads)) {
+      setCls(c, 'sorted', k === this.sortKey);
+      c.dataset.dir = k === this.sortKey ? (this.dir > 0 ? '▲' : '▼') : '';
+    }
   }
   update(dt, u, tracks, data, force = false) {
     this.tick += dt;
     if (this.tick < 0.25 && !force && this.sel === u.selected) return;
     this.tick = 0;
     this.sel = u.selected;
-    const list = tracks.filter((t) => t.cls !== 'bomb' && t.cls !== 'rocket').sort((a, b) => a.range - b.range);
+    const by = SORT[this.sortKey], dir = this.dir;
+    const list = tracks.filter((t) => t.cls !== 'bomb' && t.cls !== 'rocket').sort((a, b) => {
+      const ka = by(a, data), kb = by(b, data);
+      return (ka < kb ? -1 : ka > kb ? 1 : 0) * dir || a.range - b.range;
+    });
     const seen = new Set();
     const order = [];
     for (const t of list) {
@@ -448,13 +486,12 @@ export class TargetList {
         });
         this.rows.set(t.id, r);
       }
-      const reported = t.source === 'link' && !(data.picture || []).some((p) => p.id === t.id && p.reporter);
       setText(r.cells.id, pad3(t.id));
       setText(r.cells.cls, clsOf(t.cls)[2]);
       setText(r.cells.rng, km(t.range));
       setText(r.cells.alt, thou(t.alt));
       setText(r.cells.brg, pad3(Math.round(t.bearing) % 360));
-      setText(r.cells.src, t.source === 'link' ? (reported ? 'FluMe' : 'NACHB') : 'EIGEN');
+      setText(r.cells.src, srcOf(t, data));
       setText(r.cells.eng, (t.engagedBy || []).map((id) => (data.units.find((x) => x.id === id)?.callsign ?? id).slice(0, 4).toUpperCase()).join(' '));
       setCls(r.el, 'sel', t.id === u.selected);
       setCls(r.el, 'link', t.source === 'link');

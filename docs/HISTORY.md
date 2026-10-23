@@ -15,7 +15,7 @@ The systems keep their real names, look and place in the layering, and the WW2 s
 
 - **Values.** Every range, rate, hit chance and reload time is a game value tuned for play. The modern alternatives' values are set relative to the defaults, not taken from real figures.
 - **Raids.** The raids are scripted and much smaller than the real ones.
-- **The flak tower** at Hopsten is a what-if; the real ones stood in Berlin, Hamburg and Vienna.
+- **The flak towers** at Hopsten are a what-if; the real pairs stood in Berlin, Hamburg and Vienna. The pair is built after the first type (the three Berlin towers and Hamburg's Heiligengeistfeld): the gun tower at the Zoo tower's size, 70.5 m square and 39 m, its fire control tower 420 m away (the real pairs stood 385 to 480 m apart). The sources disagree on the light guns in the nests by 1945 (2 cm only, or 3.7 cm as well), so the game mixes them.
 - **The runway.** The shared runway lies on 070 where Hopsten's lay about 085.
 
 ## The long version

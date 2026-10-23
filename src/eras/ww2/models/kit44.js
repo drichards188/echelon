@@ -450,6 +450,48 @@ export function noShadow(mesh) {
 // ---------------------------------------------------------------- geometry pieces
 
 // Tube along an arbitrary straight axis: from a to b, radius r0 at a and r1 at b.
+// Telescoping struts between two nodes that move apart (equilibrators, rams), in two InstancedMeshes (the
+// cylinders and their rods, two draw calls for all of a rig's): `struts` are { a, b, r, len } with a and b
+// Object3Ds in the rig, r the cylinder's radius and len its length from a (the rod runs from b, a third of
+// r thick, to inside it). Build it last on the rig's root, as wheelSet.
+export function strutSet(root, struts, cylMat, rodMat, seg = 12) {
+  const mk = (mat, name) => {
+    const g = new THREE.CylinderGeometry(1, 1, 1, seg, 1).translate(0, 0.5, 0);
+    // the Parts attributes the WW2 materials read: a white tint, and a height over the ground clear of the mud line
+    const n = g.attributes.position.count;
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(0.85), 3));
+    g.setAttribute('aH', new THREE.BufferAttribute(new Float32Array(n).fill(2), 1));
+    const mesh = new THREE.InstancedMesh(g, mat, struts.length);
+    mesh.name = name;
+    mesh.frustumCulled = false;
+    root.add(mesh);
+    return mesh;
+  };
+  const cyl = mk(cylMat, 'struts'), rod = mk(rodMat, 'strutRods');
+  const rel = new THREE.Matrix4(), m = new THREE.Matrix4(), q = new THREE.Quaternion(), pa = new THREE.Vector3(), pb = new THREE.Vector3(), d = new THREE.Vector3(), s = new THREE.Vector3();
+  const at = (o, out) => {
+    rel.identity();
+    for (let n = o; n && n !== root; n = n.parent) rel.premultiply(n.matrix);
+    return out.setFromMatrixPosition(rel);
+  };
+  cyl.updateMatrix = function () {
+    THREE.Object3D.prototype.updateMatrix.call(this);
+    struts.forEach((st, i) => {
+      at(st.a, pa);
+      at(st.b, pb);
+      const L = d.subVectors(pb, pa).length();
+      d.normalize();
+      q.setFromUnitVectors(_y, d);
+      cyl.setMatrixAt(i, m.compose(pa, q, s.set(st.r, Math.min(st.len, L), st.r)));
+      q.setFromUnitVectors(_y, d.negate());
+      rod.setMatrixAt(i, m.compose(pb, q, s.set(st.r * 0.36, Math.max(0.05, L - st.len + 0.15), st.r * 0.36)));
+    });
+    cyl.instanceMatrix.needsUpdate = rod.instanceMatrix.needsUpdate = true;
+  };
+  return [cyl, rod];
+}
+const _y = new THREE.Vector3(0, 1, 0);
+
 export function tubeAB(a, b, r0, r1 = r0, seg = 12, open = false) {
   const d = b.clone().sub(a), len = d.length();
   const g = new THREE.CylinderGeometry(r1, r0, len, seg, 1, open);

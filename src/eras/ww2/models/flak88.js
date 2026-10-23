@@ -51,6 +51,8 @@ import { flakMats, setPaint, paintCarrier, add, build, noShadow, tubeAB, panSeat
 //   anchors.sight     the ZF 20E direct-laying telescope at the front of the right wall; follows elevation.
 //   anchors.eye       camera focus (0, 1.9, 0.3) on the root.
 //   anchors.fuzeCups  [2] the setting cups' mouths on the fuze setter (turret space), +Y up.
+//   anchors.rack      the ready-round rack's top slot on the setter housing (turret space): a round's middle there,
+//                     its nose along -Z, is where the number takes the next round from.
 //   anchors.niches    [5] the ammunition niches' openings on the pit wall (root), -Z into the niche.
 //   anchors.cable     where the data cable from the rear arm's junction box leaves the pit (root, ground level).
 //   anchors.crew      crew spots, see crewSpot in kit44.js (position = feet or seat point, -Z = facing):
@@ -309,12 +311,31 @@ function topCarriage(T, rig) {
   add(T, 'black', xTube(Lx - 0.47, Lx - 0.56, 0.013, 0.013, 6, sy - 0.09, -0.36));
   add(T, 'metal', lathe([[0.001, 0.0], [0.06, 0.0], [0.055, 0.03], [0.035, 0.06], [0.001, 0.065]], 14).applyMatrix4(xf(Lx - 0.05, sy + 0.36, -0.1)), 0xb09040);
   paint(rod(V(Lx - 0.05, sy + 0.1, -0.1), V(Lx - 0.05, sy + 0.36, -0.1), 0.012, 5), 0xd0d0d0);
+  // the ready-round rack bolted to the setter housing's outer face (E: a stand-in; the references show the
+  // ready rounds in the pit's niches, carried to the gun): two rails with saddles, two rounds lying in it nose
+  // forward, a third slot on top where the number takes the next (rig.anchors.rack); brass and steel under the
+  // set's metal so the rack costs no draw call
+  const rx = Lx - 0.62, ry0 = -0.08;
+  for (const z of [-0.42, 0.18]) {
+    paint(box(0.42, 0.04, 0.05, rx, ry0, z), 0xd0d0d0);
+    for (const x of [rx - 0.11, rx + 0.11]) paint(box(0.03, 0.06, 0.05, x, ry0 + 0.04, z), 0xd0d0d0);
+  }
+  paint(box(0.04, 0.04, 0.7, rx - 0.2, ry0 - 0.01, -0.12), 0xc8c8c8);
+  paint(box(0.04, 0.04, 0.7, rx + 0.2, ry0 - 0.01, -0.12), 0xc8c8c8);
+  paint(box(0.24, 0.05, 0.05, (Lx - 0.38 + rx + 0.2) / 2, ry0, -0.42), 0xc8c8c8); // the bracket to the housing
+  paint(box(0.24, 0.05, 0.05, (Lx - 0.38 + rx + 0.2) / 2, ry0, 0.05), 0xc8c8c8);
+  for (const x of [rx - 0.06, rx + 0.06]) {
+    const y = ry0 + 0.07, z0 = 0.34; // base end at z0, nose toward -z
+    add(T, 'metal', zTube(z0 - 0.57, z0, 0.052, 0.052, 12, x, y), 0xd9b25e); // the case
+    add(T, 'metal', zTube(z0 - 0.93, z0 - 0.57, 0.012, 0.046, 12, x, y), 0x8d917c); // the projectile and fuze
+  }
+  const rack = V(rx, ry0 + 0.15, 0.34 - 0.466);
   // the setter's seat in front, its footrest
   panSeat(T, 'paint', Lx - 0.2, -0.4, -0.95, 0.5, 0.13, true, Math.PI);
   paint(rod(V(Lx - 0.1, -0.2, -0.6), V(Lx - 0.2, 0.04, -0.95), 0.022, 6), 0xd0d0d0);
   paint(box(0.3, 0.03, 0.08, Lx - 0.2, -0.32, -1.22), 0xd0d0d0);
   paint(rod(V(Lx - 0.2, -0.32, -1.19), V(Lx - 0.2, -0.1, -0.97), 0.015, 5), 0xd0d0d0);
-  return { recv, cups, dialM, hy, ry, sy, W };
+  return { recv, cups, dialM, hy, ry, sy, W, rack };
 }
 
 // ---------------------------------------------------------------- cradle and barrel
@@ -534,6 +555,8 @@ export function buildFlak88() {
   rig.anchors.breech = node(rc, 'breechMouth', 0, 0, F88.bf + 0.05);
   rig.anchors.sight = node(sight, 'sightEye', 0, 0, 0.22);
   rig.anchors.fuzeCups = tc.cups.map((p, i) => node(tur, 'cup' + i, p.x, p.y, p.z));
+  rig.anchors.rack = node(tur, 'rack', tc.rack.x, tc.rack.y, tc.rack.z); // the top slot's round middle, -Z its nose
+  rig.anchors.drillNodes = [rig.anchors.rack];
   rig.anchors.niches = niches;
   rig.anchors.cable = node(root, 'cable', 0.6, 0, 7.2); // where the data cable leaves the pit (to the battery's junction box)
   const deckT = F88.deck - F88.pivotY;

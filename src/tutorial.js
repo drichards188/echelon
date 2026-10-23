@@ -4,12 +4,14 @@ import { SYSTEMS, THREATS } from './sim/systems.js';
 import { SHELLS, reachOf } from './ballistics.js';
 import { ERA } from './deploy.js';
 import { eraById } from './eras/index.js';
+import { LESSONS_KEY } from './choices.js';
 import { setHighlight } from './ui/highlight.js';
 
 // Tutorials: one lesson per vehicle plus the basics, each a list of steps run on a scripted range
 // (main.js host.enter: sim.newGame({ scripted: true, loadout: def.loadout ?? DEFAULT_LOADOUT }): the
 // director spawns nothing, nothing is damaged). A lesson runs on the default units, or on the default
-// units with its own vehicle swapped in (`loadout`, see swap()); leaving goes back to the player's loadout. A step shows an
+// units with its own vehicle swapped in (`loadout`, see swap()); a lesson is a game page of its own
+// (?tutorial=<id>, picked from the menu's list) and leaving goes back to that list. A step shows an
 // instruction card over the 3D view, pulses the console controls it is about (data-tut names, see
 // src/ui/highlight.js) and completes when its `done(T)` reads true from the sim state; steps without
 // `done` only explain and advance with Next. The script places its own threats with `T.spawn`.
@@ -17,7 +19,7 @@ import { setHighlight } from './ui/highlight.js';
 // Step fields: id, title, text, goal (the objective line), hi (data-tut names to pulse), enter(T), tick(T),
 // done(T). Time compression is left to the player.
 
-const STORE = 'echelon.tutorials';
+const STORE = LESSONS_KEY; // the lessons done, which the menu's list marks
 const DEG = Math.PI / 180;
 // The lessons below are the modern era's (eras/modern.js lists them in `tutorials`; the list shows the
 // lessons of the era in play): its units, its threat axis and its default loadout.
@@ -1389,7 +1391,7 @@ const turm44 = {
   id: 'flakturm',
   name: 'Flak tower',
   unit: 'TURM',
-  blurb: 'The tower commander: three kinds of gun on one concrete tower, the gun selector, the 12.8 cm twins on the predictor, the light guns on the galleries.',
+  blurb: 'The tower commander: three kinds of gun on a pair of concrete towers, the gun selector, the 12.8 cm twins on the predictor, the light guns in the nests.',
   outro: 'The tower fights the whole sky at once: keep the 12.8 cm twins on the bombers, and whenever a fighter comes down on the tower take the light guns in hand, knowing the twins carry on without you.',
   setup: (T) => {
     T.u.mode = 'hold';
@@ -1399,7 +1401,7 @@ const turm44 = {
   steps: [
     {
       title: 'The tower',
-      text: 'A concrete flak tower, 36 m to the top of its corner turrets: four twin 12.8 cm Flakzwilling 40 on the turrets, laid together from the Kommandogerät and the Würzburg on the roof; two 3.7 cm Flak 43 on the roof; a 2 cm Flakvierling on the gallery of each face. Bombs on the ground below hardly reach the guns. In this lesson nothing is scored and nothing can be destroyed.',
+      text: 'A flak tower pair. The gun tower, 70 m square and 39 m to the rims of its gun pits: a twin 12.8 cm Flakzwilling 40 in the pit on each corner tower, laid together from the Kommandogerät on the roof, with ranges from the Würzburg-Riese on the fire control tower 420 m away; four 3.7 cm Flak 43 and four 2 cm Flakvierlinge in the nests hung on the corner towers, and four more Vierlinge on the fire control tower\'s corners. Bombs on the ground below hardly reach the guns. In this lesson nothing is scored and nothing can be destroyed.',
       hi: ['header'],
     },
     {
@@ -1437,7 +1439,7 @@ const turm44 = {
     {
       id: 'vier',
       title: 'A fighter on the tower',
-      text: 'A Mustang is coming down to strafe the tower. The 12.8 cm cannot follow a low, fast fighter: take the Vierlinge on the galleries in hand. Click 2 CM VIERLING in GESCHÜTZWAHL (or press W twice).',
+      text: 'A Mustang is coming down to strafe the tower. The 12.8 cm cannot follow a low, fast fighter: take the Vierlinge in hand. Click 2 CM VIERLING in GESCHÜTZWAHL (or press W twice).',
       goal: 'Select the 2 cm Vierlinge',
       hi: ['groups'],
       enter: (T) => {
@@ -1451,7 +1453,7 @@ const turm44 = {
     },
     {
       title: 'The heavy guns carry on',
-      text: 'The page is now the Vierlinge\'s: four guns, one per face, each card with its magazines. The 12.8 cm twins have gone back to their crews and keep firing salvos at the formation on their own, as FEUER FREI. Watch the plot for their target.',
+      text: 'The page is now the Vierlinge\'s: eight guns, 1 to 4 in the gun tower\'s nests and L1 to L4 on the fire control tower, each card with its magazines. The 12.8 cm twins have gone back to their crews and keep firing salvos at the formation on their own, as FEUER FREI. Watch the plot for their target.',
       goal: 'Wait for a 12.8 cm salvo fired by the crews',
       hi: ['guns', 'plot'],
       enter: (T) => {
@@ -1465,7 +1467,7 @@ const turm44 = {
     },
     {
       title: 'Fire the Vierlinge',
-      text: 'Select the Mustang and hold FEUER (Space) as it comes in: each gun fires once its layer is on the lead. Inside 1.5 km the four Vierlinge put up a wall of fire; beyond that the trigger shows ZU WEIT.',
+      text: 'Select the Mustang and hold FEUER (Space) as it comes in: each gun fires once its layer is on the lead. Inside 1.5 km the Vierlinge put up a wall of fire; beyond that the trigger shows ZU WEIT.',
       goal: 'Fire the Vierlinge at the Mustang',
       hi: ['tracks', 'trigger', 'sight'],
       enter: (T) => {
@@ -1478,8 +1480,8 @@ const turm44 = {
       done: (T) => T.u.group === 'flakvierling' && shotsOf(T, 'flakvierling') - T.mem.v0 >= 40,
     },
     {
-      title: 'The 3.7 cm on the roof',
-      text: 'The two 3.7 cm Flak 43 reach further, to about 3 km. Switch to 3,7 CM and fire them at the fighter while it is still out of the Vierlinge\'s reach.',
+      title: 'The 3.7 cm in the nests',
+      text: 'The four 3.7 cm Flak 43 reach further, to about 3 km. Switch to 3,7 CM and fire them at the fighter while it is still out of the Vierlinge\'s reach.',
       goal: 'Select 3,7 CM and fire the 3.7 cm',
       hi: ['groups', 'trigger'],
       enter: (T) => {
@@ -1561,21 +1563,17 @@ TUTORIALS.push(
 export class Tutorials {
   /**
    * sim: the Sim. hud: the HUD. host: what only main can do: enter(def) (starts the scripted game and
-   * selects the unit), leave() (back to the demonstration battle), cam(), scale(), setScale(k),
-   * selectedId(), padlock(), following(), hint(text).
+   * selects the unit), leave() (back to the menu's tutorial list), cam(), scale(), setScale(k),
+   * selectedId(), padlock(), following(), hint(text). The list itself is the menu's (ui/menu.js).
    */
   constructor({ sim, hud, host }) {
     this.sim = sim;
     this.hud = hud;
     this.host = host;
     this.run = null; // the lesson in progress
-    this.defs = []; // the era's lessons (buildMenu)
     this.done = this.load();
     this.card = document.getElementById('tut-card');
-    this.menu = document.getElementById('tut-menu');
     this.q = (s) => this.card.querySelector(s);
-    this.buildMenu();
-    document.getElementById('tut-back').addEventListener('click', () => this.closeMenu());
     // the card's buttons must not take keyboard focus, or Space would press them instead of the console
     for (const b of this.card.querySelectorAll('button')) b.addEventListener('pointerdown', (e) => e.preventDefault());
     this.q('#tc-next').addEventListener('click', () => this.next());
@@ -1602,56 +1600,16 @@ export class Tutorials {
     } catch (e) { /* private mode */ }
   }
 
-  // the lessons the era in play offers (its `tutorials`); built again when the era changes
-  buildMenu() {
-    this.defs = ERA.tutorials.map((id) => TUTORIALS.find((d) => d.id === id)).filter(Boolean);
-    const list = document.getElementById('tut-list');
-    list.replaceChildren();
-    this.items = new Map();
-    for (const d of this.defs) {
-      const b = document.createElement('button');
-      b.className = 'tut-item';
-      b.type = 'button';
-      b.dataset.id = d.id;
-      b.innerHTML = '<span class="ti-mark">✓</span><b></b><i></i>';
-      b.querySelector('b').textContent = d.name;
-      b.querySelector('b').insertAdjacentHTML('beforeend', `<small>${d.steps.length} steps</small>`);
-      b.querySelector('i').textContent = d.blurb;
-      b.addEventListener('click', () => this.start(d.id));
-      list.append(b);
-      this.items.set(d.id, b);
-    }
-    this.refreshMenu();
+  // the lessons the era in play offers (its `tutorials`)
+  get defs() {
+    return ERA.tutorials.map((id) => TUTORIALS.find((d) => d.id === id)).filter(Boolean);
   }
 
-  refreshMenu() {
-    for (const [id, b] of this.items) b.classList.toggle('done', !!this.done[id]);
-  }
-
-  openMenu() {
-    this.refreshMenu();
-    this.hud.showTutorialMenu(true);
-  }
-
-  closeMenu() {
-    this.hud.showTutorialMenu(false);
-  }
-
-  get menuOpen() {
-    return document.body.classList.contains('tut-menu');
-  }
-
-  // Esc: a lesson goes back to the list, the list back to the title. True when it was used.
+  // Esc: a lesson goes back to the menu's list. True when it was used.
   escape() {
-    if (this.run) {
-      this.exit();
-      return true;
-    }
-    if (this.menuOpen && document.body.classList.contains('title')) {
-      this.closeMenu();
-      return true;
-    }
-    return false;
+    if (!this.run) return false;
+    this.exit();
+    return true;
   }
 
   // ---------------------------------------------------------------- running a lesson
@@ -1659,7 +1617,6 @@ export class Tutorials {
     const def = this.defs.find((d) => d.id === id);
     if (!def) return;
     if (this.run) this.stopRun();
-    this.hud.showTutorialMenu(false);
     this.host.enter(def);
     this.u = this.sim.unitById.get(def.unit);
     this.threats = new Map();
@@ -1687,7 +1644,6 @@ export class Tutorials {
     this.stopRun();
     this.hud.setTutorial(false);
     this.host.leave();
-    this.openMenu();
   }
 
   goto(i) {
@@ -1720,7 +1676,6 @@ export class Tutorials {
     run.finished = true;
     this.done[run.def.id] = true;
     this.save();
-    this.refreshMenu();
     this.clear();
     setHighlight([]);
     this.setScale(this.baseScale);

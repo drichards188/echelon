@@ -3,11 +3,20 @@ import { mulberry32 } from './noise.js';
 import { patchMaterial, noiseGLSL } from './shaderlib.js';
 import { fieldGLSL } from './terrainField.js';
 import { ERA } from './deploy.js';
+import { heightAt } from './terrainHeight.js';
+
+// thinning with the camera's height over the ground: all tufts up to THIN_FROM m, then fewer over THIN_SPAN m,
+// down to THIN_MIN of them
+const THIN_FROM = 15, THIN_SPAN = 45, THIN_MIN = 0.35;
 
 // GPU grass. Tufts live in a square tile that wraps around the viewer, so a fixed pool of
 // instances always carpets the ground near the camera. Placement on the ground (from the finest
 // terrain level's height texture), the crop type (the same field function as the ground shader),
-// height, wind and fade all run in the vertex shader. An era with a terrain style (eras/<id>.js `terrain`)
+// height, wind and fade all run in the vertex shader; a tuft outside the view or past the fade is
+// culled there first (tuftCulled), before the field function and the noise, which are most of its
+// cost (the narrow 3D view sees a small part of the tile). With the camera high over the ground
+// (a flak tower's roof, a high chase camera) fewer tufts are drawn: the blades are a pixel or two
+// across from there. An era with a terrain style (eras/<id>.js `terrain`)
 // brings its own cover function and blade heights and colours (style.glsl(layout).grass): setStyle swaps the
 // material, the steppe's stays as it is.
 
@@ -85,6 +94,16 @@ export class Grass {
             return vec3(m.x, e);
           }
           mat3 rotY(float a) { float c = cos(a), s = sin(a); return mat3(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c); }
+          // a tuft out of the view (its foot and a point 1.2 m over it both outside the same side of the frustum,
+          // with a margin) or past the fade: no blade, and the field function and the noise below are skipped
+          bool tuftCulled(vec2 wxz, float groundH, float camDist) {
+            if (camDist > uTileSize * 0.49) return true;
+            vec4 a = projectionMatrix * viewMatrix * vec4(wxz.x, groundH, wxz.y, 1.0);
+            vec4 b = projectionMatrix * viewMatrix * vec4(wxz.x, groundH + 1.2, wxz.y, 1.0);
+            if (a.w <= 0.0 && b.w <= 0.0) return true;
+            float ma = 1.15 * abs(a.w), mb = 1.15 * abs(b.w);
+            return (a.x > ma && b.x > mb) || (a.x < -ma && b.x < -mb) || (a.y > ma && b.y > mb) || (a.y < -ma && b.y < -mb);
+          }
           `
         )
         .replace(
@@ -103,7 +122,10 @@ export class Grass {
           float pad;
           vec3 gh = groundAt(wxz, pad);
           float groundH = gh.x;
-
+          float camDist = length(wxz - uCamPos.xz);
+          vec3 transformed = vec3(0.0); // a culled tuft: every vertex at one point, nothing drawn
+          vBladeY = 0.0; vVariant = 0.0; vWPos = vec3(0.0); vGrassCol = vec3(0.0);
+          if (!tuftCulled(wxz, groundH, camDist)) {
           FieldInfo fi = fieldAt(wxz);
           float k = fi.kind;
           float patchN = fbm2(wxz * 0.035);
@@ -121,7 +143,6 @@ export class Grass {
             float tr = (1.0 - smoothstep(0.1, 0.3, f_tramDist(fi))) * smoothstep(7.0, 9.0, fi.eL);
             mask *= 1.0 - 0.8 * tr - 0.5 * f_headland(fi, wxz);
           }
-          float camDist = length(wxz - uCamPos.xz);
           float fade = 1.0 - smoothstep(uTileSize * 0.3, uTileSize * 0.49, camDist);
           float scale = aBlade.w * mask * fade * hgt * (0.75 + patchN * 0.6);
           vBladeY = position.y;
@@ -142,7 +163,8 @@ export class Grass {
 
           vec3 world = vec3(wxz.x, groundH - 0.03, wxz.y) + p;
           vWPos = world;
-          vec3 transformed = world;
+          transformed = world;
+          }
           `
         );
       shader.fragmentShader = shader.fragmentShader
@@ -173,6 +195,7 @@ export class Grass {
     this.mesh.castShadow = false;
     this.mesh.name = 'grass';
     this.count = 0;
+    this.thin = 1; // the share of the tufts drawn (terrain.js setQuality)
   }
 
   /** The grass of an era's terrain style S (its cover, blade heights and colours), or the steppe's with null. */
@@ -223,6 +246,16 @@ export class Grass {
             return vec3(m.x, e);
           }
           mat3 rotY(float a) { float c = cos(a), s = sin(a); return mat3(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c); }
+          // a tuft out of the view (its foot and a point 1.2 m over it both outside the same side of the frustum,
+          // with a margin) or past the fade: no blade, and the field function and the noise below are skipped
+          bool tuftCulled(vec2 wxz, float groundH, float camDist) {
+            if (camDist > uTileSize * 0.49) return true;
+            vec4 a = projectionMatrix * viewMatrix * vec4(wxz.x, groundH, wxz.y, 1.0);
+            vec4 b = projectionMatrix * viewMatrix * vec4(wxz.x, groundH + 1.2, wxz.y, 1.0);
+            if (a.w <= 0.0 && b.w <= 0.0) return true;
+            float ma = 1.15 * abs(a.w), mb = 1.15 * abs(b.w);
+            return (a.x > ma && b.x > mb) || (a.x < -ma && b.x < -mb) || (a.y > ma && b.y > mb) || (a.y < -ma && b.y < -mb);
+          }
           `
         )
         .replace(
@@ -241,13 +274,16 @@ export class Grass {
           float pad;
           vec3 gh = groundAt(wxz, pad);
           float groundH = gh.x;
+          float camDist = length(wxz - uCamPos.xz);
+          vec3 transformed = vec3(0.0); // a culled tuft: every vertex at one point, nothing drawn
+          vBladeY = 0.0; vVariant = 0.0; vWPos = vec3(0.0); vGrassCol = vec3(0.0);
+          if (!tuftCulled(wxz, groundH, camDist)) {
           float hgt = 0.0, mask = 1.0;
           vec3 gcol = vec3(0.1);
           ${G.grass}
           mask *= 1.0 - smoothstep(0.3, 0.7, pad);
           mask *= 1.0 - smoothstep(0.2, 0.3, 1.0 - normalize(vec3(-gh.y, 1.0, -gh.z)).y);
           float patchS = fbm2(wxz * 0.035);
-          float camDist = length(wxz - uCamPos.xz);
           float fade = 1.0 - smoothstep(uTileSize * 0.3, uTileSize * 0.49, camDist);
           float scale = aBlade.w * mask * fade * hgt * (0.75 + patchS * 0.6);
           vBladeY = position.y;
@@ -267,7 +303,8 @@ export class Grass {
 
           vec3 world = vec3(wxz.x, groundH - 0.03, wxz.y) + p;
           vWPos = world;
-          vec3 transformed = world;
+          transformed = world;
+          }
           `
         );
       shader.fragmentShader = shader.fragmentShader
@@ -313,5 +350,9 @@ export class Grass {
 
   update(camera) {
     this.uniforms.uCamPos.value.copy(camera.position);
+    // the tufts are in random order, so the first n are an even thinning of them all
+    const h = camera.position.y - heightAt(camera.position.x, camera.position.z);
+    const k = Math.min(1, Math.max(THIN_MIN, 1 - (h - THIN_FROM) / THIN_SPAN));
+    this.geometry.instanceCount = Math.round(this.count * k * this.thin);
   }
 }

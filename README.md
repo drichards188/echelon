@@ -48,7 +48,7 @@ Both eras play start to finish on three difficulties, with every loadout option 
 Not done yet:
 
 - WW2 alternatives for slots 1 to 4 (planned; candidates in the local `refs/ww2/README.md`, section 3).
-- The 12.8 cm twin mount and the flak tower are sketches, not yet matched to reference photos.
+- A fresh side-by-side check of the other WW2 models against their reference photos (the flak towers and the 12.8 cm twin have had theirs).
 
 ## Go deeper
 

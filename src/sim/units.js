@@ -60,8 +60,9 @@ export function createUnits(heightAt, rng = null) {
     const parts = partPlacements(def).map((p) => {
       const part = {
         kind: p.kind, role: sys.roles?.[p.kind] ?? PART_ROLE[p.kind] ?? 'main', heading: p.heading,
-        // a part on a structure (`deck` m over the ground at the unit's site: the flak tower's guns)
-        pos: new THREE.Vector3(p.x, p.deck != null ? heightAt(def.x, def.z) + p.deck : heightAt(p.x, p.z), p.z),
+        // a part on a structure (`deck` m over the ground at the structure, deploy.js partPlacements: the flak
+        // towers' guns)
+        pos: new THREE.Vector3(p.x, p.deck != null ? heightAt(p.bx, p.bz) + p.deck : heightAt(p.x, p.z), p.z),
         slots: SLOTS[p.kind] ? new Array(SLOTS[p.kind]).fill(true) : [], rounds: 0, alive: true,
       };
       // a part's own name and letter (the WW2 battery's guns A to F)

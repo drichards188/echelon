@@ -26,6 +26,16 @@ const QUALITY = {
   High: { grass: 200000, trees: 1, grassRadius: 62 },
   Ultra: { grass: 320000, trees: 1.2, grassRadius: 80 },
 };
+// What dynamic resolution (main.js) takes from the landscape, a step at a time, before it lowers the
+// resolution: the share of the preset's grass and of its trees, and the trees' shadows
+const SHED = [
+  { grass: 1, trees: 1, shadows: true },
+  { grass: 0.5, trees: 1, shadows: true },
+  { grass: 0.5, trees: 0.6, shadows: true },
+  { grass: 0.5, trees: 0.6, shadows: false },
+  { grass: 0.2, trees: 0.6, shadows: false },
+];
+export const SHED_MAX = SHED.length - 1;
 
 class Level {
   constructor(k) {
@@ -198,11 +208,14 @@ export class Terrain {
     this.update({ position: new THREE.Vector3(0, 10, 0) }, true);
   }
 
-  setQuality(name) {
-    const q = QUALITY[name] || QUALITY.Medium;
+  // the preset's landscape, with `shed` steps of SHED taken from it
+  setQuality(name, shed = 0) {
+    const q = QUALITY[name] || QUALITY.Medium, s = SHED[shed];
     this.quality = q;
     this.grass.setCount(q.grass, q.grassRadius);
-    this.trees.setDensity(q.trees);
+    this.grass.thin = s.grass;
+    if (q.trees * s.trees !== this.trees.density) this.trees.setDensity(q.trees * s.trees); // replants
+    this.trees.setShadows(s.shadows);
   }
 
   heightAt(x, z) {

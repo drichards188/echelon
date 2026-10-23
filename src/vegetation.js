@@ -522,6 +522,7 @@ export class Trees {
     this.group = new THREE.Group();
     this.group.name = 'trees';
     this.density = 1;
+    this.shadows = true; // the detailed trees cast shadows (setShadows)
     this.R = 2000; // individual trees (hedge segments nearer than ROW_NEAR, groves, willows)
     this.center = new THREE.Vector2(1e9, 1e9);
     this.dirty = true;
@@ -676,6 +677,13 @@ export class Trees {
     this.dirty = true;
   }
 
+  // the detailed trees' shadows (the buildings among them keep theirs)
+  setShadows(on) {
+    this.shadows = on;
+    for (const { near } of this.meshes) near.castShadow = on;
+    for (const set of this.sets?.values() ?? []) for (const m of set.meshes) if (!m.single) m.near.castShadow = on;
+  }
+
   /**
    * Plant an era's own trees (its terrain style, `S.trees`), or the steppe's again with null. The era's
    * meshes are built once, the first time, and only one set is shown.
@@ -721,7 +729,7 @@ export class Trees {
       };
       if (form.tree) {
         const near = mk(form.build(1), sp.cap[0], mat, `trees-${sp.name}`), far = mk(form.build(0), sp.cap[1], mat, `trees-${sp.name}-far`);
-        near.castShadow = true;
+        near.castShadow = this.shadows;
         // `near`: the radius of the detailed level (a wood's many pines switch sooner)
         return { near, far, caps: sp.cap, nearR2: (sp.near ?? NEAR_R) ** 2 };
       }

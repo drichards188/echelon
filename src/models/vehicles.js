@@ -20,6 +20,7 @@ import { buildPantsirTZM } from './v/tzmpantsir.js';
 import { build2F77M } from './v/t2f77m.js';
 import { buildKamaz5350 } from './v/kamaz5350.js';
 import { applyMarkings } from './markings.js';
+import { bakeRig } from './ao.js';
 
 // Procedural vehicles of the air defense force. Model space: front -Z, right +X, ground y = 0.
 // Each rig: { root, pivots, anchors, setLoaded(i, loaded), boxes } as documented in DESIGN.md.
@@ -46,6 +47,7 @@ export function buildVehicle(kind) {
   rig.root.name = kind;
   rig.root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   applyMarkings(rig, kind); // national markings (markings.js); after the shadow flags, they do not cast
+  bakeRig(rig, kind); // baked occlusion in the vertex colours (ao.js; the kinds an era opted in)
   delete rig.P;
   delete rig.mats;
   return rig;

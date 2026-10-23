@@ -16,6 +16,7 @@ import { BONES, NB, BI, PARENT, SK, JOINT, SIDE, GRIP } from './figure44.js';
 //   eyeSolve(S, E, D, mode)                lean (and bend the knees, or curl the back when seated) so the eyes
 //                                          come to E looking along D (root space); returns the error left, m
 //   look(S, D, k)                          neck and head turn the face along D (root space), k of the way
+//   lerpSpec(out, A, B, t)                 the specification t of the way from A to B (the drills' key poses)
 //   writeBones(body, out, o)               the 18 skinning matrices (3x4 rows, root space) into out[o..]
 //   newBody(girth)                         a man's pose state (local quaternions, hips, prop, his shoulders)
 // POSES: stand, atEase, walk, sidestep, carry, crouch, kneel, signal (more in crew44.js's jobs, built from
@@ -42,9 +43,11 @@ export function spec() {
   const foot = () => ({ ankle: new V3(), rot: new THREE.Euler(0, 0, 0, 'YXZ'), pole: new V3() });
   // onProp: the grip is on the held prop (pg, pf, pn in prop space), so it follows the prop if a scene moves it
   const arm = () => ({ ik: false, grip: new V3(), fingers: new V3(), palm: new V3(), pole: new V3(), ua: new THREE.Euler(), fa: 0, hand: new THREE.Euler(), onProp: false, pg: new V3(), pf: new V3(), pn: new V3() });
+  // turn: where the man's root should face (radians about its vertical from his spot's facing, crew44.js turns
+  // him there the next frame), or null to leave it
   return {
     hips: new V3(), hipsQ: new Q(), spineQ: new Q(), chestQ: new Q(), neckQ: new Q(), headQ: new Q(), shrug: [0, 0],
-    feet: [foot(), foot()], arms: [arm(), arm()], prop: { on: false, pos: new V3(), q: new Q(), s: 1 },
+    feet: [foot(), foot()], arms: [arm(), arm()], prop: { on: false, pos: new V3(), q: new Q(), s: 1 }, turn: null,
   };
 }
 const _e = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -61,8 +64,52 @@ export function resetSpec(S) {
     a.ik = false; a.onProp = false; a.ua.set(0.03, 0, s * 0.1); a.fa = 0.2; a.hand.set(0, 0, 0);
   }
   S.prop.on = false;
+  S.turn = null;
   return S;
 }
+
+const lerpE = (out, a, b, t) => out.set(lerp(a.x, b.x, t), lerp(a.y, b.y, t), lerp(a.z, b.z, t), 'YXZ');
+/** The specification t of the way from A to B into out (the drills' key poses; A and B are filled, not
+ *  solved). Arms move between two IK grips or two FK poses, and change over halfway between an IK and an FK
+ *  one; the prop shows while both keys hold it (at t = 0 A's, at t = 1 B's), so a key that gives it away
+ *  hides it as he lets go and a key that takes it shows it once he has it. */
+export function lerpSpec(out, A, B, t) {
+  out.hips.lerpVectors(A.hips, B.hips, t);
+  for (const k of ['hipsQ', 'spineQ', 'chestQ', 'neckQ', 'headQ']) out[k].slerpQuaternions(A[k], B[k], t);
+  out.shrug[0] = lerp(A.shrug[0], B.shrug[0], t); out.shrug[1] = lerp(A.shrug[1], B.shrug[1], t);
+  for (let i = 0; i < 2; i++) {
+    const f = out.feet[i], fa = A.feet[i], fb = B.feet[i];
+    f.ankle.lerpVectors(fa.ankle, fb.ankle, t); f.pole.lerpVectors(fa.pole, fb.pole, t); lerpE(f.rot, fa.rot, fb.rot, t);
+    const a = out.arms[i], aa = A.arms[i], ab = B.arms[i];
+    a.onProp = false;
+    if (aa.onProp && ab.onProp && A.prop.on && B.prop.on) {
+      // a hand on the prop in both: its grip blended on the prop, put where the blended prop is (below), so the
+      // hand stays on it while the prop turns
+      a.ik = true; a.onProp = true;
+      a.pg.lerpVectors(aa.pg, ab.pg, t); a.pf.lerpVectors(aa.pf, ab.pf, t); a.pn.lerpVectors(aa.pn, ab.pn, t);
+      a.pole.lerpVectors(aa.pole, ab.pole, t);
+    } else if (aa.ik && ab.ik) {
+      a.ik = true;
+      a.grip.lerpVectors(aa.grip, ab.grip, t); a.fingers.lerpVectors(aa.fingers, ab.fingers, t);
+      a.palm.lerpVectors(aa.palm, ab.palm, t); a.pole.lerpVectors(aa.pole, ab.pole, t);
+    } else if (!aa.ik && !ab.ik) {
+      a.ik = false;
+      lerpE(a.ua, aa.ua, ab.ua, t); a.fa = lerp(aa.fa, ab.fa, t); lerpE(a.hand, aa.hand, ab.hand, t);
+    } else {
+      const w = t < 0.5 ? aa : ab;
+      a.ik = w.ik; a.grip.copy(w.grip); a.fingers.copy(w.fingers); a.palm.copy(w.palm); a.pole.copy(w.pole);
+      a.ua.copy(w.ua); a.fa = w.fa; a.hand.copy(w.hand);
+    }
+  }
+  const pa = A.prop, pb = B.prop, p = out.prop;
+  p.on = t <= 0 ? pa.on : t >= 1 ? pb.on : pa.on && pb.on;
+  if (pa.on && pb.on) { p.pos.lerpVectors(pa.pos, pb.pos, t); p.q.slerpQuaternions(pa.q, pb.q, t); } else { const w = pb.on ? pb : pa; p.pos.copy(w.pos); p.q.copy(w.q); }
+  p.s = pb.s;
+  propGrips(out);
+  out.turn = A.turn != null && B.turn != null ? A.turn + wrapPi(B.turn - A.turn) * t : B.turn ?? A.turn;
+  return out;
+}
+const wrapPi = (a) => { a = (a + Math.PI) % TAU; return (a < 0 ? a + TAU : a) - Math.PI; };
 
 export function setIK(a, g, f, n, p) {
   a.ik = true; a.onProp = false; a.grip.copy(g); a.fingers.copy(f); a.palm.copy(n); a.pole.copy(p);
@@ -117,6 +164,34 @@ function torsoFK(S, out) {
 export function eyeOf(S, out) { return torsoFK(S, out); }
 /** The chest's root-space rotation of S. */
 export function chestOf(S, out) { torsoFK(S, null); return out.copy(_qc); }
+/** A standing man whose hands cannot reach their grips: his hips (and with them his whole upper body) go down
+ *  and toward the work until they can, a deep crouch at most, the feet where they are (the legs' IK bends the
+ *  knees). For the hand grips a pose sets out of reach (a breech low at high elevation, a round held out). */
+const REACH = L_UA + L_FA - 0.025, _rw = new V3(), _rs = new V3(), _rd = new V3(), _rm = new V3();
+export function reachFix(S, g) {
+  const mx = (S.feet[0].ankle.x + S.feet[1].ankle.x) / 2, mz = (S.feet[0].ankle.z + S.feet[1].ankle.z) / 2;
+  for (let pass = 0; pass < 3; pass++) {
+    let worst = 0;
+    for (let i = 0; i < 2; i++) {
+      const a = S.arms[i];
+      if (!a.ik) continue;
+      // the wrist: the grip is inside the curled fingers, about 9 cm along them
+      _rw.copy(a.fingers);
+      if (_rw.lengthSq() < 1e-8) _rw.set(0, -1, 0);
+      _rw.normalize().multiplyScalar(-0.09).add(a.grip);
+      shoulderOf(S, i, g, _rs);
+      _rd.subVectors(_rw, _rs);
+      const over = _rd.length() - REACH;
+      if (over > worst) { worst = over; _rm.copy(_rd).normalize().multiplyScalar(over); }
+    }
+    if (worst < 0.005) return;
+    S.hips.add(_rm);
+    S.hips.y = Math.max(0.52, S.hips.y);
+    // not far past his feet: a man leans, he does not float
+    const dx = S.hips.x - mx, dz = S.hips.z - mz, h = Math.hypot(dx, dz), lim = 0.28;
+    if (h > lim) { S.hips.x = mx + (dx / h) * lim; S.hips.z = mz + (dz / h) * lim; }
+  }
+}
 /** The shoulder joint of side i (0 left) in root space, for a body's girth. */
 export function shoulderOf(S, i, g, out) {
   torsoFK(S, null);
@@ -307,8 +382,9 @@ export function solve(S, body, blend = 1) {
   for (let i = 0; i < NB - 1; i++) { if (k >= 1) body.q[i].copy(TQ[i]); else body.q[i].slerp(TQ[i], k); }
   body.hips.lerp(S.hips, k);
   body.shrug[0] = lerp(body.shrug[0], S.shrug[0], k); body.shrug[1] = lerp(body.shrug[1], S.shrug[1], k);
+  // a prop that was not shown appears where it is at once (handed over, taken from a box)
+  if (k >= 1 || !body.prop.on) { body.prop.pos.copy(S.prop.pos); body.prop.q.copy(S.prop.q); } else { body.prop.pos.lerp(S.prop.pos, k); body.prop.q.slerp(S.prop.q, k); }
   body.prop.on = S.prop.on; body.prop.s = S.prop.s;
-  if (k >= 1) { body.prop.pos.copy(S.prop.pos); body.prop.q.copy(S.prop.q); } else { body.prop.pos.lerp(S.prop.pos, k); body.prop.q.slerp(S.prop.q, k); }
   fk(body);
 }
 

@@ -27,23 +27,10 @@ export class HUD {
     this.view = $('view');
   }
 
+  /** The loading screen's bar and line (ui/loading.js). */
   setLoading(p, msg) {
     $('load-bar-fill').style.width = `${Math.round(p * 100)}%`;
     $('status').textContent = msg;
-  }
-
-  ready() {
-    document.body.classList.add('ready');
-    $('status').textContent = '';
-  }
-
-  showTitle(show) {
-    document.body.classList.toggle('title', show);
-  }
-
-  /** The tutorial list over the title screen. */
-  showTutorialMenu(show) {
-    document.body.classList.toggle('tut-menu', show);
   }
 
   /** A tutorial is running: the instruction card is up, the score is hidden. */
@@ -195,13 +182,14 @@ export class HUD {
   }
 
   /** End screen. report: { title, sub, score, stats: [[label, value, small?]...], victory } */
-  showEnd(r, { onRestart } = {}) {
+  showEnd(r, { onRestart, onMenu } = {}) {
     $('end-title').textContent = r.title || 'Airbase held';
     $('end-sub').textContent = r.sub || '';
     const rows = r.stats || [['Score', (r.score ?? 0).toLocaleString('en-US')]];
     $('end-stats').innerHTML = rows.map(([k, v, s]) => `<div><span>${k}</span><b>${v}</b>${s ? `<small>${s}</small>` : ''}</div>`).join('');
     $('end').classList.toggle('victory', !!r.victory);
     $('end-restart').onclick = onRestart || null;
+    $('end-menu').onclick = onMenu || null;
     document.body.classList.add('ended');
   }
 

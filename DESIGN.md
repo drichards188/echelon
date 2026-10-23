@@ -259,10 +259,10 @@ setting lives in it:
   theme: 'modern',              // the class `era-modern` on <body> and on the console panel's root
   markings: 'ua',               // the markings set its vehicles carry (models/markings.js MARKING_SETS), or null
   text: {
-    sub,                        // under the title, and the toast at Take command
-    blurb,                      // the title screen's paragraph
-    setting,                    // the line under the toggle: the framing ("Ukraine defends an airbase...")
-    orders, lull,               // the radio at Take command and between raids (director)
+    sub,                        // under the menu's title, the loading card's title, the toast as a battle starts
+    blurb,                      // the menu's paragraph
+    setting,                    // the line under the toggle and on the loading card: the framing ("Ukraine defends an airbase...")
+    orders, lull,               // the radio as a battle starts and between raids (director)
     victory, defeat,            // the end screen's title
   },
   layout: {
@@ -332,23 +332,24 @@ the asset models when the units or the assets changed), the HUD (the labelled as
 the title, toast, radio and end screen text), the consoles (`ERA.alerts`) and the tutorial list
 (`ERA.tutorials`).
 
-**Menu and storage** (main.js). `setEra(id, { save = true })` (also `__iads.setEra`; resolves to the id,
-or false) refuses an era that is not available and runs no switch during a tutorial. It loads the era's
-content, sets it in deploy.js, then the theme classes, the title text, `terrain.relayout`,
-`entities.sync()`, the loadout picker for its slots with the loadout kept for it, and the tutorial list
-follow; on the title screen the demonstration battle is rebuilt in it, during a battle a new one
-starts in it. Local storage: `echelon.era`, and the loadout per era in `echelon.loadout.<era>`. The
-loadout kept before there were eras (`echelon.loadout`) moves to `echelon.loadout.modern` at start (an
-existing per-era key wins). `?era=<id>` starts in that era without keeping it (one in development, or a
-kept one, falls back to the default); `?loadout=` applies to the era the page starts in. `__iads.era`
-is the era in play, `__iads.eras` the registry.
+**Menu and storage** (ui/menu.js, choices.js; see "Pages"). The main menu's era toggle picks the era and
+keeps it; its loadout picker shows the era's slots with the loadout kept for it. Local storage:
+`echelon.era`, the loadout per era in `echelon.loadout.<era>`, the difficulty in `echelon.difficulty`. The
+loadout kept before there were eras (`echelon.loadout`) moves to `echelon.loadout.modern` (an existing
+per-era key wins). A page starts in a lesson's own era (`?tutorial=`), else `?era=<id>` without keeping
+it, else the kept one (one in development, or an unknown one, falls back to the default; `startEra`);
+`?loadout=` applies to the era the page starts in. On a game page main's `setEra(id, { save = true })`
+(`__iads.setEra`, for tests; resolves to the id, or false) refuses an era that is not available and runs
+no switch during a tutorial. It loads the era's content, sets it in deploy.js, then the theme classes,
+`terrain.relayout`, `entities.sync()` and the loadout kept for it follow, and a new battle starts in it.
+`__iads.era` is the era in play, `__iads.eras` the registry.
 
 **Development override.** `?dev=1` lets a future era with `available: false` be played through `?era=<id>`
 or `__iads.setEra(id)`. The menu still shows that era as in development, and an unavailable era is never kept
 in `echelon.era`.
 
 **Theme hook.** The class `era-<theme>` sits on `<body>` and on the console panel's root
-(`Panel.setTheme`), so an era restyles its title screen and consoles in CSS under it.
+(`Panel.setTheme`), so an era restyles its menu and consoles in CSS under it.
 
 **Lazy content.** An era's heavy browser modules (its vehicle and asset models, flyer models, markings
 set, consoles and reload scenes) are fetched with a dynamic import only when it is picked: its
@@ -417,9 +418,11 @@ sim.newGame({ difficulty, loadout })   // with `loadout`: setLoadout(loadout) fi
   S-400's six spots (two TELARs in front, the loader-launcher on their flank, the search radar 420 m and
   the command post 800 m behind, every vehicle at least 180 m from the next so one warhead never catches
   two); the single-vehicle alternatives stand where the default stands.
-- The menu calls `setLoadout` (or passes `loadout` to `newGame`) before "Take command". Tutorials are
-  written for the default units: start them with `newGame({ scripted: true, loadout: DEFAULT_LOADOUT })`
-  and apply the player's loadout again at the next "Take command". Attract mode runs whatever is set.
+- A battle's page passes the loadout the menu kept (`choices.js` `keptLoadout`, or `?loadout=`) to
+  `newGame`. Tutorials are written for the default units: start them with `newGame({ scripted: true,
+  loadout: def.loadout ?? DEFAULT_LOADOUT })`; a lesson is a page of its own, so the player's loadout is
+  never changed by one. (`newGame({ attract: true })` still runs a demonstration battle, but nothing
+  starts one since the menu stopped drawing the world.)
 
 **The alternatives.** Each keeps its class and its place in the layering and is built only from the
 game's generic rules (channels, game ranges and line of sight, turn-rate-limited missiles, the hit
@@ -998,7 +1001,7 @@ the Vierlinge north of the centreline by the west threshold; the 2 cm by the fue
 | 1 medium, Flak lane | `flak43` MED1 Martha | three `flak43` in a triangle about 100 m a side (a Zug: 69 to 137 m apart, MIS 10) |
 | 2 medium, dispersal | `flak43` MED2 Nordpol | the same |
 | 3 light, quadruple | `flakvierling` VIER Otto | two `flakvierling` and a `flakvierling-tower` (on a wooden Flak tower, its guns 10.4 m up) |
-| 4 light, single | `flakturm` TURM Paula (default; a what-if) | the flak tower: four `flak128` A to D on the corner turrets (`deck` 36 m), `kdo40`, `wurzburg` and two `flak43` on the roof (32 m), four `flakvierling` on the galleries (26 m), the `flakturm` building (see "The flak tower") |
+| 4 light, single | `flakturm` TURM Paula (default; a what-if) | the flak tower pair: four `flak128` A to D in the gun tower's corner pits (`deck` 37.1 m), `kdo40` on the roof's backup post (36.5 m), four `flak43` and four `flakvierling` in the nests (29.8 m), the `flakturm` gun tower; 420 m away the `leitturm` fire control tower with the `wurzburgriese` (36 m) and four `flakvierling` on its corners (34 m) (see "The flak tower") |
 | 4, alternative | `flak38` LIGHT Paula | three `flak38` |
 
 **Gun units of several mounts** (SYSTEMS `mounts`, sim/mounts.js, hooked from units.js where a unit has
@@ -1279,37 +1282,47 @@ of the camera (`SHADOW_NEAR`; the shadow map covers the view's surroundings only
 | `concentrate` | platoons, the flak tower | `{ on }` |
 | `group` | the flak tower | `{ kind }`: the gun kind under the player's command (`SYSTEMS[kind].groups`) |
 
-**The flak tower** (`flakturm`, slot 4's default; not historical at Hopsten: the G-towers stood in Berlin,
-Hamburg and Vienna; a what-if for play). One unit of three kinds of gun: a battery (`mounts: 'battery'`) whose
-heavy guns are four 12.8 cm Flakzwilling 40 (`flak128`: `barrels: 2`, both fired on every salvo, `twin` their
-half spacing; shell `128mm`, 880 m/s, fuze to 32 s, burst 70 m) under the Kommandogeraet and the Wuerzburg on
-the roof, and whose 'close' guns are two `flak43` and four `flakvierling`. `groups: ['flak128', 'flak43',
-'flakvierling']` lets the player command one kind at a time (`u.group`, the `group` command; the heavy kind
-first): in manual the group under command takes the selection and the trigger (as the battery's guns, or as a
-platoon's), the other groups fight on as in auto (every mode but hold). sim/mounts.js: `heavyManual(u)`,
-`gunManual(u, p)`, `lightGroup(u)`; the predictor's ballistics come from `u.heavyShell` (was the 88's),
-`predictor.reach` (default 11,000 m) the slant range beyond which the crew lets a target going away go; with a
-light group under command `u.nextGun`, `u.weapons.gun` (its `shell` too) and the camera follow that group's
-guns. Parts with `deck` (eras/ww2.js) stand that high over the ground at the unit's site (units.js
-createUnits; `part.deck`), so their bores, sights and line of sight are up there and bombs on the ground below
-hardly reach them; the `flakturm` part (role 'tower') has no hit points (Sim.applyWarhead skips parts without
-`maxHp`). The tower's lookouts see to 34 km. Masked arcs: `structure` (boxes in the unit's frame: the block,
-the roof parapet, the corner turrets; `u.structure` puts them at the tower part) stops a light gun firing
-through the tower: `Mounts.masked(u, i, dir)` tests its line of fire over the first 90 m; a masked target is
-not one its crew picks, and under the player's command the gun holds (`gun.hold` 'masked', the consoles'
-VERDECKT) without laying into the concrete. The heavy twins on the turrets fire high and are not masked. Render: `models/flak128.js` (a sketch of the twin: two recoiling
-barrels, `setRecoil(m)` or `setRecoil(k, m)`, `anchors.muzzles` and `breeches` [2]) and `models/flakturm.js`
-(the block, 40 m square, roof 32 m, corner turrets 36 m, galleries 26 m: `FLAKTURM`); a gun with `deck` leaves
-its pit behind (`rig.emplacement` removed), the tower is never culled (`WHOLE`), no data cables; crews
-(jobs44.js `flak128`: men at their posts, no hand work). Console: `consoles/turm.js`, the battery's page
-(`mountBattery(ctx, { heavyOnly, title, cal })`) and two platoon pages (`mountPlatoon(ctx, kind, { keep, guns,
-title })`) under a gun selector (GESCHÜTZWAHL; W cycles); each page has its own memo, the sight canvas moves to
-the page shown, and the sight pose is whichever part that page put in `VIEW`. Sound: `shot('128mm')`, the 88's
-bank pitched down. The Flak 38 lesson starts with the old loadout (its `loadout`); the tower has its own lesson
-(`flakturm`: the selector, twin salvos, the light guns in hand while the twins fight on). Balance with the
-tower (Normal, seeds 1 to 72, `--era ww2 --all`): all auto 21, the scripted heavy battery 57, the scripted
-battery with the platoons 55 of 72 (was 16 / 54 / 52 with the 2 cm platoon); the tower scores about 41 to 43
-kills a game and in 96 to 100 % of the waves.
+**The flak tower** (`flakturm`, slot 4's default; not historical at Hopsten: the tower pairs stood in Berlin,
+Hamburg and Vienna; a what-if for play, after refs/ww2/flakturm). A pair of the first type: the gun tower (70.5 m
+square, the rims of its gun pits 39 m up) and, 420 m away (the real pairs 385 to 480 m apart), its fire control
+tower (50 by 23 m). One unit of three kinds of gun: a battery (`mounts: 'battery'`) whose heavy guns are four
+12.8 cm Flakzwilling 40 in the corner pits (`flak128`: `barrels: 2`, both fired on every salvo, `twin` their half
+spacing; shell `128mm`, 880 m/s, fuze to 32 s, burst 70 m) under the Kommandogeraet on the gun tower's roof (the
+first type's backup post) with ranges from the Wuerzburg-Riese on the fire control tower (`wurzburgriese`, role
+'radar'), and whose 'close' guns are four `flak43` and eight `flakvierling` (four of each in the gun tower's
+nests, four Vierlinge on the fire control tower's corners). `groups: ['flak128', 'flak43', 'flakvierling']` lets
+the player command one kind at a time (`u.group`, the `group` command; the heavy kind first): in manual the group
+under command takes the selection and the trigger (as the battery's guns, or as a platoon's), the other groups
+fight on as in auto (every mode but hold). sim/mounts.js: `heavyManual(u)`, `gunManual(u, p)`, `lightGroup(u)`;
+the predictor's ballistics come from `u.heavyShell` (was the 88's), `predictor.reach` (default 11,000 m) the slant
+range beyond which the crew lets a target going away go; with a light group under command `u.nextGun`,
+`u.weapons.gun` (its `shell` too) and the camera follow that group's guns. Parts with `deck` (eras/ww2.js) stand
+that high over the ground at their structure (`base`, its offset in the unit's frame; default the unit's site;
+deploy.js `partPlacements` gives `bx`, `bz`, units.js createUnits `part.deck`), so their bores, sights and line of
+sight are up there and bombs on the ground below hardly reach them; they get no pad of their own, a structure
+part says how much levelled ground it needs (`pad: [rx, rz]`, deploy.js `flatPads`). The `flakturm` and
+`leitturm` parts (role 'tower') have no hit points (Sim.applyWarhead skips parts without `maxHp`). The tower's
+lookouts see to 34 km. Masked arcs: `structure` holds each tower's boxes in its own frame (`{ flakturm: [...],
+leitturm: [...] }`: the blocks, the corner towers, the slabs over the nests, the gun tubs, the parapets and the
+roof house; no box may hold a gun's trunnion); `u.structure` lists them at the tower parts, and
+`Mounts.masked(u, i, dir)` tests a gun's line of fire over the first 90 m against every one: a masked target is not
+one its crew picks, and under the player's command the gun holds (`gun.hold` 'masked', the consoles' VERDECKT)
+without laying into the concrete. Render: `models/flak128.js` (the twin after the Aberdeen mount: two cradles,
+four equilibrators drawn between the carriage and the cradles by kit44 `strutSet`, two recoiling barrels,
+`setRecoil(m)` or `setRecoil(k, m)`, `anchors.muzzles` and `breeches` [2], `rig.trayBack`), `models/flakturm.js`
+(`buildFlakturm`, `buildLeitturm`; their levels `FLAKTURM`, `LEITTURM`) and `models/riese.js` (the Riese:
+`pivots.turret`, `elevation` 0 to 75 deg, `quirl`); a gun with `deck` leaves its pit behind (`rig.emplacement`
+removed), the towers are never culled (`WHOLE`), no data cables; crews (jobs44.js `flak128`: the layers K1 and
+K2 seated at their handwheels, the loaders' and the ammunition numbers' drill; crew44 `CAP` 384). Console:
+`consoles/turm.js`, the battery's page (`mountBattery(ctx, { heavyOnly, title, cal, radar })`) and two platoon
+pages (`mountPlatoon(ctx, kind, { keep, guns, title })`; more than four guns: two rows of compact cards) under a
+gun selector (GESCHÜTZWAHL; W cycles); each page has its own memo, the sight canvas moves to the page shown, and the
+sight pose is whichever part that page put in `VIEW`. Sound: `shot('128mm')`, the 88's bank pitched down. The
+Flak 38 lesson starts with the old loadout (its `loadout`); the tower has its own lesson (`flakturm`: the
+selector, twin salvos, the light guns in hand while the twins fight on). Balance with the tower pair (Normal, seeds 1 to 72,
+`--era ww2 --all`): all auto 25, the scripted heavy battery 60, the scripted battery with the platoons 57 of 72
+(23 / 51 / 51 with the sketched tower before it on the same code); the pair scores about 41 to 44 kills a game and
+in 96 to 99 % of the waves.
 
 **Difficulty.** DIFFICULTY gains `aim` (Easy 0.85, Normal 1, Hard 1.5): it scales the WW2 light and medium
 crews' aiming errors, and the predictor's unless `heavyAim` is given (Hard 1.25); `bombAim` (Hard 0.9, 1 when
@@ -1357,6 +1370,36 @@ apart (30 s left the third box to arrive before the predictor had settled on it)
 repaired between raids (one unbroken box levelled 700); four Thunderbolts at the battery in wave 6 (six took
 out its guns before the bombers came); the fighters weaving inbound (straight and level they lost 7 a wave to
 the 8.8 cm); Hard's `aim` 1.5 (at 1.3 the scripted battery still won 21 of 48).
+
+### Pages: the main menu and a game (`src/boot.js`, `src/choices.js`, `src/ui/menu.js`, `src/ui/loading.js`)
+
+`index.html` boots `src/boot.js`. A URL with `play` (a battle) or `tutorial=<id>` (a lesson) is a game
+page; anything else is the main menu.
+
+- **The menu** (`ui/menu.js` `mountMenu`, the `#menu` markup) is DOM only: no renderer, no sim, nothing of
+  the world. The era toggle, the difficulty and the loadout picker are kept in local storage
+  (`choices.js`); Take command opens `gameHref({ era, difficulty })`, a lesson in the Tutorials list
+  `gameHref({ era, tutorial })`. The list's lessons come from `tutorial.js` `TUTORIALS`, imported after the
+  menu is up (it brings three.js, which the game page fetches next anyway); a tick marks the ones in
+  `echelon.tutorials`. `?lessons=1` opens the list, `?era=<id>` shows that era without keeping it (a pick
+  keeps it and drops the parameter).
+- **The stills** behind the menu and the loading card (`ui/backdrop.js`): `public/menu/<kind>.jpg`, a
+  unit of each kind in `STILLS` firing in a raid, captured from the game by `tools/menushots.mjs`. The
+  menu turns through the loadout's units every 9 s and jumps to an option when it is picked; two layers
+  crossfade and drift (none of it under `prefers-reduced-motion`).
+- **A game page** shows its loading card (`ui/loading.js` `showLoading(q)`: a battle's era, difficulty
+  and units, or the lesson's name and steps, from the URL and the choices kept) before `main.js` is even
+  fetched; `hud.setLoading(p, msg)` fills its bar while `init()` builds the world for that game (the
+  sim's first `newGame` is the battle's or the lesson's, so the warm-up compiles its vehicles; main's
+  `warmUp(full)` compiles against the scene pass's target, as the game draws, and on the loading card
+  draws one frame of everything, shown and unculled, so nothing compiles or uploads in play), then
+  `start()` or `tutorial.start(id)` runs and `hideLoading()` fades the card. An unknown lesson goes back
+  to the menu's list.
+- **Ways back** (`menuHref(q, { era, lessons })`): Main menu beside the gear and on the end card, a
+  lesson's Exit or Esc (to the list). Fight again starts a new battle on the same page. `quality` and
+  `dev` pass between the pages.
+- **Sound** starts on the first pointer or key on the game page (`audio.start()`): the click that opened
+  it was on the menu's page, and browsers refuse sound before a gesture.
 
 ### UI (`src/ui/`, UI agent)
 
@@ -1527,3 +1570,12 @@ Reuse the maxgfx engine core (distance delay, air absorption, voice stealing, re
 - WW2 release: `available: true` exposes Hopsten through the normal era toggle and `?era=ww2`. The battery and platoon consoles register through `ww2/content.js`; `registerSightPose` supplies their gun and predictor poses, `main.js` sends them to `SightRenderer`, and `UnitViews.sightPos` accepts a part index so each picture begins at its own eyepiece. Four gun tutorials are available from the title screen. The 2 cm loop banks' silent start buffers are intentional and excluded from `audiotest.mjs` silence warnings.
 - WW2 flak tower: slot 4's default is `flakturm` (TURM Paula), the 2 cm platoon its alternative. SYSTEMS `flakturm` (`groups`), `flak128`; SHELLS `128mm` (id 5); PART_ROLE `flak128` 'gun', `flakturm` 'tower'; parts' `deck`; mounts.js gun groups (`u.group`, `group` command, `heavyManual`, `gunManual`, `lightGroup`, `u.heavyKind`, `u.heavyShell`, twin barrels in `fireHeavy`, `predictor.reach`); Sim.applyWarhead skips parts without `maxHp`; models `flak128`, `flakturm`; consoles/turm.js; battery.js and platoon.js take options; simtest `TURM` column. The modern simtest and the WW2 one with the old loadout (`--loadout flak88,flak43,flak43,flakvierling,flak38`) are byte-identical.
 - WW2 battery (`fire`): the manual order fires one loaded and laid gun instead of a salvo, in predicted fire and in barrage (on the tower, one twin mount); the trigger still fires salvos while held. New `predictor.lastSingle` (sim time of the last single-gun shot; `gun.firing` counts it, no `salvo` event); hold, `cease` and `group` drop an order not yet fired. Console: the battery page's SALVE / ONE SALVO button is EINZEL / ONE GUN (highlight id `single`, was `salvo`), its status line shows ONE GUN; the battery lesson's salvo step names it. The WW2 simtest is unchanged (its players use the trigger).
+- Pages (see "Pages"): the main menu is DOM only and the world is built only on a game page (`?play=1` a battle, `?tutorial=<id>` a lesson): `src/boot.js` picks the page, `src/choices.js` keeps the era, the loadout per era and now the difficulty (`echelon.difficulty`, `?difficulty=`) and builds the URLs between the pages, `src/ui/menu.js` the menu (the title screen's controls and the tutorial list moved out of main.js and tutorial.js), `src/ui/loading.js` the loading card, `src/ui/backdrop.js` the stills (`public/menu/<kind>.jpg`, `tools/menushots.mjs`). Main no longer runs the demonstration battle or the title camera; `state` starts as 'loading'. HUD: `ready`, `showTitle` and `showTutorialMenu` are gone, `showEnd(report, { onRestart, onMenu })`. Tutorials: `defs` is the era's lessons (a getter), the list and `buildMenu`/`openMenu` are gone, `host.leave()` leaves for the menu's list.
+- WW2 crews (eras/ww2/models): loading drills. `crew44.js` `h.setGun(part.gun, dt, { barrelGun })` (render/units.js, every frame) keeps `h.drill`: `since` (s since the last shot), `load` (0..1 the heavy round into the breech or the 3.7 cm clip onto the table, 1 done), `loading`, `done` (s since a loading ended), `loads`, `change[gun]` (0..1 a 2 cm magazine change, -1 none), `after[gun]`. `jobs44.js` "the loading drills": a drill job moves through key poses along that clock (`keyed`, `pose44.js` `lerpSpec`); a load passed hand to hand is shown by the key that takes it and hidden by the one that gives it; a pose may set `S.turn` (the man turns on his spot); a job's `ease` (1/s) eases him into each pose; `REACT[kind]` after the pose (the heavy guns' flinch, the light guns' layer shaken while firing). Drills: the 8.8 cm K5 (setter cup), K4, K3 (breech by hand, the firing lever); the 12.8 cm twin's loaders and ammunition numbers (hoist, trays, rammer); the 3.7 cm loader and his two numbers in turn (they follow the mount round now); the 2 cm loaders' magazine changes (the Flak 38's standing, the Vierling's seated, a full one from the box or the rack after). `pose44.js` `solve` shows a prop that was hidden where it is at once. `figure44.js` prop `round128` (part bit 21). The 12.8 cm twin (flak128.js): its carriage was laid out as if the turret pivot's frame were the floor's, so the deck stood 0.9 m above the crew's spots; the deck is now 0.5 m over the floor with the loading platform 0.8 m longer and its rail behind, the trunnions 0.35 m higher, the trays 0.9 m and on the bore's line, the hoist at the platform's rear (`anchors.hoist`), the layers K1 and K2 not drawn (in their closed cabins), the loaders behind the trays' sweep, the gun commander behind the left cabin.
+- WW2 flak tower pair (refs/ww2/flakturm): `flakturm` is now a first-type pair, the gun tower (70.5 m, its pits 39 m up) and a new `leitturm` fire control tower 420 m away (role 'tower', `WHOLE`). New kind `wurzburgriese` (role 'radar', models/riese.js) on the L-tower; `flak128` rebuilt after the surviving twin (FLAK128 `twin` 0.675, `height` 2.55, `muzzle` 7.4; render RECOIL stroke 1.0; jobs `k1`, `k2` seated layers, the tray behind the recoil via `rig.trayBack`). Parts: four `flak128` (`deck` 37.1), `kdo40` on the roof's post (36.5), four `flak43` and four `flakvierling` in the nests (29.8), four `flakvierling` and the Riese on the L-tower (`base` its offset; 34 and 36). Shared: deploy.js `partPlacements` gives deck parts `bx`, `bz` (their structure's ground; units.js measures `deck` from it), `flatPads` skips deck parts and takes a structure's `pad: [rx, rz]`; SYSTEMS `structure` is keyed by tower kind and `u.structure` is a list (mounts.js `masked` tests each, `maskedBy`). kit44 `strutSet` (telescoping struts in two InstancedMeshes). Console: `mountBattery` `radar` [de, en, set]; platoon pages with more than four guns wrap into two rows of compact cards; the Vierling page lists 1 to 4 and L1 to L4. crew44 `CAP` 384.
+- Sight pictures (`sight.js`): the read-back is asynchronous (`readRenderTargetPixelsAsync`, one picture in flight; a renderer without it reads synchronously), so the picture lands a frame or two after it was rendered and `present(canvas, mono)` tone-maps it then; the tone curve is a 4,097-entry table (within one level of the curve) and the exposure's 90th percentile a selection instead of a sort. Measured on an RTX 4070 (WW2, Medium): the main thread's frame from 14.4 to 4.4 ms (it no longer waits for the GPU), the worst frame gap from 40 to 23 ms, the picture rate unchanged (about 13 a second).
+- Rendering pass: grass tufts outside the view or past the fade are culled in the vertex shader before the field function (`tuftCulled`), and fewer are drawn as the camera rises (`THIN_FROM`, `THIN_SPAN`, `THIN_MIN`; grass.js `update`). New `models/ao.js`: `setBakeRenderer(renderer)` (main.js, the model viewer), `bakeKinds(kinds)` (an era's models.js; every WW2 kind), and buildVehicle calls `bakeRig(rig, kind)`: occlusion from 64 directions on the GPU, cached per kind and vertex count, into the vertex colours. Kommandogeraet 40 detail pass (eyepiece blocks with red bands, bezels and hoods, clamp bands, door frames, data plate, handwheels R 0.16; jobs44 WHEELS `kdo40` 0.16). Crews: crew44 `springPose` (hips, torso and head on damped springs after the job's pose, before the solve; snaps after a gap over 0.2 s) and `stepTurning` (`st.turnRate` from `root`), figure44 cloth relief (`crewBump`) and face shading (`faceCol`). Model viewer `&pit=0`, `&flat=1`.
+- 12.8 cm loading machine (flak128.js `LOAD`, `LOAD_PHASES`; refs/ww2/flak128 sec. 5, flak105 sec. 5): the fixed tray is replaced by a swinging loading tray per gun (`anchors.trays`, its rest `anchors.trayRest` on a stand at the side platform's inner edge, a telescoping arm from the trunnion boss in the rig's `strutSet`, two rubber rollers at its front), ammunition hoists at the platforms' rear ends (`anchors.hoists`), release levers (`anchors.levers`); `rig.setDrill(drill)` poses them from the crew's clock (render/units.js crewUpdate calls it after `h.setGun`) and sets `rig.load = { swing, ram, rise }`. The outer walls' rear lower corner is cut back for the swing; the platforms run from x 1.62 to 4.3 m back; the floor rack is gone; crew spots k3/k4 at z 2.85, k5/k6 at 3.55. jobs44 `LOADER128`, `AMMO128` rewritten (the rounds are the men's props, placed on the machine while no hand holds them). 8.8 cm: a ready-round rack on the setter housing (`anchors.rack`, a stand-in) replaces the unseen basket (`k5Basket`). jobs44 `prepareRig` updates `anchors.drillNodes` and `breeches`. pose44: `lerpSpec` blends a grip on the prop in prop space when both keys hold it (`propGrips` after), and `reachFix(S, g)` (crew44 `solveMan`, standing men) lowers and shifts the hips until the hands reach their grips. Model viewer `&drill=`.
+- Shader warm-up (main.js `warmUp(full)`): the programs are compiled with the scene pass's HDR target bound (`post.scenePass.rt`). three.js keys a program on its target (tone mapping, output colour space), and the old `compileAsync` against the screen made variants the game never draws, so every material compiled again the first time the camera saw it (20 programs on the first move from the battery to the flak towers). On the loading card it then draws one frame with every object shown and none frustum culled (lights untouched: their count is in every program), which makes the shadow-depth programs and uploads the textures and geometry; it waits for the WW2 crews' module (`views.crewing`) first. In that frame every shadow caster's `onBeforeShadow` marks the depth material changed: three.js shares one depth material between the casters and sets its side and map per caster without a version bump, so otherwise which depth variants get made depends on the draw order (two were still made in play). `newBattle` compiles only. fx.js builds the crater decals' mesh in its constructor instead of with the first crater.
+- Quality presets (main.js `QUALITY`): `pixels`, the most the 3D view renders in megapixels (Low 0.6, Medium 1.1, High 2, Ultra 4.2); `basePixelRatio()` is the least of the device pixel ratio, the preset's `pixelRatio` and the ratio that fits the budget, so at native 4K (a 1920x2160 view) Medium renders about 990x1110 and the browser scales it up, at the cost of a 1080p screen. A resize reapplies it (`applyPixelRatio`).
+- Dynamic resolution is a ladder: over budget (`frameAvg` > 20 ms, checked every 1.5 s) the landscape gives up a step of detail first (terrain.js `SHED`, `terrain.setQuality(name, shed)`: half the grass (`grass.thin`), 0.6 of the preset's tree density (a replant), no tree shadows (`trees.setShadows`), a fifth of the grass), then the resolution drops 0.1 at a time to 0.5; under 13.5 ms the resolution comes back first (0.05 a step), then the landscape. The models are never simplified, so the guns stay sharp longest. F3 shows the step.

@@ -19,20 +19,36 @@ const AXIS = 250;
 const ZUG = [[0, -55], [-50, 30], [50, 30]];
 const RING = [[0, -32], [30.4, -9.9], [18.8, 25.9], [-18.8, 25.9], [-30.4, -9.9], [0, 0]];
 const platoon = (kind, last = kind) => ZUG.map(([dx, dz], i) => ({ kind: i === 2 ? last : kind, dx, dz, name: `gun ${i + 1}` }));
-// The flak tower (a what-if at Hopsten: the eight G-towers stood in Berlin, Hamburg and Vienna): a 40 m
-// concrete block, its roof 32 m up (eras/ww2/models/flakturm.js FLAKTURM). Four 12.8 cm Flakzwilling 40 on
-// the corner turrets (36 m), gun A first (the camera's), the Kommandogeraet and the Wuerzburg and two 3.7 cm
-// on the roof, a Flakvierling on the gallery of each face (26 m); `deck`: m over the ground at the site.
-const TURM = { roof: 32, turret: 36, gallery: 26, corner: 15, side: 24 };
-const flakturm = () => [
-  ...[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz], i) => ({ kind: 'flak128', dx: sx * TURM.corner, dz: sz * TURM.corner, deck: TURM.turret, name: `gun ${'ABCD'[i]}`, letter: 'ABCD'[i] })),
-  { kind: 'kdo40', dx: 0, dz: -8, deck: TURM.roof, name: 'predictor' },
-  { kind: 'wurzburg', dx: 0, dz: 9, deck: TURM.roof, name: 'Wuerzburg' },
-  { kind: 'flak43', dx: -8.5, dz: 0, deck: TURM.roof, name: '3.7 cm gun 1' },
-  { kind: 'flak43', dx: 8.5, dz: 0, deck: TURM.roof, name: '3.7 cm gun 2' },
-  ...[[0, -1], [1, 0], [0, 1], [-1, 0]].map(([sx, sz], i) => ({ kind: 'flakvierling', dx: sx * TURM.side, dz: sz * TURM.side, deck: TURM.gallery, name: `Vierling ${['north', 'east', 'south', 'west'][i]}` })),
-  { kind: 'flakturm', dx: 0, dz: 0, name: 'tower' },
-];
+// The flak tower pair (a what-if at Hopsten: the towers stood in Berlin, Hamburg and Vienna) of the first type
+// (eras/ww2/models/flakturm.js FLAKTURM, LEITTURM; refs/ww2/flakturm): the gun tower, 70.5 m square, a twin
+// 12.8 cm Flakzwilling 40 in the round pit on each corner tower (floor 37.1 m), gun A first (the camera's), the
+// Kommandogeraet on the backup fire control post in the roof's middle; the eight light-flak nests on the corner
+// towers' outer faces (29.8 m) with four 2 cm Flakvierlinge and four 3.7 cm Flak 43, one of each on every face;
+// and 420 m away the fire control tower, 50 by 23 m, the Wuerzburg-Riese on its roof (36 m) and a Flakvierling
+// on each corner bastion (34 m). `deck`: m over the ground at the structure the part stands on (the unit's site,
+// or `base`, the L-tower's place); `pad`: the levelled ground a structure needs (deploy.js flatPads).
+const TURM = { floor: 37.1, post: 36.5, nest: 29.8, corner: 24, nestAt: 35.25 + 4.0, L: [-420, 0], lRoof: 34, lPlinth: 36, lx: 25, lz: 11.5, riese: 15 };
+const flakturm = () => {
+  const C = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  // the nests: on each corner tower's x face and z face; the Vierling and the 3.7 cm swap faces from corner to
+  // corner, so every face of the tower has one of each
+  const nests = C.flatMap(([sx, sz], i) => [
+    { kind: i % 2 ? 'flak43' : 'flakvierling', dx: sx * TURM.nestAt, dz: sz * TURM.corner },
+    { kind: i % 2 ? 'flakvierling' : 'flak43', dx: sx * TURM.corner, dz: sz * TURM.nestAt },
+  ]);
+  const vier = nests.filter((n) => n.kind === 'flakvierling'), med = nests.filter((n) => n.kind === 'flak43');
+  const [Lx, Lz] = TURM.L;
+  return [
+    ...C.map(([sx, sz], i) => ({ kind: 'flak128', dx: sx * TURM.corner, dz: sz * TURM.corner, deck: TURM.floor, name: `gun ${'ABCD'[i]}`, letter: 'ABCD'[i] })),
+    { kind: 'kdo40', dx: 0, dz: 0, deck: TURM.post, name: 'predictor' },
+    { kind: 'wurzburgriese', dx: Lx + TURM.riese, dz: Lz, deck: TURM.lPlinth, base: TURM.L, name: 'Wuerzburg-Riese' },
+    ...med.map((n, i) => ({ ...n, deck: TURM.nest, name: `3.7 cm gun ${i + 1}` })),
+    ...vier.map((n, i) => ({ ...n, deck: TURM.nest, name: `Vierling ${i + 1}` })),
+    ...C.map(([sx, sz], i) => ({ kind: 'flakvierling', dx: Lx + sx * TURM.lx, dz: Lz + sz * TURM.lz, deck: TURM.lRoof, base: TURM.L, name: `L-tower Vierling ${i + 1}` })),
+    { kind: 'flakturm', dx: 0, dz: 0, name: 'gun tower', pad: [38, 38] },
+    { kind: 'leitturm', dx: Lx, dz: Lz, name: 'fire control tower', pad: [29, 16] },
+  ];
+};
 
 export default {
   id: 'ww2',
@@ -162,7 +178,7 @@ export default {
       options: [
         {
           kind: 'flakturm', id: 'TURM', name: 'Flak tower', callsign: 'Paula', label: 'Flak tower',
-          info: 'A concrete G-tower: four twin 12.8 cm on its predictor, two 3.7 cm and four Vierlinge on the galleries; pick which guns you fire',
+          info: 'A concrete gun tower and its fire control tower: four twin 12.8 cm on the predictor and the Riese radar, four 3.7 cm and eight Vierlinge in the nests; pick which guns you fire',
           parts: flakturm(),
         },
         { kind: 'flak38', id: 'LIGHT', name: '2 cm Flak 38 platoon', callsign: 'Paula', label: '2 cm Flak 38', info: 'Three single guns: short reach, quick to swing onto a diving attacker', parts: platoon('flak38') },

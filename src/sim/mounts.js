@@ -122,10 +122,10 @@ export function initMounts(u) {
   u.heavyShell = first.gun.shell;
   // the group of guns the player commands (null: the heavy guns, or the platoon's)
   u.group = sys.groups ? sys.groups[0] : null;
-  // a structure the guns stand on (the flak tower): its boxes and the frame they are in (the site's ground
-  // at the tower part, the unit's heading), for the light guns' masked arcs
-  const base = sys.structure ? u.parts.find((p) => p.role === 'tower') : null;
-  u.structure = base ? { x: base.pos.x, y: base.pos.y, z: base.pos.z, c: Math.cos(base.heading), s: Math.sin(base.heading), boxes: sys.structure } : null;
+  // the structures the guns stand on (the flak towers): each one's boxes and the frame they are in (the ground
+  // at the tower part, the unit's heading), for the guns' masked arcs
+  const towers = sys.structure ? u.parts.filter((p) => p.role === 'tower' && sys.structure[p.kind]) : [];
+  u.structure = towers.length ? towers.map((t) => ({ x: t.pos.x, y: t.pos.y, z: t.pos.z, c: Math.cos(t.heading), s: Math.sin(t.heading), boxes: sys.structure[t.kind] })) : null;
   // the unit's summary of its guns (the modern consoles' and the bookkeeping's `weapons.gun`): totals, and
   // the fire control of the gun the camera rides (u.nextGun) or the predictor's
   u.weapons.gun = {
@@ -189,17 +189,20 @@ export class Mounts {
     return !!u.group && u.group !== u.heavyKind;
   }
 
-  // Does the unit's structure (the flak tower's concrete) stand in gun i's line of fire toward world direction
-  // `d` (any length), within MASK_LEN of its trunnion? The segment in the structure's frame against each box
-  // (slabs). False for a unit without one.
+  // Does one of the unit's structures (the flak towers' concrete) stand in gun i's line of fire toward world
+  // direction `d` (any length), within MASK_LEN of its trunnion? The segment in each structure's frame against
+  // its boxes (slabs). False for a unit without any.
   masked(u, i, d) {
-    const S = u.structure;
-    if (!S) return false;
+    if (!u.structure) return false;
     const from = this.mountPos(u, i, _m0);
     const len = d.length() || 1;
+    for (const S of u.structure) if (this.maskedBy(S, from, d, MASK_LEN / len)) return true;
+    return false;
+  }
+
+  maskedBy(S, from, d, k) {
     const X = from.x - S.x, Z = from.z - S.z;
     const o = [X * S.c - Z * S.s, from.y - S.y, X * S.s + Z * S.c];
-    const k = MASK_LEN / len;
     const v = [(d.x * S.c - d.z * S.s) * k, d.y * k, (d.x * S.s + d.z * S.c) * k];
     for (const b of S.boxes) {
       let t0 = 0, t1 = 1;
