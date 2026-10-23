@@ -17,9 +17,8 @@ npm run preview  # serves dist/ on http://localhost:4173
 ## Sharing the build
 
 - **Build and serve.** Build it and put `dist/` on a web server.
-- **Site root only.** `vite.config.js` sets no `base`, so the build loads its files from the root of the site (`/assets/...`, `/audio/...`). `dist/` works served at the top of a site or domain (`npm run preview` does this).
-- **Where it fails.** Not from a subfolder (a GitHub Pages project page, an itch.io upload), and not opened straight from disk (`file://`).
-- **A subfolder** would need `base: './'` in `vite.config.js` and a new build.
+- **Any folder.** `vite.config.js` sets `base: './'`, so the build loads its files relative to its page and works from a site's root or any folder in it. It still needs a web server: opened straight from disk (`file://`) it fails.
+- **itch.io.** Zip what is inside `dist/` (`index.html` at the top of the zip, not in a folder), upload it as an HTML game and tick "This file will be played in the browser". In Embed options pick "Click to launch in fullscreen" (the screen is split in two halves, so it wants room), or embed at 1280 x 720 or larger with the Fullscreen button; leave Mobile friendly and SharedArrayBuffer off.
 - **What's in it.** The build holds only the game page. Its first file is the main menu's, small and without three.js; the game's code is fetched when a battle or a lesson starts, and the WW2 era's models and consoles when that era is played. The development pages are not part of it.
 
 ## Checks

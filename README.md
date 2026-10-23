@@ -23,7 +23,7 @@ npm run dev      # http://localhost:5200
 
 You need Node.js, and a browser with WebGL2, a keyboard and a mouse.
 
-To share it, serve the build (`dist/`) from a site's root, not a subfolder: `vite.config.js` sets no `base`. More in [Development](docs/DEVELOPMENT.md).
+To share it, serve the build (`dist/`) from any web server or folder, or zip it for itch.io. More in [Development](docs/DEVELOPMENT.md).
 
 ## Controls
 
