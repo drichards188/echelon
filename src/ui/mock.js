@@ -11,7 +11,7 @@ const TAU = Math.PI * 2;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-const GUN_KINDS = new Set(['pantsir', 'tunguska', 'shilka']);
+const GUN_KINDS = new Set(['pantsir', 'tunguska', 'shilka', 'gepard']);
 const SPEC = {
   aircraft: { n: 8, speed: [220, 290], alt: [5000, 9000], dist: [20000, 200000] },
   cruise: { n: 8, speed: [220, 250], alt: [35, 70], dist: [10000, 120000] },
@@ -83,6 +83,12 @@ export class MockWorld {
       u.radar.track = true;
       u.period = 1;
       u.weapons = { missiles: null, gun: { rounds: 2400, max: 2400, firing: false, heat: 0, aimOk: false, aim: { x: 0, y: 0, z: 0 } }, weapon: 'gun' };
+      u.sight = { az: 250 * DEG, el: 0.1, fov: 0.07, uncaged: true, lock: 0, tone: 0, src: 'radar' };
+    } else if (d.kind === 'gepard') {
+      u.radar.range = 15000;
+      u.radar.track = true;
+      u.period = 1;
+      u.weapons = { missiles: null, gun: { rounds: 640, max: 640, firing: false, heat: 0, aimOk: false, aim: { x: 0, y: 0, z: 0 } }, weapon: 'gun' };
       u.sight = { az: 250 * DEG, el: 0.1, fov: 0.07, uncaged: true, lock: 0, tone: 0, src: 'radar' };
     } else if (d.kind === 'buk' || d.kind === 'tor') {
       initBukTor(u, d);
@@ -264,7 +270,7 @@ export class MockWorld {
   pantsirGuns(u, dt) {
     const g = u.weapons.gun;
     const t = u.tracks.find((x) => x.id === u.selected);
-    const auto = u.mode === 'auto' && u.weapons.weapon === 'gun' && t && t.range < (u.kind === 'shilka' ? 1400 : 3800);
+    const auto = u.mode === 'auto' && u.weapons.weapon === 'gun' && t && t.range < (u.kind === 'shilka' ? 1400 : u.kind === 'gepard' ? 3500 : 3800);
     if (auto) g.firing = true; else if (u.mode === 'auto' && !this.trigger) g.firing = !!(u.trig);
     if (g.firing && g.rounds > 0) {
       const n = 80 * dt;

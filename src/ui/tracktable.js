@@ -16,7 +16,8 @@ const COLS = {
 };
 
 export class TrackTable {
-  constructor({ cols, onPick, sort = 'tti', maxHeight = 200, abbrev = (i) => String(i).slice(0, 2) }) {
+  // heads: the column captions in another language ({ col: caption }), none: the empty table's caption
+  constructor({ cols, onPick, sort = 'tti', maxHeight = 200, abbrev = (i) => String(i).slice(0, 2), heads = {}, none = 'НЕТ ЦЕЛЕЙ' }) {
     this.cols = cols;
     this.onPick = onPick;
     this.sortKey = sort;
@@ -27,7 +28,7 @@ export class TrackTable {
     this.heads = {};
     for (const c of cols) {
       const d = COLS[c];
-      const h = el('span', 'td c-' + c, d.h);
+      const h = el('span', 'td c-' + c, heads[c] ?? d.h);
       h.style.width = d.w + 'px';
       h.title = `${d.en}\n(click to sort)`;
       h.addEventListener('pointerdown', (e) => {
@@ -41,7 +42,7 @@ export class TrackTable {
       this.head.append(h);
     }
     this.body = el('div', 'tbody');
-        this.empty = el('div', 'tempty', 'НЕТ ЦЕЛЕЙ / NO TRACKS');
+        this.empty = el('div', 'tempty', `${none} / NO TRACKS`);
     this.el.append(this.head, this.body);
     this.rows = new Map();
     this.order = null;

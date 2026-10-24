@@ -223,6 +223,24 @@ export const SYSTEMS = {
     reload: 0,
     turnAz: 1.8, turnEl: 1.3,
   },
+  // Guns only, on the Leopard 1 hull: two 35 mm guns (2 x 550 rounds/min) in mounts outside the turret,
+  // a search radar on the turret rear and a tracking radar between the guns, the periscope sight when
+  // the tracking radar is off. Reaches farther and higher than the Shilka with fewer, heavier rounds.
+  gepard: {
+    hp: 95,
+    fc: 'track', eoFallback: true,
+    search: { range: 15000, period: 1, height: 4, low: 0.85 },
+    track: { range: 10000 },
+    eo: { range: 5000, vis: 0.8 },
+    channels: 1,
+    react: 2.5,
+    close: 4000,
+    stocks: {},
+    // opens fire at 3.5 km; the 35 mm reaches about 5.3 km (640 rounds, 320 a gun)
+    gun: { shell: '35mm', rounds: 640, range: 3500, maxAlt: 3000, rate: 18.3, burst: 1.5, cool: 0.6, side: 1.42, height: 2.36, settle: 2 },
+    reload: 0,
+    turnAz: 1.6, turnEl: 1.1,
+  },
 };
 
 // ---------------------------------------------------------------- WW2 (eras/ww2.js, refs/ww2)
@@ -491,19 +509,19 @@ export const MISSILES = {
   },
 };
 
-// Threats. cls: what radar classification reveals. size: game radar size (0..1), ir: game heat
-// signature for the Strela's seeker, radius: hit sphere (m), warhead: damage and radius on arrival,
-// points: score for a kill.
+// Threats. cls: what radar classification reveals, name: for the radio (the modern era's Russian types,
+// models/threats.js). size: game radar size (0..1), ir: game heat signature for the Strela's seeker,
+// radius: hit sphere (m), warhead: damage and radius on arrival, points: score for a kill.
 export const THREATS = {
-  fighter: { cls: 'aircraft', speed: 260, hp: 2, size: 1, ir: 1, radius: 7, warhead: null, points: 400 },
-  decoy: { cls: 'aircraft', speed: 230, hp: 1, size: 0.85, ir: 0.15, radius: 2, warhead: null, points: 20 },
-  cruise: { cls: 'cruise', speed: 240, hp: 1, size: 0.3, ir: 0.55, radius: 3, warhead: [140, 60], points: 150 },
-  drone: { cls: 'drone', speed: 65, hp: 1, size: 0.18, ir: 0.35, radius: 2.5, warhead: [45, 30], points: 50 },
-  arm: { cls: 'arm', speed: 680, hp: 1, size: 0.14, ir: 0.5, radius: 2, warhead: [80, 35], points: 120 },
-  glide: { cls: 'bomb', speed: 260, hp: 1, size: 0.2, ir: 0.05, radius: 2, warhead: [160, 60], points: 120 },
-  helo: { cls: 'helo', speed: 70, hp: 2.5, size: 0.75, ir: 0.85, radius: 6, warhead: null, points: 300 },
-  atgm: { cls: 'atgm', speed: 330, hp: 1, size: 0.05, ir: 0.6, radius: 1, warhead: [55, 14], points: 60 },
-  tbm: { cls: 'tbm', speed: 1200, hp: 1, size: 0.25, ir: 0.9, radius: 3, warhead: [260, 90], points: 500 },
+  fighter: { cls: 'aircraft', name: 'Su-34', speed: 260, hp: 2, size: 1, ir: 1, radius: 7, warhead: null, points: 400 },
+  decoy: { cls: 'aircraft', name: 'Kh-55 decoy', speed: 230, hp: 1, size: 0.85, ir: 0.15, radius: 2, warhead: null, points: 20 },
+  cruise: { cls: 'cruise', name: 'Kh-101 cruise missile', speed: 240, hp: 1, size: 0.3, ir: 0.55, radius: 3, warhead: [140, 60], points: 150 },
+  drone: { cls: 'drone', name: 'Geran-2 drone', speed: 65, hp: 1, size: 0.18, ir: 0.35, radius: 2.5, warhead: [45, 30], points: 50 },
+  arm: { cls: 'arm', name: 'Kh-31P ARM', speed: 680, hp: 1, size: 0.14, ir: 0.5, radius: 2, warhead: [80, 35], points: 120 },
+  glide: { cls: 'bomb', name: 'UMPK glide bomb', speed: 260, hp: 1, size: 0.2, ir: 0.05, radius: 2, warhead: [160, 60], points: 120 },
+  helo: { cls: 'helo', name: 'Ka-52', speed: 70, hp: 2.5, size: 0.75, ir: 0.85, radius: 6, warhead: null, points: 300 },
+  atgm: { cls: 'atgm', name: 'Vikhr ATGM', speed: 330, hp: 1, size: 0.05, ir: 0.6, radius: 1, warhead: [55, 14], points: 60 },
+  tbm: { cls: 'tbm', name: 'Iskander-M', speed: 1200, hp: 1, size: 0.25, ir: 0.9, radius: 3, warhead: [260, 90], points: 500 },
 };
 
 // The WW2 era's aircraft and ordnance (refs/ww2/<type>/README.md; game values, the speeds and heights from

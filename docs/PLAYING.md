@@ -39,7 +39,7 @@ Launching, firing, uncaging or slewing a sight puts a unit in auto into manual f
 
 In the 2020s you defend an airbase on the steppe. The default units are an S-400 battalion for the long-range, high layer, two Pantsir-S1 for point defense, and an Osa-AKM and a Strela-10M3 for the short-range layer.
 
-**The raids.** Seven escalating raids of drones, cruise missiles, fighters with radar-seeking missiles and glide bombs, decoys, attack helicopters and ballistic missiles.
+**The raids.** Seven escalating Russian raids: Geran-2 drones, Kh-101 cruise missiles, Su-34s with Kh-31P radar-seeking missiles and UMPK glide bombs, old Kh-55s flown as decoys, Ka-52 attack helicopters with Vikhr missiles, and Iskander-M ballistic missiles.
 
 | Slot | Default | Alternative |
 |---|---|---|
@@ -47,7 +47,7 @@ In the 2020s you defend an airbase on the steppe. The default units are an S-400
 | 2 battalion cover | Pantsir-S1 | 2S6M Tunguska: guns first (more 30 mm, its crew opens fire at 3.5 km, tougher), eight cheap 9M311 to 10 km guided only through the optical sight, a new missile target every 8 s at most |
 | 3 airbase cover | Pantsir-S1 | 2S6M Tunguska |
 | 4 short range | Osa-AKM | Tor-M2: four targets at once inside its radar sector (a new one every 4 s at most), quick, best against small fast targets, dearer rounds fired straight up out of their cells |
-| 5 very short range | Strela-10M3 | ZSU-23-4M4 Shilka-M4: four 23 mm guns, free to fire, its shells reach about 2.8 km and its crew opens fire inside 2 km; its radar emits |
+| 5 very short range | Strela-10M3 | ZSU-23-4M4 Shilka-M4: four 23 mm guns, free to fire, its shells reach about 2.8 km and its crew opens fire inside 2 km; its radar emits. Or the Flakpanzer Gepard: two 35 mm guns with 640 heavy rounds, its shells reach about 5 km and its crew opens fire inside 3.5 km; a search and a tracking radar, both emitting; its panel is in German |
 
 **The layers.** The search radars see high flyers far out and low flyers only close in and over open ground. So the long layer gets the aircraft, decoys and ballistic missiles, and what comes in low leaks through to the Pantsirs, the Osa and the Strela.
 
@@ -133,17 +133,17 @@ The console keys act on the selected unit. Click a track on a scope, plot or tab
 | Key | Modern consoles | WW2 consoles |
 |---|---|---|
 | `Tab` / `Shift+Tab` | next / previous track | next / previous aircraft |
-| `Space` | launch one missile (`Shift+Space` two: S-400, Buk, Osa, Tor); hold to fire the guns of the Pantsir and Tunguska (on guns) and the Shilka; Strela: fire | FEUER (hold) |
+| `Space` | launch one missile (`Shift+Space` two: S-400, Buk, Osa, Tor); hold to fire the guns of the Pantsir and Tunguska (on guns), the Shilka and the Gepard; Strela: fire | FEUER (hold) |
 | `A` | mode: auto, manual, hold | mode: FREI, BEFEHL, HALT |
 | `R` | search radar (the Shilka's one dish: search) | battery: Wuerzburg on or off |
-| `T` | tracking radar (Buk: the TELAR radars; Tor: its tracking array; Shilka: track) | battery: range source, rangefinder or Wuerzburg |
+| `T` | tracking radar (Buk: the TELAR radars; Tor: its tracking array; Shilka: track; Gepard: the tracking radar between the guns) | battery: range source, rangefinder or Wuerzburg |
 | `G` | Pantsir, Tunguska: missiles or guns | battery: barrage; platoon: spread or concentrate the fire |
 | `Q` | S-400: missile type; Buk: firing vehicle (best, TELAR 1, TELAR 2) | battery: telescope 12x or 24x; platoon: the next gun's sight |
 | `W` | | flak tower: the next kind of gun under your command |
 | `X` | cease fire on the selected track (S-400, Buk, Tor) | |
 | `U` | Strela: uncage the seeker | |
 | `L` | reload (the missile units) | |
-| arrows | slew the sight (Strela, and the optical sight of the Pantsir, Tunguska and Shilka); `Shift` slews faster | |
+| arrows | slew the sight (Strela, the optical sight of the Pantsir, Tunguska and Shilka, the Gepard's periscope); `Shift` slews faster | |
 
 ## Tutorials
 
@@ -154,7 +154,7 @@ The console keys act on the selected unit. Click a track on a scope, plot or tab
 - **Next and Skip.** Steps that only explain go on with **Next**; **Skip step** passes one you cannot complete.
 - **Time compression** stays in your hands: the + and - buttons by the time readout, or [ and ].
 - **Leaving.** Esc or **Exit** goes back to the menu's list, Esc again to the menu.
-- **Your loadout.** A lesson runs on the default units with its own vehicle swapped in (the Buk, Tunguska, Tor and Shilka lessons, and the WW2 2 cm Flak 38 lesson) and leaves your loadout as it was.
+- **Your loadout.** A lesson runs on the default units with its own vehicle swapped in (the Buk, Tunguska, Tor, Shilka and Gepard lessons, and the WW2 2 cm Flak 38 lesson) and leaves your loadout as it was.
 
 ### The lessons
 
@@ -167,6 +167,7 @@ The console keys act on the selected unit. Click a track on a scope, plot or tab
 - **2S6M Tunguska** (replaces a Pantsir): holding the trigger and the fire control's lead, heat and ammunition, the optical-only missile channel and when to use it, the search radar, reloading.
 - **Tor-M2** (replaces the Osa): the tracking sector, a vertical cold launch, several targets at once on separate channels, a salvo, reloading.
 - **Shilka-M4** (replaces the Strela): radar tracking and the lock lamp, the lead mark in the sight, a very short range, bursts and heat, the optical fallback with the dish off, the radar as an anti-radar target.
+- **Flakpanzer Gepard** (replaces the Strela): the German panel, the search and tracking radars, the lead mark, short bursts from the two 35 mm guns, the periscope with the tracking radar off, going dark against an anti-radar missile.
 - **WW2 8.8 cm battery**: the air picture, designating a target, letting the solution settle, salvos, reading the bursts, optical ranging when Window spoils the radar, and barrage fire.
 - **WW2 flak tower**: the gun selector, twin 12.8 cm salvos on a bomber box, then the Vierlinge and the 3.7 cm in hand against a Mustang strafing the tower while the twins fight on with their crews.
 - **WW2 3.7 cm, Flakvierling and 2 cm platoons**: one lesson per gun type, covering the sight, the reach, the ammunition feed, naming the target, firing, and spreading or concentrating the fire (the 2 cm lesson swaps the Flak 38 platoon in for the tower).

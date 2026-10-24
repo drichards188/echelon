@@ -59,7 +59,7 @@ export class Entities {
         scene.add(mesh);
         const plain = new THREE.InstancedBufferAttribute(new Float32Array(cap * 16), 16);
         plain.setUsage(THREE.DynamicDrawUsage);
-        return { mesh, spin: pt.spin, pivot: pt.pivot, plain, scaled: null, shadow: mesh.castShadow };
+        return { mesh, spin: pt.spin, pivot: pt.pivot, dir: pt.dir ?? 1, plain, scaled: null, shadow: mesh.castShadow };
       });
       let radius = 0.5;
       for (const pt of model.parts) {
@@ -179,7 +179,7 @@ export class Entities {
     if (k > 1) _big.scale(_x.set(k, k, k));
     for (const p of g.parts) {
       if (p.spin) {
-        _s.makeRotationAxis(p.spin === 'x' ? _x.set(1, 0, 0) : p.spin === 'y' ? _y.set(0, 1, 0) : _z.set(0, 0, 1), spin * SPIN[p.spin] + t * SPIN[p.spin]);
+        _s.makeRotationAxis(p.spin === 'x' ? _x.set(1, 0, 0) : p.spin === 'y' ? _y.set(0, 1, 0) : _z.set(0, 0, 1), (spin + t) * SPIN[p.spin] * p.dir);
         _s.setPosition(p.pivot);
         p.mesh.setMatrixAt(g.n, _m.multiplyMatrices(_big, _s));
         _m.multiplyMatrices(_r, _s).toArray(p.plain.array, g.n * 16);

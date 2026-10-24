@@ -11,6 +11,7 @@ import { mountOsa } from './consoles/osa.js';
 import { mountStrela } from './consoles/strela.js';
 import { mountTunguska } from './consoles/tunguska.js';
 import { mountShilka } from './consoles/shilka.js';
+import { mountGepard } from './consoles/gepard.js';
 import { mountBuk } from './consoles/buk.js';
 import { mountTor } from './consoles/tor.js';
 import { applyHighlight } from './highlight.js';
@@ -21,9 +22,9 @@ const DESIGN_H = 860;
 // The consoles by unit kind (a global registry: each era lists the kinds it uses), the tab's type label
 // and the kinds whose console shows a sight picture. An era's lazily loaded content adds its own with
 // registerConsole.
-const MOUNT = { s400: mountS400, pantsir: mountPantsir, osa: mountOsa, strela: mountStrela, tunguska: mountTunguska, shilka: mountShilka, buk: mountBuk, tor: mountTor };
-const TYPE_LABEL = { s400: 'С-400', pantsir: 'ПАНЦИРЬ-С1', osa: 'ОСА-АКМ', strela: 'СТРЕЛА-10М3', tunguska: 'ТУНГУСКА-М', shilka: 'ШИЛКА-М4', buk: 'БУК-М2', tor: 'ТОР-М2' };
-const SIGHT_KINDS = new Set(['pantsir', 'strela', 'tunguska', 'shilka']);
+const MOUNT = { s400: mountS400, pantsir: mountPantsir, osa: mountOsa, strela: mountStrela, tunguska: mountTunguska, shilka: mountShilka, gepard: mountGepard, buk: mountBuk, tor: mountTor };
+const TYPE_LABEL = { s400: 'С-400', pantsir: 'ПАНЦИРЬ-С1', osa: 'ОСА-АКМ', strela: 'СТРЕЛА-10М3', tunguska: 'ТУНГУСКА-М', shilka: 'ШИЛКА-М4', gepard: 'GEPARD 1A2', buk: 'БУК-М2', tor: 'ТОР-М2' };
+const SIGHT_KINDS = new Set(['pantsir', 'strela', 'tunguska', 'shilka', 'gepard']);
 
 /** Registers the console of a unit kind: mount({ id, send, memo, sight }) -> { el, update, key, dispose? }. */
 export function registerConsole(kind, { mount, label = kind, sight = false }) {

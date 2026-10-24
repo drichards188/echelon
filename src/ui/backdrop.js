@@ -3,7 +3,7 @@
 // tools/menushots.mjs). Two layers crossfade once the next picture has loaded and each drifts slowly
 // under a shade that keeps the text readable (style.css); for a viewer who asks for less motion they
 // neither drift nor turn.
-export const STILLS = new Set(['s400', 'buk', 'pantsir', 'tunguska', 'osa', 'tor', 'strela', 'shilka', 'flak88', 'flak43', 'flakvierling', 'flakturm', 'flak38']);
+export const STILLS = new Set(['s400', 'buk', 'pantsir', 'tunguska', 'osa', 'tor', 'strela', 'shilka', 'gepard', 'flak88', 'flak43', 'flakvierling', 'flakturm', 'flak38']);
 const BASE = import.meta.env?.BASE_URL ?? '/';
 export const stillUrl = (kind) => `${BASE}menu/${kind}.jpg`;
 const ROTATE = 9000;

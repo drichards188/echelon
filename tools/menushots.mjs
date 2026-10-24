@@ -36,6 +36,7 @@ export const SHOTS = [
   { kind: 'tor', era: 'modern', base: MODERN, slot: 3, on: 'launch', ff: 20, cam: [2, 0.08, 16], after: 14 },
   { kind: 'strela', era: 'modern', base: MODERN, slot: 4, on: 'launch', ff: 20, cam: [2, 0.08, 13], after: 3 },
   { kind: 'shilka', era: 'modern', base: MODERN, slot: 4, on: 'gun', ff: 20, cam: [2.2, 0.08, 13], after: 1 },
+  { kind: 'gepard', era: 'modern', base: MODERN, slot: 4, on: 'gun', ff: 20, cam: [2.2, 0.08, 15], after: 1 },
   { kind: 'flak88', era: 'ww2', base: WW2, slot: 0, part: 1, on: 'muzzle', ff: 20, cam: [2.2, 0.1, 14], after: 2 },
   { kind: 'flak43', era: 'ww2', base: WW2, slot: 1, part: 0, on: 'muzzle', ff: 20, cam: [2.2, 0.18, 16], after: 1 },
   { kind: 'flakvierling', era: 'ww2', base: WW2, slot: 3, part: 0, on: 'muzzle', ff: 20, cam: [2.2, 0.1, 10], after: 1 },

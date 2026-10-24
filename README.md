@@ -8,11 +8,11 @@
 
 ## What you do
 
-- **Modern era:** an S-400 battalion for the long range, two Pantsir-S1 for point defense, an Osa-AKM and a Strela-10M3 for short range, against seven raids of drones, cruise missiles, fighters, decoys, helicopters and ballistic missiles.
+- **Modern era:** an S-400 battalion for the long range, two Pantsir-S1 for point defense, an Osa-AKM and a Strela-10M3 for short range, against seven Russian raids: Geran-2 drones, Kh-101 cruise missiles, Su-34s, decoys, Ka-52 helicopters and Iskander-M ballistic missiles.
 - **WW2 era:** an 8.8 cm battery, two 3.7 cm platoons, 2 cm Flakvierlinge and a what-if flak tower, against six day raids, from a Spitfire photo run to B-17 boxes dropping Window.
 - **Two halves:** the selected unit in 3D on the left, its console on the right. Crews fight on their own in auto, but wastefully; in manual you give the orders.
-- **Loadout:** pick a unit for each of five slots. Every modern slot has an alternative; in WW2 so far only slot 5.
-- **Tutorials:** fourteen guided lessons on a quiet range, one per kind of unit plus the basics.
+- **Loadout:** pick a unit for each of five slots. Every modern slot has an alternative (slot 5 two: the Shilka or the German Gepard); in WW2 so far only slot 5.
+- **Tutorials:** fifteen guided lessons on a quiet range, one per kind of unit plus the basics.
 
 ## Play it
 
@@ -43,7 +43,7 @@ All keys: [How to play](docs/PLAYING.md#controls).
 
 ## Status
 
-Both eras play start to finish on three difficulties, with every loadout option and all fourteen lessons.
+Both eras play start to finish on three difficulties, with every loadout option and all fifteen lessons.
 
 Not done yet:
 

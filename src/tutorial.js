@@ -1053,6 +1053,135 @@ export const TUTORIALS = [
       },
     ],
   },
+  {
+    id: 'gepard',
+    name: 'Flakpanzer Gepard',
+    unit: 'GEP',
+    loadout: swap(4, 'gepard'),
+    blurb: 'Replaces the Strela: two radars, the lead mark, short bursts from two 35 mm guns, the periscope fallback, and radars that emit.',
+    outro: 'The Gepard reaches farther than the Shilka with fewer, heavier rounds: let the tracking radar lock and the fire control lead, fire short bursts inside 3.5 km, and remember that both radars are targets.',
+    setup: (T) => {
+      T.u.mode = 'hold';
+    },
+    steps: [
+      {
+        title: 'Guns only',
+        text: 'The Gepard is a German gun tank on the Leopard 1 hull, sent to Ukraine from 2022 and known there for bringing down Shahed drones. It has two 35 mm guns, 640 rounds and no missiles; a search radar turns on the turret rear and a tracking radar sits between the guns. Its panel is labelled in German, with the English under each caption. It replaces the Strela, and unlike the Strela it emits. In this lesson nothing is scored and nothing can be destroyed.',
+        hi: ['header'],
+      },
+      {
+        title: 'The search radar',
+        text: 'The round scope (RUNDSUCHRADAR) is the search radar\'s picture, plan view, north up, and the line under it says what both radars are doing. A Geran-2 drone has appeared to the west-southwest. The table beside it (ZIELE) lists the tracks.',
+        hi: ['scope', 'range', 'tracks'],
+        enter: (T) => T.spawn('a', 'drone', { bearing: FROM, range: 9000 }),
+        tick: keeper('a', 'drone', { bearing: FROM, range: 9000 }),
+      },
+      {
+        title: 'Take manual control',
+        text: 'AUTOMAT lets the crew choose; HAND fires only on your orders; SPERRE is weapons safe.',
+        goal: 'Set the mode to HAND (YOU FIRE)',
+        hi: ['mode'],
+        tick: keeper('a', 'drone', { bearing: FROM, range: 9000 }),
+        done: (T) => T.u.mode === 'manual',
+      },
+      {
+        id: 'pick',
+        title: 'Select the drone',
+        text: 'Click the mark on the scope, click its row in the table, or press Tab. In HAND the selected track becomes the guns\' target.',
+        goal: 'Select the drone track',
+        hi: ['scope', 'tracks'],
+        tick: keeper('a', 'drone', { bearing: FROM, range: 9000 }),
+        done: (T) => selectedIs(T, 'a'),
+      },
+      {
+        title: 'Radar tracking',
+        text: 'The tracking radar (FOLGERADAR) holds one target to about 10 km, and the fire control reads its range and speed from it. The drone is selected, so it locks on by itself: wait for the AUFGESCHALTET lamp (LOCKED ON). T switches the tracking radar off and on by hand. ZIELVERFOLGUNG says what is laying the guns: RADAR while it tracks.',
+        goal: 'Wait for the tracking radar to lock on (AUFGESCHALTET)',
+        hi: ['track-radar', 'lamps', 'src'],
+        tick: (T) => {
+          keeper('a', 'drone', { bearing: FROM, range: 9000 })(T);
+          if (T.respawned) T.goto('pick');
+        },
+        done: (T) => T.u.radar.track && !!T.u.channel?.locked,
+      },
+      {
+        title: 'The lead mark',
+        text: 'Shells take time to arrive, so the guns are laid ahead of the target, not on it. Once the target is inside the shells\' reach, about 5 km, the fire control shows that lead point in the periscope as a yellow ring labelled VORH, joined to the target by a dashed line; VORHALT (LEAD m) reads the distance. You never aim ahead yourself.',
+        goal: 'Wait until the lead mark appears in the periscope',
+        hi: ['sight', 'lamps'],
+        tick: (T) => {
+          keeper('a', 'drone', { bearing: FROM, range: 9000 })(T);
+          if (T.respawned) T.goto('pick');
+        },
+        done: (T) => !!T.u.weapons.gun?.aimOk,
+      },
+      {
+        title: 'Open fire',
+        text: 'The 35 mm shell keeps its speed: about 2 s to 2 km and 3.5 s to 3 km, gone at about 5.3 km, and the crew opens fire inside 3.5 km. The IM WIRKBEREICH lamp (IN GUN RANGE) lights when the drone is near enough. Then hold FEUER (or hold Space) until it falls. The trigger greys out (OUT OF RANGE) while the shells cannot reach the target and warns LONG RANGE: FEW HITS beyond where the crew would open fire.',
+        goal: 'Shoot the drone down with the guns',
+        hi: ['lamps', 'trigger', 'sight'],
+        tick: (T) => {
+          keeper('a', 'drone', { bearing: FROM, range: 9000 })(T);
+          if (T.respawned) T.goto('pick');
+        },
+        done: (T) => T.killedBy('a', '35mm'),
+      },
+      {
+        title: 'Short bursts',
+        text: 'The two guns fire 550 rounds a minute each, about 18 a second together, so 640 rounds last about 35 s of trigger: far fewer than the Shilka\'s, but each hit does much more. Fire short bursts at a target in range: ROHRTEMPERATUR (BARREL HEAT) climbs while you hold the trigger and guns that overheat stop until they cool. FEUERSTÖSSE counts your bursts.',
+        hi: ['heat', 'stock', 'trigger'],
+        enter: (T) => T.clear(),
+      },
+      {
+        id: 'optical',
+        title: 'The periscope',
+        text: 'With the tracking radar off the guns are laid through the gunner\'s periscope instead; the periscope follows the selected target by itself, and the arrow keys slew it if it drifts. A new drone is coming: select it, switch the tracking radar off (T), keep the search radar on, and shoot it down.',
+        goal: 'Select the drone, switch the tracking radar off and shoot it down',
+        hi: ['track-radar', 'src', 'sight', 'trigger'],
+        enter: (T) => {
+          T.clear();
+          topUp(T);
+          T.spawn('b', 'drone', { bearing: FROM + 12, range: 4000 });
+        },
+        tick: (T) => {
+          keeper('b', 'drone', { bearing: FROM + 12, range: 4000 })(T);
+          if (!T.u.radar.track && T.u.weapons.gun?.firing) T.mem.eo = true;
+          if (T.respawned) T.mem.eo = false;
+        },
+        done: (T) => T.killedBy('b', '35mm') && !!T.mem.eo,
+      },
+      {
+        id: 'arm-off',
+        title: 'Two radars emit',
+        text: 'ARM INBOUND! A Kh-31P anti-radar missile is homing on the Gepard: a radar that is on can be found. It cannot hit one that is switched off. Switch the search radar and the tracking radar off (R and T).',
+        goal: 'Switch both radars off',
+        hi: ['search', 'track-radar'],
+        enter: (T) => {
+          T.clear();
+          T.u.radar.search = true;
+          T.spawnArm(34000);
+        },
+        tick: (T) => T.armWatch('arm-off'),
+        done: (T) => !T.u.radar.search && !T.u.radar.track,
+      },
+      {
+        id: 'arm-wait',
+        title: 'Stay dark',
+        text: 'The scope shows nothing while the radars are silent. Keep them off until the missile has gone by.',
+        goal: 'Wait for the missile to miss',
+        hi: ['search'],
+        tick: (T) => T.armWatch('arm-off'),
+        done: (T) => !T.threats.get('arm')?.alive && !T.u.radar.search && !T.u.radar.track,
+      },
+      {
+        title: 'Back on the air',
+        text: 'It missed. Switch the search radar back on.',
+        goal: 'Switch the search radar on',
+        hi: ['search'],
+        done: (T) => T.u.radar.search,
+      },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------------------------------

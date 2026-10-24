@@ -317,6 +317,17 @@ export const MARKINGS = {
     { type: 'emblem', pivot: 'doorR', pos: [0.013, 1.62, 0.33], face: 'x', size: 0.36 },
     { type: 'flag', pos: [0.55, 1.72, -3.516], face: '-z', size: 0.34 },
   ],
+  // Gepard 1A2 (gepard.js on leopard1.js): the turret's flat side walls |x| = 1.15 (turret space y 0.13 to 1.12; the barrel passes
+  // outboard at y 0.67 to 0.82 and the gun mount's front taper below 0.85 from z -0.93, the grab rail ends at z -1.04), so the
+  // emblem sits above the barrel ahead of the mount (turret space = model space minus the ring (0, 1.62, -0.1)); the sponson
+  // sides are stowage bins and louvres, so no emblem there. The upper rear plate leans in from z = 3.3 at y 1.2 to 3.2 at y 1.74
+  // (lamp clusters at |x| 0.87 to 1.13); the upper glacis rises 29 degrees from the nose (z -3.42, y 0.98), clear right of the
+  // spare track shoes (x < 0.33) and behind the right headlight (z < -2.8).
+  gepard: [
+    ...pair({ type: 'emblem', pivot: 'turret', pos: [1.153, 0.98, -0.8], face: 'x', size: 0.28 }),
+    { type: 'emblem', pos: [0.45, 1.45, 3.254], face: [0, 0.182, 0.983], size: 0.26 },
+    { type: 'flag', pos: [0.8, 1.44, -2.6], face: [0, 0.874, -0.486], size: 0.26 },
+  ],
 };
 
 /**

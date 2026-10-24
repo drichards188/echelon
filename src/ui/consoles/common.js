@@ -13,8 +13,18 @@ const alertRank = (a) => (alertOf(a) ? alertOf(a)[2] : 2);
 // Sirens only for what can kill the unit right now.
 export const alertSevere = (a) => alertRank(a) === 0;
 
+// The shared captions in a console's own language: the cabins are Russian, the Gepard's panel German.
+export const CAPS = {
+  ru: { status: 'СОСТОЯНИЕ', health: 'ИСПРАВНОСТЬ', selected: 'ВЫБРАНА', fire: 'ОГОНЬ', out: 'ВНЕ ЗОНЫ', alarm: 'ТРЕВОГА', none: 'НЕТ ЦЕЛЕЙ' },
+  de: { status: 'ZUSTAND', health: 'EINSATZBEREIT', selected: 'ZIEL', fire: 'FEUER', out: 'AUSSER REICHWEITE', alarm: 'ALARM', none: 'KEINE ZIELE' },
+};
+
+// The unit header; `lang` picks its captions, `alerts` (alert -> caption) overrides the era's alert
+// captions for a console in another language.
 export class Header {
-  constructor(kindRu, kindEn) {
+  constructor(kindRu, kindEn, { lang = 'ru', alerts = null } = {}) {
+    const cap = CAPS[lang];
+    this.alertCap = (a) => alerts?.[a] ?? (alerts ? cap.alarm : alertRu(a));
     this.el = el('div', 'hdr');
     const id = el('div', 'hid');
     this.call = el('b', 'call');
@@ -23,10 +33,10 @@ export class Header {
     const st = el('div', 'hstat');
     this.stat = el('b', 'stat');
     this.line = el('i', 'sline');
-    st.append(label('СОСТОЯНИЕ', 'STATUS', 'cap'), this.stat, this.line);
+    st.append(label(cap.status, 'STATUS', 'cap'), this.stat, this.line);
     const hp = el('div', 'hhp');
     this.hp = new Bar({ segs: 12, cls: 'hpbar' });
-    hp.append(label('ИСПРАВНОСТЬ', 'HEALTH', 'cap'), this.hp.el);
+    hp.append(label(cap.health, 'HEALTH', 'cap'), this.hp.el);
     this.lamps = [new Lamp('', '', 'red', 'wide'), new Lamp('', '', 'red', 'wide')];
     const al = el('div', 'halerts');
     al.append(...this.lamps.map((l) => l.el));
@@ -44,7 +54,7 @@ export class Header {
     const al = (u.alerts || []).slice().sort((a, b) => alertRank(a) - alertRank(b));
     for (let i = 0; i < 2; i++) {
       const l = this.lamps[i];
-      if (al[i]) { l.text(alertRu(al[i]), alertEn(al[i])); l.set(alertRank(al[i]) < 2 ? 2 : 1); } else { l.text('', ''); l.set(0); }
+      if (al[i]) { l.text(this.alertCap(al[i]), alertEn(al[i])); l.set(alertRank(al[i]) < 2 ? 2 : 1); } else { l.text('', ''); l.set(0); }
     }
   }
 }
@@ -93,9 +103,9 @@ const CLS_NAME = { aircraft: 'aircraft', cruise: 'cruise missile', drone: 'drone
 
 // Thin bar under the header: the selected track and which units are engaging it.
 export class SelBar {
-  constructor() {
+  constructor(lang = 'ru') {
     this.el = el('div', 'selbar');
-    this.cap = label('ВЫБРАНА', 'SELECTED TRACK', 'cap');
+    this.cap = label(CAPS[lang].selected, 'SELECTED TRACK', 'cap');
     this.txt = el('b', 'seltxt');
     this.eng = el('i', 'seleng');
     this.el.append(this.cap, this.txt, this.eng);
@@ -203,6 +213,11 @@ export const MODE_ITEMS = [
   { v: 'manual', ru: 'РУЧНОЙ', en: 'YOU FIRE' },
   { v: 'hold', ru: 'ЗАПРЕТ', en: 'HOLD FIRE', color: 'red' },
 ];
+export const MODE_ITEMS_DE = [
+  { v: 'auto', ru: 'AUTOMAT', en: 'CREW FIRES', color: 'green' },
+  { v: 'manual', ru: 'HAND', en: 'YOU FIRE' },
+  { v: 'hold', ru: 'SPERRE', en: 'HOLD FIRE', color: 'red' },
+];
 
 // Is this track inside the unit's gun range (the sim's own rule: the crew opens fire inside it, below maxAlt)?
 export const inGunRange = (u, t) => {
@@ -224,10 +239,10 @@ export function gunReach(u, t) {
 
 // The gun trigger's face for the selected track: greyed out (no fire) beyond the shells' reach, a warning
 // beyond the crew's opening range.
-export function setTrigger(btn, u, t, en, ok) {
+export function setTrigger(btn, u, t, en, ok, lang = 'ru') {
   const r = gunReach(u, t);
   btn.enable(ok && r !== 'out');
-  btn.text(r === 'out' ? 'ВНЕ ЗОНЫ' : 'ОГОНЬ', r === 'out' ? 'OUT OF RANGE' : r === 'long' ? 'LONG RANGE: FEW HITS' : en);
+  btn.text(r === 'out' ? CAPS[lang].out : CAPS[lang].fire, r === 'out' ? 'OUT OF RANGE' : r === 'long' ? 'LONG RANGE: FEW HITS' : en);
   setCls(btn.el, 'warn', r === 'long' && ok);
   setCls(btn.el, 'out', r === 'out');
 }

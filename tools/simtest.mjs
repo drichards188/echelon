@@ -45,7 +45,7 @@ try {
 // kills are counted per slot (the area unit, the point defense pair's missiles, their guns, the
 // short-range missile unit, the very short range unit), labelled by the kinds in the loadout; another
 // era's slots get a column each
-const LABEL = { s400: 'S400', buk: 'BUK', pantsir: 'PAN', tunguska: 'TUN', osa: 'OSA', tor: 'TOR', strela: 'STR', shilka: 'SHK' };
+const LABEL = { s400: 'S400', buk: 'BUK', pantsir: 'PAN', tunguska: 'TUN', osa: 'OSA', tor: 'TOR', strela: 'STR', shilka: 'SHK', gepard: 'GEP' };
 const NAME = { s400: 'S-400', buk: 'Buk', pantsir: 'Pantsirs', tunguska: 'Tunguskas' };
 const modern = () => ERA.id === 'modern';
 // the WW2 era's columns: the heavy battery's 8.8 cm, the two 3.7 cm platoons (Flak lane, dispersal), the

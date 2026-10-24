@@ -267,7 +267,7 @@ export class Sim {
       const height = y - this.heightAt(x, z) < 300 ? 'low' : y > 6000 ? 'high' : 'medium';
       if (t.type === 'arm') this.say(reporter, `ARM launch, bearing ${brg}, ${Math.round(r / 1000)} km!`, 'alert');
       else if (t.type === 'tbm') this.say(reporter, `ballistic target, bearing ${brg}, ${Math.round(r / 1000)} km, descending!`, 'alert');
-      else if (t.type === 'atgm') this.say(reporter, `missile launch from the helicopter, bearing ${brg}!`, 'alert');
+      else if (t.type === 'atgm') this.say(reporter, `missile launch from the ${THREATS.helo.name}, bearing ${brg}!`, 'alert');
       // (an era may phrase it its own way, ERA.text.radio: the WW2 era's reporting service plots aircraft)
       else if (ERA.text.radio?.raid) this.radio(ERA.text.radio.raid(members.length, brg, Math.round(r / 1000), height), 'warn');
       else this.say(reporter, `new raid, bearing ${brg}, ${Math.round(r / 1000)} km, ${members.length} track${members.length > 1 ? 's' : ''}, ${height}`, 'warn');
@@ -314,8 +314,7 @@ export class Sim {
     this.stats.add('kills', `${by.unitId}:${by.weapon}`);
     this.events.threatKilled?.(t, by);
     const u = this.unitById.get(by.unitId);
-    const name = { fighter: 'fighter', decoy: 'decoy', cruise: 'cruise missile', drone: 'drone', arm: 'ARM', glide: 'glide bomb', helo: 'helicopter', atgm: 'ATGM', tbm: 'ballistic target' }[t.type] ?? def.name;
-    if (u) this.say(u, ERA.text.radio?.kill?.(name) ?? `target destroyed, ${name}`, 'kill');
+    if (u) this.say(u, ERA.text.radio?.kill?.(def.name) ?? `target destroyed, ${def.name}`, 'kill');
   }
 
   // a threat or its weapon reaches its target or the ground

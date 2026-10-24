@@ -6,10 +6,11 @@ The systems keep their real names, look and place in the layering, and the WW2 s
 
 ## What is real
 
-- **The systems:** their names, their look and their place in the layering.
+- **The systems:** their names, their look and their place in the layering. The modern attackers are real Russian types too.
 - **The WW2 setting:** Fliegerhorst Hopsten, a jet airfield in north-west Germany and the Me 262 base of KG 51, against the Allied day raids of February and March 1945. The guns, the Kommandogeraet 40, the Wuerzburg D and Window, the aircraft types and the landscape are real too.
 - **"Black X."** The jet in blast bay 1 is the one Me 262 that survives in its original paint, W.Nr. 500200 "Black X" of KG 51.
-- **The modern era** has no real date or place: Russian-built systems in Ukrainian markings defend an airbase on the steppe.
+- **The modern era** has no real date or place: Russian-built systems in Ukrainian markings defend an airbase on the steppe against Russian raids (Su-34s, Ka-52s, Kh-101 cruise missiles, old Kh-55s flown as decoys, Geran-2 drones, Kh-31P, UMPK glide bombs, Iskander-M).
+- **The Gepard** (an option for slot 5) is a German 35 mm gun tank Ukraine really fields: Germany delivered 52 from July 2022, and they made their name against Shahed drones. Its panel in the game is labelled in German.
 
 ## What is game
 

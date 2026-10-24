@@ -38,11 +38,11 @@ if (bar) {
     bar.append(b);
   };
   for (const k of ['9M317', '9M338', '9M311', '48N6']) for (const d of [60, 1500]) btn(`launch ${k} ${d} m`, () => audio.launch(k, P(d, 0, -d / 4)));
-  for (const sh of ['30mm', '30mm-tunguska', '23mm']) {
+  for (const sh of ['30mm', '30mm-tunguska', '23mm', '35mm']) {
     let on = false;
     btn(`gun ${sh} (toggle)`, () => audio.gun('btn-' + sh, (on = !on), P(25, 3, -10), sh));
   }
-  for (const k of ['buk', 'tor', 'tunguska', 'shilka', 'pantsir', 's400']) btn(`idle ${k}`, () => audio.vehicle(k));
+  for (const k of ['buk', 'tor', 'tunguska', 'shilka', 'gepard', 'pantsir', 's400']) btn(`idle ${k}`, () => audio.vehicle(k));
   // the WW2 era's heavy guns (WW2 era first: its banks render and its recordings load in a few seconds), one
   // round and a battery's salvo of six guns 25 m apart; close ones dull the ears (deafen)
   btn('WW2 era', () => audio.setEra('ww2'));
@@ -82,13 +82,13 @@ const tick = (n) => {
   tick(30);
   step('gun off', () => audio.gun('P1', false, P(10, 3, 0)));
   // several gun units at once, each by its shell type (more than GUN_VOICES to exercise the cap)
-  const shells = ['30mm', '23mm', '30mm', '23mm', '30mm-tunguska', '23mm', '30mm', '23mm', '30mm', '23mm'];
+  const shells = ['30mm', '23mm', '30mm', '35mm', '30mm-tunguska', '23mm', '30mm', '35mm', '30mm', '23mm'];
   shells.forEach((sh, i) => step(`gun ${sh} #${i}`, () => audio.gun('G' + i, true, P(20 + i * 400, 3, -30))));
   tick(30);
   await wait(800);
   shells.forEach((sh, i) => step(`gun off #${i}`, () => audio.gun('G' + i, false, P(20 + i * 400, 3, -30))));
   step('ignite', () => audio.ignite('9M338', P(30, 0, 0)));
-  for (const k of ['buk', 'tor', 'tunguska', 'shilka', 'pantsir']) step(`vehicle ${k}`, () => audio.vehicle(k));
+  for (const k of ['buk', 'tor', 'tunguska', 'shilka', 'gepard', 'pantsir']) step(`vehicle ${k}`, () => audio.vehicle(k));
   for (const n of ['click', 'switch', 'button', 'alarm', 'warning', 'lock']) step(`ui ${n}`, () => audio.ui(n));
   for (let i = 0; i <= 10; i++) step(`seeker ${i}`, () => audio.seeker(i / 10, i === 10));
   step('seeker off', () => audio.seeker(0, false));

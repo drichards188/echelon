@@ -1,5 +1,6 @@
-// The modern era: an airbase on the steppe against drones, cruise missiles, strike aircraft, helicopters
-// and ballistic missiles, defended by a layered Russian-built air defense in Ukrainian markings. Plain
+// The modern era: an airbase on the steppe against Russian drones, cruise missiles, strike aircraft,
+// helicopters and ballistic missiles (Geran-2, Kh-101, Su-34, Ka-52, Iskander-M; models/threats.js),
+// defended by a layered Russian-built air defense in Ukrainian markings. Plain
 // data, importable in Node (tools/simtest.mjs); the shape of an era is in eras/index.js and DESIGN.md
 // ("Eras"). Its models, consoles and reload scenes are imported statically by their registries, so it
 // has no `content` to load.
@@ -18,7 +19,7 @@ export default {
   text: {
     sub: 'Layered air defense',
     blurb: 'An S-400 battalion, two Pantsir-S1, an Osa and a Strela-10 stand between the airbase and the raids, or the alternatives you pick for them. The long layer sees them first; the short layer catches what leaks through.',
-    setting: 'Ukraine defends an airbase on the steppe against drones, missiles and strike aircraft.',
+    setting: 'Ukraine defends an airbase on the steppe against Russian drones, missiles and strike aircraft.',
     orders: 'Command: all units, weapons free. First raid expected shortly.',
     lull: 'Command: raid over. Supply column is up, reload and stand by.',
     victory: 'Airbase held',
@@ -54,7 +55,7 @@ export default {
   // player can pick on the main menu, all of the same class: the area layer, two gun-missile point
   // defense units, a short-range missile system and a very short range one. Unit ids belong to the
   // option, not the slot: the default loadout keeps 'S400', 'P1', 'P2', 'OSA' and 'STR'; the
-  // alternatives are 'BUK', 'T1' / 'T2' (a Tunguska in slot 1 or 2), 'TOR' and 'SHK'. `label` and
+  // alternatives are 'BUK', 'T1' / 'T2' (a Tunguska in slot 1 or 2), 'TOR', 'SHK' and 'GEP'. `label` and
   // `info` are the menu's short name and one-line trade-off (DESIGN.md, "Loadout").
   slots: [
     {
@@ -114,6 +115,7 @@ export default {
       options: [
         { kind: 'strela', id: 'STR', name: 'Strela-10M3', callsign: 'Arrow', label: 'Strela-10M3', info: 'IR missiles to 5 km, no radar: silent, and you aim the sight', parts: [{ kind: 'strela', dx: 0, dz: 0 }] },
         { kind: 'shilka', id: 'SHK', name: 'ZSU-23-4M4 Shilka-M4', callsign: 'Saw', label: 'Shilka-M4', info: 'Four 23 mm guns, free to fire; very short range, its radar emits', parts: [{ kind: 'shilka', dx: 0, dz: 0 }] },
+        { kind: 'gepard', id: 'GEP', name: 'Flakpanzer Gepard', callsign: 'Cheetah', label: 'Gepard', info: 'Two 35 mm guns to 3.5 km on their own radars; few heavy rounds, its radars emit', parts: [{ kind: 'gepard', dx: 0, dz: 0 }] },
       ],
     },
   ],
@@ -126,7 +128,8 @@ export default {
   // lacks). Each wave runs about three to five minutes at x1 from the call to the last threat.
   waves: [
     {
-      title: 'Wave 1: drones', sub: 'One-way attack drones, low and slow, from the west',
+      title: 'Wave 1: drones', sub: 'Geran-2 one-way attack drones, low and slow, from the west',
+      radio: 'Command: Geran-2 drones, low and slow, from the west. Stand by.',
       groups: [
         { type: 'drone', count: 6, bearing: 0, range: 9000, spread: 14, delay: 0, target: 'assets' },
         { type: 'drone', count: 4, bearing: 28, range: 9000, spread: 8, delay: 40, target: 'short' },
@@ -134,7 +137,8 @@ export default {
       ],
     },
     {
-      title: 'Wave 2: cruise missiles', sub: 'Terrain-hugging cruise missiles with drones in support',
+      title: 'Wave 2: cruise missiles', sub: 'Terrain-hugging Kh-101 cruise missiles with drones in support',
+      radio: 'Command: Kh-101 cruise missiles on the deck, drones in support. Stand by.',
       groups: [
         { type: 'cruise', count: 4, bearing: -8, range: 30000, spread: 10, delay: 0, target: 'any' },
         { type: 'drone', count: 5, bearing: 32, range: 9000, spread: 10, delay: 10, target: 'assets' },
@@ -143,7 +147,8 @@ export default {
       ],
     },
     {
-      title: 'Wave 3: suppression strike', sub: 'Fighters hunting radars, decoys and cruise missiles',
+      title: 'Wave 3: suppression strike', sub: 'Su-34s with Kh-31P anti-radar missiles, Kh-55 decoys and Kh-101s',
+      radio: 'Command: Su-34s with Kh-31P anti-radar missiles, Kh-55 decoys and Kh-101s. Stand by.',
       groups: [
         { type: 'fighter', count: 4, bearing: 0, range: 85000, spread: 14, delay: 0, role: 'sead', weapons: 2, target: 'assets' },
         { type: 'decoy', count: 6, bearing: 5, range: 80000, spread: 20, delay: 5, target: 'radar' },
@@ -152,7 +157,8 @@ export default {
       ],
     },
     {
-      title: 'Wave 4: standoff bombing', sub: 'Glide bombers behind decoys, drones from the south',
+      title: 'Wave 4: standoff bombing', sub: 'Su-34s with UMPK glide bombs behind decoys, drones from the south',
+      radio: 'Command: Su-34s with UMPK glide bombs behind decoys, drones from the south. Stand by.',
       groups: [
         { type: 'fighter', count: 4, bearing: -5, range: 70000, spread: 12, delay: 0, role: 'glide', weapons: 2, target: 'assets' },
         { type: 'decoy', count: 3, bearing: 0, range: 75000, spread: 16, delay: 0, target: 'radar' },
@@ -161,7 +167,8 @@ export default {
       ],
     },
     {
-      title: 'Wave 5: helicopters', sub: 'Radar hunters and cruise missiles, then attack helicopters against the short-range units',
+      title: 'Wave 5: helicopters', sub: 'Radar hunters and cruise missiles, then Ka-52s against the short-range units',
+      radio: 'Command: radar hunters and Kh-101s, then Ka-52s against the short-range units. Stand by.',
       groups: [
         { type: 'fighter', count: 2, bearing: 0, range: 85000, spread: 8, delay: 0, role: 'sead', weapons: 2, target: 'assets' },
         { type: 'cruise', count: 6, bearing: 5, range: 30000, spread: 14, delay: 0, target: 'any' },
@@ -171,7 +178,8 @@ export default {
       ],
     },
     {
-      title: 'Wave 6: ballistic missiles', sub: 'Ballistic missiles at the battalion and the airbase, behind cruise missiles and drones',
+      title: 'Wave 6: ballistic missiles', sub: 'Iskander-M missiles at the battalion and the airbase, behind cruise missiles and drones',
+      radio: 'Command: Iskander-M launches expected, cruise missiles and drones ahead of them. Stand by.',
       groups: [
         { type: 'cruise', count: 8, bearing: -15, range: 30000, spread: 20, delay: 0, target: 'any' },
         { type: 'drone', count: 10, bearing: 40, range: 9000, spread: 20, delay: 10, target: 'any' },
@@ -220,5 +228,5 @@ export default {
   },
 
   // the lessons on the Tutorials list (tutorial.js TUTORIALS ids), in order
-  tutorials: ['basics', 's400', 'pantsir', 'osa', 'strela', 'buk', 'tunguska', 'tor', 'shilka'],
+  tutorials: ['basics', 's400', 'pantsir', 'osa', 'strela', 'buk', 'tunguska', 'tor', 'shilka', 'gepard'],
 };

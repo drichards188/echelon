@@ -19,6 +19,7 @@ import { build9T244 } from './v/t9t244.js';
 import { buildPantsirTZM } from './v/tzmpantsir.js';
 import { build2F77M } from './v/t2f77m.js';
 import { buildKamaz5350 } from './v/kamaz5350.js';
+import { buildGepard } from './v/gepard.js';
 import { applyMarkings } from './markings.js';
 import { bakeRig } from './ao.js';
 
@@ -31,6 +32,7 @@ const BUILDERS = { 's400-tel': buildTEL, 's400-radar': buildRadar, 's400-search'
 VEHICLE_KINDS.push('9t217'); BUILDERS['9t217'] = build9T217; // Osa-AKM transloader (render/reload/osa.js)
 VEHICLE_KINDS.push('9t244'); BUILDERS['9t244'] = build9T244; // Tor-M2 transloader (render/reload/tor.js)
 VEHICLE_KINDS.push('kamaz-5350'); BUILDERS['kamaz-5350'] = buildKamaz5350; // Shilka ammunition truck (render/reload/shilka.js)
+VEHICLE_KINDS.push('gepard'); BUILDERS.gepard = buildGepard; // Flakpanzer Gepard 1A2 (v/gepard.js on v/leopard1.js)
 
 /** Registers vehicle builders, { kind: () => rig } with the rig contract (an era's lazily loaded content, eras/index.js). */
 export function registerVehicles(builders) {

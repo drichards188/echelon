@@ -75,6 +75,7 @@ const GUNS = {
   '30mm': { bank: 'gun', ref: 90, level: LEVELS_GUN, casing: [0.09, 0.1, 0.9, 0.25] },
   '30mm-tunguska': { bank: 'gun_30t', ref: 90, level: LEVELS_GUN, casing: [0.1, 0.1, 0.85, 0.25] },
   '23mm': { bank: 'gun_23', ref: 70, level: LEVELS_GUN * 0.85, casing: [0.05, 0.06, 1.2, 0.18] },
+  '35mm': { bank: 'gun_35', ref: 110, level: LEVELS_GUN * 1.05, casing: [0.12, 0.12, 0.8, 0.3] },
 };
 
 // Looping threat engines. loop: bank key; ref / level: as for launches; rate: playback rate at
@@ -689,6 +690,7 @@ const GUN_RATE = 5000 / 60; // both barrels together
 // a 30 mm pair: rounds a second, rounds in the loop, the two barrels' pitches
 const GUN30 = { rate: GUN_RATE, shots: 50, f: [198, 218] };
 const GUN30T = { rate: 4400 / 60, shots: 44, f: [172, 190] }; // Tunguska's 2A38M cycles slower and sounds deeper
+const GUN35 = { rate: 1100 / 60, shots: 22, f: [128, 142] }; // the Gepard's two KDAs, 550 rounds a minute each: a slow, heavy beat
 
 /** Shape a gun rendering for its distance band. */
 function gunBand(x, sr, band) {
@@ -1186,6 +1188,8 @@ export function bankTasks(SR, make) {
     ['idle', 'trk_tor', set(1, 273, loopOf(22050, (sr, r) => trackedLoop(sr, r, { cyl: 8, rpm: 720, rough: 0.35, f: 92, clatter: 0.28, ticks: 13, tick: 950 })))],
     ['idle', 'trk_tun', set(1, 277, loopOf(22050, (sr, r) => trackedLoop(sr, r, { cyl: 12, rpm: 640, rough: 0.28, f: 78, clatter: 0.32, ticks: 11, tick: 800 })))],
     ['idle', 'trk_shk', set(1, 281, loopOf(22050, (sr, r) => trackedLoop(sr, r, { cyl: 6, rpm: 840, rough: 0.45, f: 118, clatter: 0.5, ticks: 16, tick: 1100 })))],
+    // the Leopard 1's ten-cylinder MTU at idle
+    ['idle', 'trk_gep', set(1, 347, loopOf(22050, (sr, r) => trackedLoop(sr, r, { cyl: 10, rpm: 650, rough: 0.25, f: 74, clatter: 0.22, ticks: 10, tick: 760 })))],
     ['gun', 'loop', gunSet(251, gunLoop)],
     ['gun', 'up', gunSet(257, (sr, r, band) => gunSpin(sr, r, band, true))],
     ['gun', 'down', gunSet(263, (sr, r, band) => gunSpin(sr, r, band, false))],
@@ -1197,6 +1201,9 @@ export function bankTasks(SR, make) {
     ['gun_23', 'loop', gunSet(307, gunLoop23)],
     ['gun_23', 'up', gunSet(311, (sr, r, band) => gunSpin23(sr, r, band, true))],
     ['gun_23', 'down', gunSet(313, (sr, r, band) => gunSpin23(sr, r, band, false))],
+    ['gun_35', 'loop', gunSet(317, (sr, r, band) => gunLoop(sr, r, band, GUN35))],
+    ['gun_35', 'up', gunSet(331, (sr, r, band) => gunSpin(sr, r, band, true, GUN35))],
+    ['gun_35', 'down', gunSet(337, (sr, r, band) => gunSpin(sr, r, band, false, GUN35))],
   ];
   for (const [kind, [recipe, len]] of Object.entries(LAUNCH_RECIPES)) {
     const g = 'launch_' + kind, seed = 300 + kind.charCodeAt(1) * 13;
@@ -1230,7 +1237,7 @@ export function bankTasks(SR, make) {
 const MIN_GAIN = { burst: 0.004, casing: 0.02 };
 // the WW2 era's gun positions (fieldIdle): only the battery has a generator, far off behind the pits
 const FIELD = { flak88: { idle: 'genset', level: 0.3 }, flak43: { level: 0 }, flakvierling: { level: 0 }, flak38: { level: 0 } };
-const IDLE = { s400: 'genset', pantsir: 'v8', osa: 'v8', strela: 'v8', buk: 'trk_buk', tor: 'trk_tor', tunguska: 'trk_tun', shilka: 'trk_shk' };
+const IDLE = { s400: 'genset', pantsir: 'v8', osa: 'v8', strela: 'v8', buk: 'trk_buk', tor: 'trk_tor', tunguska: 'trk_tun', shilka: 'trk_shk', gepard: 'trk_gep' };
 // What the tracked vehicles add to the idle: the electronics hum, a gas turbine (the auxiliary
 // power unit) as [Hz, level], and the hydraulic pump cycling as [Hz, level, cycles a second].
 const VEHICLE = {
@@ -1238,6 +1245,7 @@ const VEHICLE = {
   tor: { hum: [[400, 0.04], [1200, 0.015]], turbine: [1750, 0.05], hydro: [760, 0.08, 0.22] },
   tunguska: { hum: [[400, 0.05], [800, 0.025], [1200, 0.012]], turbine: [2350, 0.055], hydro: [540, 0.07, 0.17] },
   shilka: { hum: [[400, 0.045], [600, 0.02], [1000, 0.01]], hydro: [880, 0.06, 0.3] },
+  gepard: { hum: [[400, 0.045], [800, 0.02], [1200, 0.01]], hydro: [700, 0.07, 0.2] },
 };
 
 export class AudioEngine {
@@ -2182,7 +2190,7 @@ export class AudioEngine {
 
   /**
    * Continuous fire from a unit's guns while `on`; spin-up and wind-down around the loop. `shell` is
-   * the unit's `weapons.gun.shell` ('30mm' Pantsir and Tunguska, '23mm' Shilka; '30mm-tunguska' for
+   * the unit's `weapons.gun.shell` ('30mm' Pantsir and Tunguska, '23mm' Shilka, '35mm' Gepard; '30mm-tunguska' for
    * the Tunguska's slower, deeper 2A38M); it is read when the burst starts. Any number of units may
    * fire at once (the most distant loops are dropped beyond GUN_VOICES).
    */

@@ -35,8 +35,10 @@ function line2(c, pts, w, col) {
 }
 
 export class SightView {
-  constructor({ canvas, kind = 'strela', onSlew, cls = '', overlay = null }) {
+  // legend: the top line's captions [sight, by radar, by optics, km] in the console's language
+  constructor({ canvas, kind = 'strela', onSlew, cls = '', overlay = null, legend = ['ОЭС', 'РЛС', 'ТВ/ТПВ', 'КМ'] }) {
     this.kind = kind;
+    this.legend = legend;
     this.overlay = overlay; // optional (c, info, st, fov) drawn over the standard reticle
     this.el = el('div', `sightwrap ${kind} ${cls}`);
     this.base = canvas;
@@ -271,9 +273,10 @@ export class SightView {
     // top legend
     c.textAlign = 'left';
     c.fillStyle = col;
-    c.fillText(`ОЭС  ${st.src === 'radar' ? 'РЛС' : 'ТВ/ТПВ'}`, 24, 30);
+    const [lSight, lRadar, lOptic, lKm] = this.legend;
+    c.fillText(`${lSight}  ${st.src === 'radar' ? lRadar : lOptic}`, 24, 30);
     c.textAlign = 'right';
-    c.fillText(`${fmtKm(info.range)} КМ`, W - 24, 30);
+    c.fillText(`${fmtKm(info.range)} ${lKm}`, W - 24, 30);
     c.textAlign = 'center';
     c.fillText(`${fovDeg(fov)}°`, cx, 30);
     // lock box on the designated target

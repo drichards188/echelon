@@ -41,7 +41,7 @@ These run on the dev server only.
 - **The pages.** `/` is the main menu: plain HTML, nothing of the world is built (`src/boot.js`). **`?play=1`** is a battle's page and **`?tutorial=ID`** a lesson's (see [Tutorials](PLAYING.md#tutorials)): its loading card at once, then the world is built and the game starts. The menu's buttons open these; on the menu, **`?lessons=1`** opens the tutorial list.
 - **`?quality=Low|Medium|High|Ultra`** (default Medium) and **`?dev=1`** pass between the menu and the game. **`?difficulty=Easy|Normal|Hard`** sets a battle's (default: the one the menu kept, else Normal). **`?unit=N`** selects unit N, counted from 0 in slot order.
 - **`?era=modern`** or **`?era=ww2`** starts in that era without saving it (on the menu: shows it). `?dev=1` would let an era still marked in development be played (none is at present).
-- **`?loadout=buk,tunguska,pantsir,tor,shilka`** starts with that loadout without saving it. Give the kinds in slot order; empty entries or anything a slot does not offer take the default; `alt` picks every alternative.
+- **`?loadout=buk,tunguska,pantsir,tor,shilka`** starts with that loadout without saving it. Give the kinds in slot order; empty entries or anything a slot does not offer take the default; `alt` picks every slot's first alternative (slot 5's Shilka; the Gepard is `gepard`).
 
 ## `window.__iads`
 
@@ -148,9 +148,9 @@ src/
   fx.js            particles, fires, bursts, debris, spent cases
   models/          procedural vehicles, threats, interceptors and the modern airbase
     vehicles.js    the vehicle registry; one builder per vehicle in v/: the fire units (tel, radar92n6, search91n6, cp55k6,
-                   pantsir, osa, strela, buk, bukradar, tunguska, tor, shilka), the reload vehicles (t22t6, t5t58, t9t217,
+                   pantsir, osa, strela, buk, bukradar, tunguska, tor, shilka, gepard), the reload vehicles (t22t6, t5t58, t9t217,
                    t9t244, tzmpantsir, t2f77m, kamaz5350), their chassis (maz543, ural, kamaz, baz5937, mtlb, gm352, gm355,
-                   gm567, gm569, gm575), crew.js (the reload crews) and swap.js
+                   gm567, gm569, gm575, leopard1), crew.js (the reload crews) and swap.js
     threats.js     the attackers and the interceptors; site.js the modern airbase; markings.js the national markings
     kit.js, rig.js, trucks.js   shared modelling helpers
   dev/             modelviewer.js and audiotest.js, behind models.html and audio.html

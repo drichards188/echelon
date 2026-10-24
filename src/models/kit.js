@@ -262,6 +262,9 @@ export const CAMO = {
   tri: { green: [0x435a2d, 0xa08f64, 0x1c1e1a] }, // green with sand and black blotches
   green: { green: [0x4a5336, 0x535c3b, 0x424a30] }, // plain army green, mottled
   khaki: { green: [0x6d6a4a, 0x7c7655, 0x5a5a3e] }, // dusty olive for support vehicles
+  // Bundeswehr three-tone (refs/gepard): RAL 6031 bronze green with RAL 8027 leather brown and RAL 9021
+  // tar black patches, hard edged like 'tri' but larger and flowing
+  nato: { green: [0x48523b, 0x5a4232, 0x222420] },
 };
 
 // Metric tile of a painted steel skin: 4 m square. Returns { map, rough, normal } textures.
@@ -269,13 +272,16 @@ export const CAMO = {
 //   rough   G roughness, R vertical streak noise, B patchy noise (the surface finish shader reads R, B)
 //   normal  panel seams, rivet rows, the paint's edge and a fine grain
 // Panels are about 1 m by 1.3 m with brick offset; blotches of the tri scheme are hard edged and
-// irregular, 0.5 to 1.5 m across, built from thresholded warped noise with a jagged edge.
+// irregular, 0.5 to 1.5 m across, built from thresholded warped noise with a jagged edge. The nato
+// scheme's are the same kind, about 1 to 2 m across in flowing patches (about 40 % green, 35 %
+// brown, 25 % black), and wear like tri.
 const camoCache = new Map();
 export function camoTextures(scheme = 'tri', size = 512) {
   if (camoCache.has(scheme)) return camoCache.get(scheme);
   const [base, sand, black] = CAMO[scheme].green.map((h) => new THREE.Color(h));
-  const tri = scheme === 'tri';
-  const rnd = mulberry32(scheme === 'tri' ? 7 : scheme === 'green' ? 17 : 27);
+  const tri = scheme === 'tri', nato = scheme === 'nato';
+  const blotch = tri || nato; // hard-edged patches, worn like tri
+  const rnd = mulberry32(scheme === 'tri' ? 7 : scheme === 'green' ? 17 : nato ? 37 : 27);
   const N = size * size;
   const alb = new Float32Array(N * 3), rg = new Float32Array(N), rr = new Float32Array(N), rb = new Float32Array(N), ht = new Float32Array(N);
   // panel layout: three rows of about 1.33 m; seams brick-offset per row, some of them missing
@@ -318,6 +324,19 @@ export function camoTextures(scheme = 'tri', size = 512) {
       const bl = sstep(0.56 - AA, 0.56 + AA, b);
       col.lerp(black, bl);
       edgeStep = Math.max(sa, bl) > 0.5 ? 0.5 : 0; // the paint stands a hair proud where it is thickest
+    } else if (nato) {
+      // larger, flowing patches: a slow warp, five lattice cells per tile, black over brown
+      const wx = pfbm(u, v, 2, 2, 2, 311) - 0.5, wy = pfbm(u, v, 2, 2, 2, 312) - 0.5;
+      const uu = u + wx * 0.25, vv = v + wy * 0.25;
+      const jag = (pfbm(u, v, 40, 40, 2, 341) - 0.5) * 0.1;
+      const a = pfbm(uu, vv, 5, 5, 3, 321) + jag;
+      const b = pfbm(uu + 0.37, vv + 0.21, 5, 5, 3, 331) + jag * 0.8;
+      col.lerp(lightGreen, sstep(0.5 - AA, 0.5 + AA, pfbm(u, v, 6, 6, 2, 351)) * 0.25);
+      const br = sstep(0.52 - AA, 0.52 + AA, a);
+      col.lerp(sand, br);
+      const bl = sstep(0.64 - AA, 0.64 + AA, b);
+      col.lerp(black, bl);
+      edgeStep = Math.max(br, bl) > 0.5 ? 0.5 : 0;
     } else {
       const wx = pfbm(u, v, 3, 3, 2, 61) - 0.5;
       const m = pfbm(u + wx * 0.2, v, 4, 4, 3, 71);
@@ -330,7 +349,7 @@ export function camoTextures(scheme = 'tri', size = 512) {
     }
     // fade and dust haze
     const fade = pfbm(u, v, 2, 2, 3, 101);
-    col.lerp(dust, tri ? 0.05 + fade * 0.12 : 0.02 + fade * 0.07);
+    col.lerp(dust, blotch ? 0.05 + fade * 0.12 : 0.02 + fade * 0.07);
     // rain streaks run down the panel (v)
     const streak = pfbm(u, v, 56, 3, 2, 111);
     let k = 1 - sstep(0.55, 0.85, streak) * 0.1 + (pfbm(u, v, 160, 160, 1, 121) - 0.5) * 0.12;
@@ -344,7 +363,7 @@ export function camoTextures(scheme = 'tri', size = 512) {
     const nearSeam = Math.min(lineY, onX ? lineX : 99);
     const chipMask = pfbm(u, v, 6, 6, 2, 131) * (1.0 + 0.8 * Math.max(0, 1 - nearSeam / 8));
     const chip = pnoise(u, v, 90, 90, 141) * 0.6 + pnoise(u, v, 200, 200, 142) * 0.4;
-    const chipped = chipMask > (tri ? 0.6 : 0.64) && chip > (tri ? 0.67 : 0.7) ? 1 : 0;
+    const chipped = chipMask > (blotch ? 0.6 : 0.64) && chip > (blotch ? 0.67 : 0.7) ? 1 : 0;
     let r = 0.88 - fade * 0.06; // paint is a flat matt
     if (chipped) { col.lerp(chip > 0.76 ? bare : primer, 0.75); r = chip > 0.76 ? 0.5 : 0.8; }
     if (seam) { k *= 0.55; r = 0.95; }
@@ -648,7 +667,7 @@ export function surfaceFinish(mat, key, { mud = 0.7, mudTop = 1.1, dust = 0.5, m
 const matCache = new Map();
 const std = (c, rough = 0.7, metal = 0.1, extra = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: rough, metalness: metal, vertexColors: true, ...extra });
 
-// The material set vehicles share. `scheme` picks the camouflage ('tri' | 'green' | 'khaki').
+// The material set vehicles share. `scheme` picks the camouflage ('tri' | 'green' | 'khaki' | 'nato').
 // Painted parts carry the paint scheme and its wear; bare metal, rubber and the rest take a fine
 // grain. All of them get the mud line and the dust from surfaceFinish.
 export function vehicleMats(scheme = 'tri') {

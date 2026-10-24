@@ -48,7 +48,7 @@ const step = async (p, msg) => {
 // them (toMenu).
 const query = new URLSearchParams(location.search);
 
-const KILL_NAME = { fighter: 'fighter', decoy: 'decoy', cruise: 'cruise missile', drone: 'drone', arm: 'ARM', glide: 'glide bomb', helo: 'helicopter', atgm: 'ATGM', tbm: 'ballistic missile' };
+const KILL_NAME = { fighter: 'Su-34', decoy: 'Kh-55 decoy', cruise: 'Kh-101', drone: 'Geran-2', arm: 'Kh-31P', glide: 'glide bomb', helo: 'Ka-52', atgm: 'Vikhr', tbm: 'Iskander-M' };
 const CLS_SHORT = { aircraft: 'AC', cruise: 'CM', drone: 'UAV', arm: 'ARM', tbm: 'TBM', helo: 'HELO', bomb: 'BOMB', decoy: 'DCY', atgm: 'ATGM', unknown: '?' };
 // the WW2 era's aircraft (the kill toasts) and track classes (the compass and the bracket), and its guns'
 // shells as the kill toasts name them
@@ -59,12 +59,12 @@ const WEAPON_NAME = { '128mm': '12.8 cm', '88mm': '8.8 cm', '37mm': '3.7 cm', '2
 const MSIZE = { '48N6': 1.4, '9M96': 1, '57E6': 0.6, '9M33': 0.8, '9M37': 0.5, '9M317': 1.1, '9M338': 0.7, '9M311': 0.55 };
 const COLD = { '48N6': 1.5, '9M96': 1.0, '9M338': 0.7 }; // cold-launched rounds: fx size
 // shell hits: sparks, no burst
-const SHELL = new Set(['30mm', '23mm']);
+const SHELL = new Set(['30mm', '23mm', '35mm']);
 // the gun units' muzzle flash and the sound of their guns (audio.gun's `shell`; the sim's otherwise)
-const FLASH = { '30mm': 0.7, '23mm': 0.5 };
+const FLASH = { '30mm': 0.7, '23mm': 0.5, '35mm': 0.85 };
 const GUN_VOICE = { tunguska: '30mm-tunguska' };
 // sight pictures: monochrome TV channels (the Pantsir's, and as it the Tunguska's and Shilka's) or
-// the Strela's direct-view optics
+// the direct-view optics of the Strela and the Gepard's periscopes
 const MONO_SIGHT = new Set(['pantsir', 'tunguska', 'shilka']);
 // Every round leaves from its own slot on the model, along the slot's axis (refs/launch): 'mouth' when
 // the slot anchor is the canister, tube, container or cell mouth (the round starts inside, its nose
@@ -78,12 +78,14 @@ const SLOT_AT = {
 // the receiver, as the Pantsir firing photo shows (an arc to the side and rear of the turret, more on
 // the ground behind the truck), with its links and a lick of flame and smoke at the port; the Shilka's
 // 2A7s drop theirs out of the turret front under the guns onto the hull (no source found: the usual
-// arrangement for guns in an enclosed turret). back: muzzle to ejection port along the bore (m); v:
+// arrangement for guns in an enclosed turret); the Gepard's KDAs throw theirs out of the gun housings
+// beside the turret (no source found either). back: muzzle to ejection port along the bore (m); v:
 // [out, up, back] in the gun's frame (m/s; the Shilka's back is forward, along the hull); d, len: the case.
 const BRASS = {
   pantsir: { back: 3.2, v: [4.5, 2.5, 5], d: 0.03, len: 0.165, flame: true },
   tunguska: { back: 3.3, v: [4, 2, 4.5], d: 0.03, len: 0.165, flame: true },
   shilka: { back: 1.7, front: true, v: [0.6, -0.8, 2.2], d: 0.025, len: 0.152 },
+  gepard: { back: 3.5, v: [1.6, -0.3, 0.6], d: 0.035, len: 0.228 },
 };
 
 // ---------------------------------------------------------------- era and loadout

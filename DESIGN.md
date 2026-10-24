@@ -88,7 +88,7 @@ rig.setLoaded(i, loaded)  // show/hide the round or canister in slot i
 rig.boxes     // [{ min, max }] model-space hit boxes for damage tests (optional)
 
 import { buildThreat, buildInterceptor, THREAT_TYPES, INTERCEPTOR_KINDS } from './models/threats.js';
-buildThreat(type)   // -> { parts: [{ geometry, material, spin?: 'z' | 'y', pivot?: Vector3 }], length, plume?: Vector3 }
+buildThreat(type)   // -> { parts: [{ geometry, material, spin?: 'z' | 'y' | 'x', pivot?: Vector3, dir?: -1 }], length, plume?: Vector3 }
 buildInterceptor(k) // same shape; `plume` is the nozzle position in model space
 // One merged BufferGeometry per part so the render layer can draw each part as an InstancedMesh.
 
@@ -101,7 +101,8 @@ Vehicles: 5P85SM2 TEL (MZKT-7930 8x8, four 48N6 canisters on an erector; or 9M96
 8x8 (two 2A38M twin 30 mm, twelve 57E6 tubes, 1RS2 tracking radar, rotating search radar, EO block),
 9K33M3 Osa-AKM (BAZ-5937 6x6, turret with search radar, tracking radar and six 9M33M3 in containers),
 9K35M3 Strela-10M3 (MT-LB tracked, turret with four 9M37M containers, optical sight). Threat types:
-`'cruise' | 'fighter' | 'decoy' | 'drone' | 'arm' | 'glide' | 'helo' | 'tbm' | 'atgm'`; interceptors:
+`'cruise' | 'fighter' | 'decoy' | 'drone' | 'arm' | 'glide' | 'helo' | 'tbm' | 'atgm'`, built as the Russian
+Kh-101, Su-34, Kh-55, Geran-2, Kh-31P, FAB-500 with UMPK, Ka-52, Iskander-M's 9M723 and Vikhr; interceptors:
 `'48N6' | '9M96' | '57E6' | '9M33' | '9M37'`. All built procedurally, detailed enough to hold up in a
 close third-person view, materials from `MeshStandardMaterial` (camo via canvas textures is fine).
 
@@ -168,7 +169,7 @@ Fields added with the loadout (all kinds unless noted): `slot` (0..4, = `index`)
 right now), and the loader-launcher `turret: { az, el }`; `unit.telars` (part indices) and `unit.loader`
 (part index). `unit.turret` is the lead vehicle's turret (a Buk: TELAR 1's, the same object).
 `weapons.missiles` is null for a unit without missiles (Shilka: `types` is empty, `weapon` stays 'gun').
-`weapons.gun.shell` ('30mm' | '23mm'), `gun.aim` (the lead point the fire control lays the guns on),
+`weapons.gun.shell` ('30mm' | '23mm' | '35mm'), `gun.aim` (the lead point the fire control lays the guns on),
 `gun.aimOk` (a target is held and `aim` is valid), `gun.locked` (the guns' channel holds their target),
 `gun.tof` (the lead's time of flight, s), `gun.laid` (the guns have the turret) and `gun.hold` (why they
 cannot fire on their target, or null; see "Gun fire control"). A Buk's stock has `reloadPart` (the vehicle the
@@ -468,6 +469,14 @@ relative to the systems already there.
   nothing above 1.5 km.
   Free per kill (guns cost nothing in `score.cost`); it takes drones, ATGMs, ARMs and cruise missiles
   diving close by. Its radar emits, unlike the Strela.
+- **Flakpanzer Gepard** (`gepard`, the third option in slot 5): guns only, as the Shilka. Two 35 mm
+  KDA (2 x 550 rounds/min, 18.3 rounds/s in bursts of 1.5 s), 640 rounds, heavier hits (`SHELLS['35mm']`
+  dmg 0.35 against the 23 mm's 0.14, a 2.4 m hit radius, tighter grouping), a 15 km search radar on the
+  turret rear and a 10 km tracking radar between the guns, the gunner's periscope taking over while the
+  tracking radar is off (`eoFallback`). Reaches farther: the 35 mm takes 2.1 s to 2 km and 3.5 s to 3 km
+  and self-destructs at about 5.3 km, the crew opens fire inside 3.5 km, up to 3 km high. Tougher (95 hp,
+  the Leopard 1 hull). Its console is labelled in German (`Header`'s `lang` and `alerts`, `SelBar`,
+  `setTrigger`, `MODE_ITEMS_DE`, `TrackTable`'s `heads`); both its radars emit.
 
 Game values (`SYSTEMS`, `MISSILES`), for comparison with the existing systems:
 
@@ -481,6 +490,7 @@ Game values (`SYSTEMS`, `MISSILES`), for comparison with the existing systems:
 | tor | 9M338 15 km, 1000 m/s, 8 + 12, 14 (cold launch, pairs) | 4 inside a 0.9 rad sector, a new target every 4 s | - | 28 / 18 km | 100 |
 | strela | 9M37 5 km, 560 m/s, 4 + 4, 5 | 1 (seeker) | - | sight 6.5 km | 70 |
 | shilka | - | 1 | 23 mm, 2400, opens at 2 km, reach 2.8 km | 14 / 6 / 4 km | 80 |
+| gepard | - | 1 | 35 mm, 640, opens at 3.5 km, reach 5.3 km | 15 / 10 / 5 km | 95 |
 
 **Balance** (`node tools/simtest.mjs <seeds> --all --loadout ...`, Normal; games won by the all-auto
 crews / the scripted area player / the scripted area player with the point defense pair; the other
@@ -496,6 +506,7 @@ below; measured with the trigger's out-of-range hold, which only changes the thi
 | two Tunguskas | 5 / 43 / 65 | | -15 (seeds 1 to 144: 87 against 107, -14) |
 | Tor | 19 / 59 / 70 | | +7 |
 | Shilka | 11 / 59 / 64 | | +7 |
+| Gepard | 12 / 59 / 64 | | +5 (all auto it kills 13.5 a game, the Strela 11.2, the Shilka 9.0) |
 | all alternatives | 28 / 52 / 70 | 52 / 113 / 136 | |
 
 On Hard (default, seeds 1 to 48) 0 / 10 / 19 (the scripted S-400 won 5 of seeds 49 to 96, the tree
@@ -694,7 +705,9 @@ self-destructs at 4.2 to 4.4 km (the old 0.0007 and 5.5 s, from a WW2 game, took
 out at 2.2 km, so beyond that the fire control had no lead and the guns pointed straight at the target);
 the 23 mm (c 0.00036, life 5 s) takes 1.3 s to 1 km and 3.05 s to 2 km and self-destructs at 2.7 to 2.9
 km. A head-on target at 3 km gets about 1.7 degrees of gravity aim-off, a crossing drone 6 degrees of
-lead. `maxAlt` stays 3000 m (30 mm) and 1500 m (23 mm). The crews open fire well inside the reach (see
+lead. `maxAlt` stays 3000 m (30 mm) and 1500 m (23 mm). The Gepard's 35 mm (c 0.0002, 1,175 m/s, life 8 s)
+takes 2.1 s to 2 km, 3.5 s to 3 km and 5.2 s to 4 km and self-destructs at about 5.3 km; its crew opens
+fire at 3.5 km, up to 3 km high. The crews open fire well inside the reach (see
 "Balance" for why): the guns' dispersion grows with the range, so far out the rounds mostly go to waste.
 The missile crew of a gun-missile unit leaves targets inside `gun.range` below `maxAlt` to its guns (it
 was 1.4 times `gun.range`, about the same distances with the old opening ranges).
@@ -1441,7 +1454,7 @@ const audio = new AudioEngine();
 audio.start();                        // on the first user gesture
 audio.update(dt, camera, { threats, timeScale });   // engine loops for nearby threats, listener
 audio.launch(kind, pos);              // '48N6' cold launch thump + motor, '9M96', '57E6', '9M33', '9M37', '9M317' (Buk, hot), '9M338' (Tor, cold vertical, motor lights 0.9 s after the thump), '9M311' (Tunguska, short booster)
-audio.gun(unitId, on, pos, shell);    // continuous while on; shell = weapons.gun.shell: '30mm' (default), '23mm' (Shilka), '30mm-tunguska' (slower, deeper)
+audio.gun(unitId, on, pos, shell);    // continuous while on; shell = weapons.gun.shell: '30mm' (default), '23mm' (Shilka), '35mm' (Gepard, 18 rounds/s, deep), '30mm-tunguska' (slower, deeper)
 audio.explosion(pos, size); audio.airburst(pos); audio.impact(pos, size);
 audio.seeker(level, locked);          // Strela seeker tone (0 = silent)
 audio.ui(name);                       // 'click' | 'switch' | 'button' | 'alarm' | 'warning' | 'lock'
@@ -1585,3 +1598,5 @@ Reuse the maxgfx engine core (distance delay, air absorption, voice stealing, re
 - Quality presets (main.js `QUALITY`): `pixels`, the most the 3D view renders in megapixels (Low 0.6, Medium 1.1, High 2, Ultra 4.2); `basePixelRatio()` is the least of the device pixel ratio, the preset's `pixelRatio` and the ratio that fits the budget, so at native 4K (a 1920x2160 view) Medium renders about 990x1110 and the browser scales it up, at the cost of a 1080p screen. A resize reapplies it (`applyPixelRatio`).
 - Dynamic resolution is a ladder: over budget (`frameAvg` > 20 ms, checked every 1.5 s) the landscape gives up a step of detail first (terrain.js `SHED`, `terrain.setQuality(name, shed)`: half the grass (`grass.thin`), 0.6 of the preset's tree density (a replant), no tree shadows (`trees.setShadows`), a fifth of the grass), then the resolution drops 0.1 at a time to 0.5; under 13.5 ms the resolution comes back first (0.05 a step), then the landscape. The models are never simplified, so the guns stay sharp longest. F3 shows the step.
 - Audio (WW2): the 8.8 cm's report is built in layers from recordings (`heavyShots`, exported: InMotionAudio's field gun `fieldgun`, CC0, over Yle's 76 mm, a sub thump, the rolling echo; six takes), replacing the cannon shot and the 76 mm as they were. New `ears` low-pass between every bus but `uiBus` and the mix, `deafen(octaves, time)`, `SHOTS[kind].deafen` and `ring` for '88mm' and '128mm'. `/audio.html` has WW2 buttons (era, 8.8 cm and 12.8 cm at 20, 1500 and 6000 m, a salvo at 30 m) and keeps calling `update` once a button is pressed.
+- Modern attackers are Russian types (refs/threats-ru): `models/threats.js` builds `fighter` as the Su-34 (Kh-31P under the wings, UMPK glide bombs under the nacelles, Khibiny wingtip pods, red stars), `decoy` the Kh-55 flown with ballast, `cruise` the Kh-101, `drone` the Geran-2 in black, `arm` the Kh-31P, `glide` a FAB-500 with the UMPK kit, `helo` the Ka-52 (two coaxial rotors), `tbm` the Iskander-M's 9M723, `atgm` the Vikhr; new helpers `hull` (a smooth hull through cross-sections), `kh31`, `umpk`, `starPts`. A spinning part may carry `dir: -1` (turns the other way; `render/entities.js`). THREATS carry `name` for the modern types too; the kill call reads it (`sim.js`), the kill toasts name the types (main.js `KILL_NAME`), and the modern waves carry their own `radio` call (the default lower-cases the subtitle, type names included). Sim values unchanged: modern and WW2 simtest identical but for the names in the radio log.
+- Loadout: the Flakpanzer Gepard (`gepard`, unit id 'GEP', callsign Cheetah) is a third option in slot 5 (see "Loadout"): SYSTEMS `gepard` (guns only, `eoFallback`), SHELLS `'35mm'` (id 6), the model `src/models/v/gepard.js` on the new Leopard 1 chassis `src/models/v/leopard1.js` (refs/gepard; rig: `turret`, `elevation` with both external gun mounts, `searchRadar` on its arm at the turret rear (`setDeploy` raises the arm and turns the antenna round from its face-down stowage), `trackRadar` the head between the guns, rotation.x only; two `muzzles` [left, right] at x -+1.42; `sight` the gunner's periscope), CAMO `'nato'` (the Bundeswehr three-tone), markings `gepard`, render `UnitViews.gepard`, main `SHELL`/`FLASH`/`BRASS` entries (natural sight picture, not TV), audio `'35mm'` (bank `gun_35`, 1100 rounds/min) and idle `trk_gep`, the console `ui/consoles/gepard.js` in German (shared pieces gain a language: `Header(kindRu, kindEn, { lang, alerts })`, `SelBar(lang)`, `setTrigger(..., lang)`, `MODE_ITEMS_DE`, `TrackTable`'s `heads` and `none`, `SightView`'s `legend`; Russian stays the default), the lesson 'gepard', the menu still `public/menu/gepard.jpg`. No reload scene: the supply column refills its rounds at the end of a raid. Default loadout and WW2 simtest unchanged.

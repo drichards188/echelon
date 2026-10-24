@@ -45,6 +45,10 @@ export const SHELLS = {
   // 32 s; the heavier shell keeps its speed better (game values: about 12 s to 7,000 m at 85 degrees, a
   // reach to about 14 km up) and its burst is bigger
   '128mm': { id: 5, v0: 880, c: 0.0001, H: 8500, life: 32, dmg: 2.2, tracer: null, width: 0, tail: 0, every: 0, radius: 2, spread: 0.0008, grow: 0, burst: 70 },
+  // 35 mm Oerlikon KDA (the Gepard): a heavier shell at 1,175 m/s that keeps its speed (game values: 2.1 s
+  // to 2 km, 3.5 s to 3 km, 5.2 s to 4 km, gone at about 5.3 km), a bigger burst per hit, tighter
+  // grouping from the stabilised mounts
+  '35mm': { id: 6, v0: 1175, c: 0.0002, life: 8, dmg: 0.35, tracer: [24, 8, 2.6], width: 0.2, tail: 0.03, every: 3, radius: 2.4, spread: 0.0035, grow: 0.45 },
 };
 const BY_ID = Object.values(SHELLS);
 const NAMES = Object.keys(SHELLS);

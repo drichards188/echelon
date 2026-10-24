@@ -33,7 +33,7 @@ const SECTOR_RATE = 0.25; // rad/s: its slew
 const HATCH_OPEN = 3; // s: a Tor cell's lid stays open after its round left
 // the vehicles whose radars and masts stand up at the start of a battle (the others stand in action:
 // the Buk launchers' travel locks stay folded)
-const RAISED = new Set(['buk-radar', 'tor', 'tunguska', 'shilka']);
+const RAISED = new Set(['buk-radar', 'tor', 'tunguska', 'shilka', 'gepard']);
 
 // The WW2 era's gun units of several mounts (SYSTEMS `mounts`, sim/mounts.js): every gun part laid from its
 // own turret, recoiling and running out from its gun's `recoil` (s since its last shot), its feed shown
@@ -295,6 +295,7 @@ export class UnitViews {
       else if (u.kind === 'tor') this.tor(u, lead, dt);
       else if (u.kind === 'tunguska') this.tunguska(u, lead, dt);
       else if (u.kind === 'shilka') this.shilka(u, lead, dt);
+      else if (u.kind === 'gepard') this.gepard(u, lead, dt);
       else if (SYSTEMS[u.kind]?.mounts) this.mounts(u, v, dt, sim, fx, camera);
       else {
         const p = lead.pivots;
@@ -519,6 +520,22 @@ export class UnitViews {
       tk.nod = moveTo(tk.nod, clamp(nod, -0.1, 1.3), 2, dt);
     } else st.on = false;
     if (nodP) nodP.rotation.x = up ? tk.nod : (tk.nod = moveTo(tk.nod, 0, 2, dt));
+  }
+
+  // Flakpanzer Gepard: turret and guns; the search antenna on its arm at the turret rear turns with the
+  // sweep (held while the radar is silent, folded down once the vehicle is knocked out), the tracking radar between
+  // the guns tilts onto the guns' aim while it tracks or the fire control holds a lead.
+  gepard(u, rig, dt) {
+    const p = rig.pivots;
+    if (p.turret) p.turret.rotation.y = u.turret.az;
+    if (p.elevation) p.elevation.rotation.x = clamp(u.turret.el, -0.17, 1.48);
+    const g = u.weapons.gun;
+    if (p.trackRadar) {
+      const on = u.alive && (u.radar.track || g?.aimOk);
+      p.trackRadar.rotation.x = moveTo(p.trackRadar.rotation.x, on ? clamp(u.turret.el, -0.17, 1.48) : 0, 1.5, dt);
+    }
+    const up = this.standUp(rig, u.alive, p.searchRadar, dt);
+    if (p.searchRadar) this.searchAntenna(rig, p.searchRadar, -u.radar.sweep - u.heading - u.turret.az, u.radar.search && u.alive, up, dt);
   }
 
   // ---------------------------------------------------------------- the WW2 era's flak
