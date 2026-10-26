@@ -187,6 +187,23 @@ async function init() {
     onSelect: (id) => unitKey(UNITS.findIndex((u) => u.id === id)),
     onCommand: (id, name, args) => sim.command(id, name, args),
   });
+  // the WW2 era's crew voices (eras/ww2/voices.js, Drumfire's German clips): built only when the page opens in that
+  // era; the clips decode while the page loads. B or the panel's VOICES button switches them (echelon.voices).
+  let voices = null;
+  if (ERA.id === 'ww2') {
+    try {
+      const { CrewVoices } = await import('./eras/ww2/voices.js');
+      voices = new CrewVoices({
+        audio, view, panel: panelEl, radio: (text, kind) => hud.radio(text, kind),
+        selectedId: () => sim.units[selected]?.id,
+        active: () => ERA.id === 'ww2' && (state === 'playing' || state === 'tutorial'),
+      });
+      voices.load();
+    } catch (e) {
+      console.warn('crew voices failed:', e.message);
+      voices = null;
+    }
+  }
 
   // ---------------------------------------------------------------- settings
   const params = {
@@ -592,7 +609,7 @@ async function init() {
     else if (e.code === 'KeyV') {
       padlock = !padlock;
       hud.hint(padlock ? 'Padlock: the camera keeps the selected track in view (V)' : 'Padlock off', 2500);
-    }
+    } else if (e.code === 'KeyB' && voices) hud.hint(voices.toggle() ? 'Crew voices on (B)' : 'Crew voices off', 1500);
     else if (e.code === 'F3') {
       e.preventDefault();
       document.body.classList.toggle('debug');
@@ -922,6 +939,8 @@ async function init() {
     );
   };
 
+  voices?.attach(sim); // the crew voices chain onto the events above (eras/ww2/voices.js)
+
   // ---------------------------------------------------------------- warm up
   await step(0.85, loading[4]);
   applyQuality(startQuality);
@@ -941,6 +960,10 @@ async function init() {
   await warmUp(true);
   renderer.shadowMap.needsUpdate = true;
   post.render(0.016);
+  if (voices) {
+    hud.setLoading(0.97, 'Briefing the crews'); // the crew voices' clips (eras/ww2/voices.js)
+    await voices.ready();
+  }
   hud.setLoading(1, '');
   hud.setTimeScale(1);
 
@@ -1067,6 +1090,7 @@ async function init() {
       if (g && !SYSTEMS[u.kind].mounts) audio.gun(u.id, u.alive && g.firing && dt > 0, _p.copy(u.pos).setY(u.pos.y + 3), GUN_VOICE[u.kind] ?? g.shell);
     }
     ww2Sound(dt);
+    voices?.update(sim); // the crew voices' watchers and queues, after the sim's step (eras/ww2/voices.js)
     audio.update(rawDt, camera, { threats: sim.threats, timeScale: params.timeScale });
 
     // dynamic resolution: keep frame time near 60 fps. The landscape gives up detail first (terrain.js
@@ -1132,7 +1156,7 @@ async function init() {
   Object.assign(iads, {
     tutorial,
     renderer, scene, camera, terrain, atmosphere, post, fx, hud, chase, params, frame, clouds, weather, eyes,
-    sim, views, entities, panel, audio, sight,
+    sim, views, entities, panel, audio, sight, voices, // (voices: the WW2 crew voices, null in other eras; voices.log lists every line)
     select: selectUnit, start, setTimeScale, setLoadout, setEra, eras: ERAS,
     // headless tests: stop the loop, run `seconds` of battle without drawing, then draw a few frames
     fastForward(seconds, { unit = null, scale = 8, settle = 6 } = {}) {

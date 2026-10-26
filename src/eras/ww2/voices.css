@@ -1,0 +1,24 @@
+/* The WW2 era's crew voices (voices.js): the subtitles over the 3D view and the panel's VOICES button, a stencilled
+   push button of the 1945 command post (consoles/ww2.css). */
+#voice-sub {
+  position: absolute; left: 50%; bottom: 15%; translate: -50% 0; z-index: 12; width: min(680px, 92%);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none;
+  font: 12.5px/1.35 var(--mono); text-align: center;
+}
+#voice-sub .vs { max-width: 100%; padding: 4px 11px; background: rgba(16, 16, 13, 0.74); border-left: 3px solid rgba(235, 229, 205, 0.35); opacity: 0; transition: opacity 0.25s; }
+#voice-sub .vs.show { opacity: 1; }
+#voice-sub .vs:empty { display: none; }
+#voice-sub .vs b { font-weight: 700; color: #f4dc9a; }
+#voice-sub .vs i { color: #c9c4ab; }
+#voice-sub .vs.phone { border-left-color: #aaa797; }
+#voice-sub .vs.gun { border-left-color: #ffc45a; }
+body.ui-hidden #voice-sub { display: none; }
+
+#voice-btn {
+  position: absolute; right: 8px; bottom: 8px; z-index: 6; padding: 5px 8px 4px;
+  font: 700 9.5px/1 'DejaVu Sans Condensed', 'Liberation Sans Narrow', 'Arial Narrow', Arial, sans-serif; letter-spacing: 0.12em;
+  color: #ffc45a; background: #11110f; border: 1px solid #000; border-radius: 3px;
+  box-shadow: inset 0 0 6px #000, 0 1px 0 rgba(255, 250, 225, 0.08); cursor: pointer;
+}
+#voice-btn:hover { color: #ffe3a3; border-color: #5f625b; }
+#voice-btn.off { color: #8f8d80; }

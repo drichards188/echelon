@@ -60,7 +60,7 @@ Framework pieces from maxgfx keep their rules: `shaderlib.js` overrides three's 
 
 ### UI (`src/ui/`) and audio (`src/audio.js`)
 
-`Panel` reads only the data passed to `update` and talks back through `onSelect` and `onCommand(unitId, name, args)` (command table in DESIGN.md); one console per kind in `ui/consoles/`. It owns the console keys (Tab, Space, R, T, G, U, A, arrows, Q, L); main owns 1 to 5, C, V, F, M, H, F3, `[` and `]`. Each console has a status line under the header and a selected-track bar; a control that the AI crew would undo (slew, trigger, uncage, launch) first switches the unit to manual (`takeManual`). `AudioEngine` renders its banks at `start()` (a user gesture), lays the recordings over them when decoded, routes world sounds with travel delay and air absorption, runs threat engine loops with Doppler, the Pantsir gun loops, the Strela seeker tone and the console sounds.
+`Panel` reads only the data passed to `update` and talks back through `onSelect` and `onCommand(unitId, name, args)` (command table in DESIGN.md); one console per kind in `ui/consoles/`. It owns the console keys (Tab, Space, R, T, G, U, A, arrows, Q, L); main owns 1 to 5, C, V, B (the WW2 crew voices, `eras/ww2/voices.js`), F, M, H, F3, `[` and `]`. Each console has a status line under the header and a selected-track bar; a control that the AI crew would undo (slew, trigger, uncage, launch) first switches the unit to manual (`takeManual`). `AudioEngine` renders its banks at `start()` (a user gesture), lays the recordings over them when decoded, routes world sounds with travel delay and air absorption, runs threat engine loops with Doppler, the Pantsir gun loops, the Strela seeker tone and the console sounds.
 
 ## README structure
 

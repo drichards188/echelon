@@ -47,6 +47,7 @@ The simulation lives in `src/sim/`: plain logic that also runs headless in Node.
 - **Distance.** Far sounds arrive late (sound travel) and dull (air absorption); threat engines have Doppler.
 - **Voices.** Only the loudest sounds of a frame get a voice, and the rest feed a battle rumble.
 - **Recordings.** A few real recordings are cut up and laid over the synthesized sounds; without them the synthesized sounds play.
+- **Crew voices (WW2).** The flak crews call out in German, with subtitles: the air raid warning, new targets, salvos, barrages, guns ready or knocked out, cover. The clips are synthetic speech borrowed from Drumfire, only the lines a flak position can use.
 - **The 8.8 cm in layers.** No recording of a firing 8.8 cm is free to use, so its report is built as a game's gun usually is: a field gun's close crack and body over a 76 mm gun's shots, a synthesized sub thump and the rolling echo off the field. The 12.8 cm is the same, pitched down.
 - **Deafened.** A heavy gun fired right beside you dulls everything but the console for a second or two.
 - **Where they come from.** All are from Freesound (details in [public/audio/CREDITS.md](../public/audio/CREDITS.md)): by qubodup (two from US government video and one of US Army training), craigsmith, GryffDavid and InMotionAudio under CC0 1.0, and "Tykki, laukaus / Big gun, cannon, 76 mm, single shots, gunshots" by YleArkisto (https://freesound.org/s/332935/), licensed under CC BY 4.0.

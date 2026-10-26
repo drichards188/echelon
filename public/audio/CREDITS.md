@@ -27,3 +27,30 @@ fighters' strafing; the distant explosions are the 8.8 cm's bursts heard from th
 Only the Yle archive recording requires attribution: "Tykki, laukaus / Big gun, cannon, 76 mm, single
 shots, gunshots" by YleArkisto (https://freesound.org/s/332935/), licensed under CC BY 4.0. The rest are
 CC0 and credited as a courtesy.
+
+## WW2 crew voices (`voice-de/`)
+
+The WW2 era's German callouts (`voice-de/*.mp3`, indexed by `voice-de/lines.json`; played by
+`src/eras/ww2/voices.js`) are synthetic speech, not recordings of people: 53 of the clips made for the sibling game
+Drumfire, copied unchanged (the ones a flak position can use). They were generated offline with
+[Piper](https://github.com/OHF-Voice/piper1-gpl) and two German voices from
+[rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices); the game adds the field telephone and the open
+air at runtime.
+
+| Voice | Speakers used | Who speaks | Dataset licence |
+|---|---|---|---|
+| `de_DE-mls-medium` (trained from scratch) | MLS speaker ids 194, 159, 101 | the gun commander (194), the loader (159), the Abteilung on the telephone (101) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| `de_DE-thorsten_emotional-medium` | its "angry" speaker (id 1) | the battery officer's shouted commands and alarms | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+
+**Attribution (CC BY 4.0).** The `de_DE-mls-medium` voice was trained on the German part of Multilingual LibriSpeech:
+"MLS: A Large-Scale Multilingual Dataset for Speech Research" by Vineel Pratap, Qiantong Xu, Anuroop Sriram, Gabriel
+Synnaeve and Ronan Collobert (2020), [openslr.org/94](https://www.openslr.org/94/), licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (its audio comes from LibriVox's public-domain audiobooks). The
+speech here is new synthesized speech from a model trained on that data, cut, filtered and encoded; it does not reproduce
+the dataset's recordings.
+
+**Licence note on the Thorsten voice.** The Thorsten-Voice dataset (Thorsten Müller) is CC0. The `thorsten_emotional`
+voice was fine-tuned from Piper's German `thorsten` voice, which was itself fine-tuned from the English `lessac` voice,
+whose training data (Blizzard 2013, Lessac Technologies) is under a research licence. That is acceptable for this
+source-available, non-commercial project; a commercial release should replace the battery officer's lines with an MLS
+speaker, a commercially licensed TTS service or recorded actors.

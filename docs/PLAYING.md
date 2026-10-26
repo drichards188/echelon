@@ -119,6 +119,7 @@ Alternatives for slots 1 to 4 come later (`DESIGN.md`, "WW2 era").
 | `1`-`5` | select a unit (or click its tab above the console) |
 | Drag, wheel | orbit and zoom the camera |
 | `V` | padlock: the camera keeps the selected track in view |
+| `B` | WW2 era: the crews' German voices on or off (also the panel's VOICES button) |
 | `F` | chase the selected unit's newest missile in flight (F again, a unit key or C returns) |
 | `C` | free camera (WASD to move; C again returns to the unit) |
 | `[` `]` | time compression (x0.25 to x8); also the - and + buttons by the time readout (click the readout for x1) |
