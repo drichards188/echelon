@@ -21,7 +21,7 @@ npm install
 npm run dev      # http://localhost:5200
 ```
 
-You need Node.js, and a browser with WebGL2, a keyboard and a mouse.
+You need Node.js, and a browser with WebGL2 and graphics acceleration on, a keyboard and a mouse.
 
 To share it, serve the build (`dist/`) from any web server or folder, or zip it for itch.io. More in [Development](docs/DEVELOPMENT.md).
 

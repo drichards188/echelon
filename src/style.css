@@ -383,6 +383,18 @@ body.loaded #loading { opacity: 0; pointer-events: none; }
 .ld-back { font: 10px var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); text-decoration: none; white-space: nowrap; }
 .ld-back:hover { text-decoration: underline; }
 
+/* ---------------------------------------------------------- no graphics acceleration (ui/gpu.js), on the loading card */
+#gpu { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px; overflow-y: auto; background: rgba(5, 7, 5, 0.82); }
+.gpu-steps { margin: 14px 0 0 20px; display: grid; gap: 6px; font-size: 13px; line-height: 1.45; color: var(--ui); }
+.gpu-steps b { font-weight: 600; }
+.gpu-steps code, .gpu-note code { font: 12px var(--mono); color: var(--accent); user-select: all; }
+.gpu-note { margin-top: 12px; font-size: 12px; line-height: 1.5; color: var(--ui-dim); }
+.gpu-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.12); }
+.gpu-actions button { font: 600 11px var(--mono); letter-spacing: 0.2em; text-transform: uppercase; padding: 11px 22px; border: 1px solid rgba(143, 227, 154, 0.85); background: var(--accent-soft); color: #e6ffe9; cursor: pointer; }
+.gpu-actions button:hover { background: rgba(143, 227, 154, 0.3); }
+.gpu-actions button.quiet { border-color: rgba(255, 255, 255, 0.35); background: rgba(0, 0, 0, 0.35); color: var(--ui); }
+.gpu-actions button.quiet:hover { background: rgba(255, 255, 255, 0.14); }
+
 /* ---------------------------------------------------------- tutorials */
 .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
 #tutorials {

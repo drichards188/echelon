@@ -97,7 +97,7 @@ public/menu/       the main menu's stills, one per unit kind (tools/menushots.mj
 docs/              the README's screenshot and these pages (PLAYING, MODELLED, HISTORY, DEVELOPMENT)
 tools/             simtest.mjs, audiotest.mjs, shot.mjs, menushots.mjs
 src/
-  boot.js          the page's entry: the main menu, or a game page (?play=1, ?tutorial=ID) that loads main.js
+  boot.js          the page's entry: the WebGL check (ui/gpu.js), then the main menu, or a game page (?play=1, ?tutorial=ID) that loads main.js
   choices.js       the era, loadout and difficulty kept between the menu and the game, and the URLs between them
   main.js          a game page: renderer, quality presets, settings, game flow, event wiring, main loop
   style.css        the page, the main menu, the loading card, the HUD and the tutorial card
@@ -128,7 +128,8 @@ src/
     entities.js    everything that flies, instanced, with plumes and wreck trails (distant flyers are enlarged to stay visible)
     reload.js      the reload scenes' driver; reload/ one scene per unit kind (s400, buk, pantsir, tunguska, osa, tor, strela, shilka) and their shared helpers
   sight.js         the consoles' sight pictures (the modern sights, the WW2 gun sights and the predictor's telescope)
-  ui/              menu.js (the main menu), loading.js (a game page's loading card), backdrop.js (their stills);
+  ui/              menu.js (the main menu), loading.js (a game page's loading card), backdrop.js (their stills),
+                   gpu.js (the card when graphics acceleration is off);
                    the right half: panel.js (the unit tabs and the console), consoles/ (one per modern kind, common.js),
                    scope.js, tracktable.js, sightview.js, widgets.js, highlight.js (the tutorials' frames), fallback.js;
                    mock.js, mockbuktor.js, mockloadout.js for ui.html
