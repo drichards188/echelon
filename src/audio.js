@@ -31,11 +31,71 @@ const GAPS = { launch: 0.05, burst: 0.04, explosion: 0, impact: 0.03, crack: 0.1
 // Real recordings in public/audio, cut into slices [start, length] (seconds, found by onset
 // analysis) that replace or layer into the synthesized banks once both are ready; anything
 // missing or undecodable leaves the synthesized sound in place.
-const RECORDINGS = {
+export const RECORDINGS = {
   blast: { file: 'explosion-182429.mp3', slices: [[0, 3]] }, // US government video (CC0)
   distant: { file: 'distant-explosions-438693.mp3', slices: [[1.35, 2.4], [6.2, 2.6], [14.1, 2.6], [29.0, 2.6], [34.35, 2.6], [48.1, 2.6], [53.6, 2.6], [72.4, 2.6], [76.15, 2.6], [87.4, 2.6]] }, // (CC0)
   cannon: { file: 'cannon-shot-187767.mp3', slices: [[0.1, 2.4], [6.36, 2.4]] }, // a gun's crack, laid under the 57E6 booster
   brass: { file: 'shell-casings-318964.mp3', slices: [[8.49, 0.4], [13.04, 0.25], [16.8, 0.2], [18.95, 0.5], [20.92, 0.25], [23.17, 0.5], [25.9, 0.3], [27.83, 0.5], [39.2, 0.5]] }, // (CC0)
+  // the modern era's launches built from recordings (recordedTasks, REC_LAUNCH): `role` what the
+  // slices are, `set` the layer they join; slices start just before their onset, or `lead` seconds before it (a motor's
+  // slice keeps the quiet before it lights, to run on from the pop's). The S-400's (mil.ru, CC BY 4.0): two
+  // clips from Ashuluk, the ground camera's cold launches cut at the motor's lighting (the gas generator's pop, the
+  // motor a second later), the main camera's from a few hundred metres, the flight and the missile going away
+  s400pop: { file: 's400-launch-mil94169488.mp3', role: 'pop', set: 's400pop', slices: [[0.07, 0.97], [5.682, 0.99]] },
+  s400popB: { file: 's400-launch-mil89106996.mp3', role: 'pop', set: 's400pop', slices: [[0.142, 0.99], [9.096, 1.0]] },
+  s400ign: { file: 's400-launch-mil94169488.mp3', role: 'launch', set: 's400ign', slices: [[0.812, 4.53], [6.453, 4.06], [11.58, 4.35]], lead: 0.258 },
+  s400ignB: { file: 's400-launch-mil89106996.mp3', role: 'launch', set: 's400ign', slices: [[0.918, 2.95]], lead: 0.258 },
+  s400midpop: { file: 's400-launch-mil94169488.mp3', role: 'pop', set: 's400midpop', slices: [[16.278, 1.0], [21.736, 0.93]] },
+  s400midpopB: { file: 's400-launch-mil89106996.mp3', role: 'pop', set: 's400midpop', slices: [[4.228, 0.97]] },
+  s400midpopC: { file: 's400-flight-mil94169488.mp3', role: 'pop', set: 's400midpop', slices: [[0.058, 0.93]] },
+  s400midign: { file: 's400-launch-mil94169488.mp3', role: 'launch', set: 's400midign', slices: [[17.126, 4.29], [22.44, 5.05]], lead: 0.258 },
+  s400midignB: { file: 's400-launch-mil89106996.mp3', role: 'launch', set: 's400midign', slices: [[4.976, 3.75]], lead: 0.258 },
+  s400midignC: { file: 's400-flight-mil94169488.mp3', role: 'launch', set: 's400midign', slices: [[0.762, 7.25]], lead: 0.258 },
+  s400recede: { file: 's400-flight-mil94169488.mp3', role: 'recede', set: 'recede', slices: [[9.4, 8.0]] },
+  s300recede: { file: 's300-recede-mil57807729.mp3', role: 'recede', set: 'recede', slices: [[0.042, 8.0]] },
+  tomahawk: { file: 'tomahawk-recede-162379.mp3', role: 'recede', set: 'recede', slices: [[0.01, 6.55]] }, // qubodup, US Navy video (CC0)
+  tomahawkB: { file: 'tomahawk-recede-162380.mp3', role: 'recede', set: 'recede', slices: [[0.01, 4.15]] },
+  crackle: { file: 'hobbyrocket-roar-730041.mp3', role: 'roar', set: 'crackle', slices: [[0.58, 1.6]] }, // a close solid motor's crackle (CC0)
+  // Stinger launches (US Army and Marine Corps video, public domain): the ejection pop, then the motor lighting 0.28 s
+  // later, cut apart; near and from 30 to 100 m. The Strela-10's own 9M37 (mil.ru, CC BY 4.0) at the launcher
+  stingerpop: { file: 'stinger-launch-dvids533527.mp3', role: 'pop', set: 'stingerpop', slices: [[1.999, 0.275], [5.311, 0.275]] },
+  stingerpopB: { file: 'stinger-launch-dvids834385.mp3', role: 'pop', set: 'stingerpop', slices: [[0.004, 0.286]] },
+  stingerpopC: { file: 'stinger-launch-dvids563495.mp3', role: 'pop', set: 'stingerpop', slices: [[0.072, 0.289]] },
+  stingerign: { file: 'stinger-launch-dvids533527.mp3', role: 'launch', set: 'stingerign', slices: [[2.269, 2.79], [5.581, 2.36]] },
+  stingerignB: { file: 'stinger-launch-dvids834385.mp3', role: 'launch', set: 'stingerign', slices: [[0.285, 1.82]] },
+  stingerignC: { file: 'stinger-launch-dvids563495.mp3', role: 'launch', set: 'stingerign', slices: [[0.356, 1.74], [6.561, 1.55]] },
+  stingermidpop: { file: 'stinger-launch-dvids563495.mp3', role: 'pop', set: 'stingermidpop', slices: [[2.41, 0.3], [8.43, 0.291]] },
+  stingermidpopB: { file: 'stinger-launch-dvids834385.mp3', role: 'pop', set: 'stingermidpop', slices: [[2.369, 0.281], [8.596, 0.274]] },
+  stingermidign: { file: 'stinger-launch-dvids563495.mp3', role: 'launch', set: 'stingermidign', slices: [[2.697, 1.75], [8.708, 1.72]] },
+  stingermidignB: { file: 'stinger-launch-dvids834385.mp3', role: 'launch', set: 'stingermidign', slices: [[2.645, 2.85], [8.865, 1.62]] },
+  stingerrecede: { file: 'stinger-launch-dvids834385.mp3', role: 'recede', set: 'stingerrecede', slices: [[11.3, 2.94], [2.88, 2.62]] },
+  stingerrecedeB: { file: 'stinger-launch-dvids533527.mp3', role: 'recede', set: 'stingerrecede', slices: [[2.46, 2.6]] },
+  strela: { file: 'strela10-launch-mil119124134.mp3', role: 'launch', set: 'strela', slices: [[0.154, 2.166]] },
+  // the Tor-M1's and Tor-M2's own launches (mil.ru, CC BY 4.0), 15 to 125 m off: the catapult's whoosh and the gas
+  // burst that pitches the round over, cut from the motor lighting 0.7 to 0.85 s later; the missiles going away
+  torpop: { file: 'tor-launch-mil163275622.mp3', role: 'pop', set: 'torpop', slices: [[0.098, 0.74], [3.407, 0.62], [7.226, 0.8]] },
+  torign: { file: 'tor-launch-mil163275622.mp3', role: 'launch', set: 'torign', slices: [[0.608, 2.41], [3.827, 2.98], [7.806, 5.52]], lead: 0.258 },
+  tormidign: { file: 'tor-launch-mil163275761.mp3', role: 'launch', set: 'tormidign', slices: [[0.089, 5.0]] },
+  torrecede: { file: 'tor-launch-mil163275622.mp3', role: 'recede', set: 'torrecede', slices: [[8.53, 4.8]] },
+  torrecedeB: { file: 'tor-launch-mil163275761.mp3', role: 'recede', set: 'torrecede', slices: [[0.85, 4.25], [7.25, 7.0]] },
+  // the 9M317M from a frigate's Shtil (mil.ru, CC BY 4.0), 50 m off: the gas generator's thump (under the Tor's
+  // catapult), the motor lighting with a crack and its heavy roar (under the Buk's and, pitched up, the Pantsir's)
+  thump: { file: 'shtil-launch-mil116841072.mp3', role: 'pop', set: 'thump', slices: [[0.076, 0.6]] },
+  shtilign: { file: 'shtil-launch-mil116841072.mp3', role: 'launch', set: 'shtilign', slices: [[1.225, 4.45], [7.195, 3.3]] },
+  shtilroar: { file: 'shtil-launch-mil116841072.mp3', role: 'roar', set: 'bukroar', slices: [[1.45, 4.2]] },
+  // a Buk-M1's hot rail launch at night (mil.ru, CC BY 4.0) from 160 m, its roar, and another heard from 1.4 km
+  bukign: { file: 'buk-launch-mil145076957.mp3', role: 'launch', set: 'bukign', slices: [[0.104, 3.37]] },
+  bukroar: { file: 'buk-launch-mil145076957.mp3', role: 'roar', set: 'bukroar', slices: [[0.78, 2.7]] },
+  bukfar: { file: 'buk-launch-mil145076957.mp3', role: 'launch', set: 'bukfar', slices: [[6.54, 7.55]] },
+  // a Pantsir-S1's 57E6 from about 400 m (mil.ru, CC BY 4.0); no nearer one is free
+  pantsir: { file: 'pantsir-launch-mil57987235.mp3', role: 'launch', set: 'pantsir', slices: [[0.07, 2.52]] },
+  // stand-ins (qubodup, from US government video, CC0): the Hawk's rail launch for the Osa's, the Hellfire's and the
+  // TOW's sharp boosters for the Tunguska's
+  hawk: { file: 'hawk-launch-67545.mp3', role: 'launch', set: 'hawk', slices: [[0.01, 6.985]] },
+  hawkB: { file: 'hawk-launch-67544.mp3', role: 'launch', set: 'hawkmid', slices: [[0.01, 3.235]] },
+  hawkrecede: { file: 'hawk-launch-67545.mp3', role: 'recede', set: 'hawkrecede', slices: [[2.0, 4.98]] },
+  hellfire: { file: 'hellfire-launch-162368.mp3', role: 'launch', set: 'hellfire', slices: [[0.01, 2.33]] },
+  tow: { file: 'tow-launch-67541.mp3', role: 'launch', set: 'tow', slices: [[0.01, 3.02]] },
   // the WW2 era's, fetched only while it is in play (slices as maxgfx cut them, the machine gun's by its
   // envelope): a field gun's close report over a 76 mm gun's shots for the 8.8 cm (heavyShots), a period
   // automatic gun for the 3.7 cm, a .50 cal for the 2 cm and, three guns out of step, the fighters'
@@ -562,17 +622,22 @@ function roar(x, sr, r, at, dur, { attack = 0.15, decay = 1.5, f0 = 5000, f1 = 9
   mixInto(x, normalize(g), at, level, sr);
 }
 
-/** 48N6: a gas-generator thump and the canister's cough, a beat of quiet, then the motor lights and tears away. */
+/** 48N6's cold launch: a gas-generator thump and the canister's cough, the round sliding out, the quiet as it climbs (the motor lights 1.2 s on). */
+function pop48N6(x, sr, r, g = 1) {
+  blast(x, sr, 0, 0.55 * g, 0.02, 1.4, 0.002);
+  blast(x, sr, 0, 0.3 * g, 0.003, 1.6, 0.0005); // the lid
+  thump(x, sr, 0, 58, 26, 0.09, 0.9 * g, 0.35);
+  thump(x, sr, 0, 110, 50, 0.05, 0.5 * g, 0.12);
+  mixInto(x, layer(sr, r, { dur: 0.7, attack: 0.004, decay: 0.18, f: 140 }), 0, 0.8 * g, sr);
+  mixInto(x, layer(sr, r, { dur: 0.4, decay: 0.08, type: 'bp', f: 380, q: 0.7 }), 0.03, 0.55 * g, sr); // the cough
+  mixInto(x, layer(sr, r, { dur: 0.9, attack: 0.15, decay: 0.3, sweep: (t) => 600 + 1800 * t }), 0.05, 0.13 * g, sr); // the round sliding out
+  mixInto(x, layer(sr, r, { dur: 1, attack: 0.3, decay: 0.3, f: 110 }), 0.3, 0.07 * g, sr); // the quiet: it climbs in silence
+}
+
+/** 48N6: the cold launch (pop48N6), a beat of quiet, then the motor lights and tears away. */
 function launch48N6(sr, r) {
   const x = new Float32Array(Math.ceil(10 * sr));
-  blast(x, sr, 0, 0.55, 0.02, 1.4, 0.002);
-  blast(x, sr, 0, 0.3, 0.003, 1.6, 0.0005); // the lid
-  thump(x, sr, 0, 58, 26, 0.09, 0.9, 0.35);
-  thump(x, sr, 0, 110, 50, 0.05, 0.5, 0.12);
-  mixInto(x, layer(sr, r, { dur: 0.7, attack: 0.004, decay: 0.18, f: 140 }), 0, 0.8, sr);
-  mixInto(x, layer(sr, r, { dur: 0.4, decay: 0.08, type: 'bp', f: 380, q: 0.7 }), 0.03, 0.55, sr); // the cough
-  mixInto(x, layer(sr, r, { dur: 0.9, attack: 0.15, decay: 0.3, sweep: (t) => 600 + 1800 * t }), 0.05, 0.13, sr); // the round sliding out
-  mixInto(x, layer(sr, r, { dur: 1, attack: 0.3, decay: 0.3, f: 110 }), 0.3, 0.07, sr); // the quiet: it climbs in silence
+  pop48N6(x, sr, r);
   const t0 = 1.2;
   blast(x, sr, t0, 0.55, 0.006, 1.5, 0.0004);
   mixInto(x, layer(sr, r, { dur: 0.15, attack: 0.001, decay: 0.03, type: 'hp', f: 1800 }), t0, 0.4, sr);
@@ -581,38 +646,53 @@ function launch48N6(sr, r) {
   return x;
 }
 
-/** 9M96: a smaller cold launch, then a sharper, higher motor. */
+/** 9M96's cold launch: a smaller thump and pop than the 48N6's, and the round sliding out. */
+function pop9M96(x, sr, r, g = 1) {
+  blast(x, sr, 0, 0.5 * g, 0.008, 1.5, 0.0008);
+  thump(x, sr, 0, 90, 45, 0.06, 0.7 * g, 0.14);
+  mixInto(x, layer(sr, r, { dur: 0.3, decay: 0.06, type: 'bp', f: 700, q: 0.8 }), 0.01, 0.6 * g, sr); // the pop
+  mixInto(x, layer(sr, r, { dur: 0.5, attack: 0.08, decay: 0.15, sweep: (t) => 900 + 3000 * t }), 0.03, 0.12 * g, sr);
+}
+
+/** 9M96: a smaller cold launch (pop9M96), then a sharper, higher motor, lighting at the sim's `eject` (1 s). */
 function launch9M96(sr, r) {
-  const x = new Float32Array(Math.ceil(6.4 * sr));
-  blast(x, sr, 0, 0.5, 0.008, 1.5, 0.0008);
-  thump(x, sr, 0, 90, 45, 0.06, 0.7, 0.14);
-  mixInto(x, layer(sr, r, { dur: 0.3, decay: 0.06, type: 'bp', f: 700, q: 0.8 }), 0.01, 0.6, sr); // the pop
-  mixInto(x, layer(sr, r, { dur: 0.5, attack: 0.08, decay: 0.15, sweep: (t) => 900 + 3000 * t }), 0.03, 0.12, sr);
-  const t0 = 0.55;
+  const x = new Float32Array(Math.ceil(6.8 * sr));
+  pop9M96(x, sr, r);
+  const t0 = 1;
   blast(x, sr, t0, 0.5, 0.004, 1.5, 0.0003);
   roar(x, sr, r, t0, 5.5, { attack: 0.08, decay: 1.2, f0: 9000, f1: 1400, rumble: 260, crackle: 0.5 });
   roar(x, sr, r, t0, 4, { attack: 0.06, decay: 0.9, f0: 5000, f1: 3000, rumble: 600, crackle: 0.3, level: 0.3 }); // the shriek
   return x;
 }
 
-/** 57E6: a violent crack, a booster roar of a second or so, then the dart goes silent. */
+/** 57E6's crack leaving the tube: the booster's blast, the shock and the thump. */
+function snap57E6(x, sr, r, g = 1) {
+  blast(x, sr, 0, g, 0.0035 * (0.9 + 0.2 * r()), 1.5, 0.00004);
+  nWave(x, sr, 0.0002, 0.5 * g, 0.0005);
+  thump(x, sr, 0, 120, 50, 0.04, 0.8 * g, 0.1);
+  mixInto(x, layer(sr, r, { dur: 0.05, attack: 0.0002, decay: 0.01, type: 'hp', f: 3000 }), 0, 0.4 * g, sr);
+}
+
+/** 57E6: a violent crack (snap57E6), a booster roar of a second or so, then the dart goes silent. */
 function launch57E6(sr, r) {
   const x = new Float32Array(Math.ceil(4.5 * sr));
-  blast(x, sr, 0, 1, 0.0035 * (0.9 + 0.2 * r()), 1.5, 0.00004);
-  nWave(x, sr, 0.0002, 0.5, 0.0005);
-  thump(x, sr, 0, 120, 50, 0.04, 0.8, 0.1);
-  mixInto(x, layer(sr, r, { dur: 0.05, attack: 0.0002, decay: 0.01, type: 'hp', f: 3000 }), 0, 0.4, sr);
+  snap57E6(x, sr, r);
   roar(x, sr, r, 0.005, 1.7, { attack: 0.01, decay: 0.45, f0: 9000, f1: 1800, rumble: 300, crackle: 0.5, level: 1.1 });
   roll(x, x.slice(0, Math.round(0.6 * sr)), sr, r, { count: 10, t0: 0.3, t1: 2.8, gain: 0.25, f: 500 });
   return x;
 }
 
-/** 9M33: ignition and a rushing roar. */
+/** 9M33's ignition on the rail: the motor's blast, a thump and the whoomph of its flame. */
+function snap9M33(x, sr, r, g = 1) {
+  blast(x, sr, 0, 0.4 * g, 0.006, 1.5, 0.0006);
+  thump(x, sr, 0, 80, 40, 0.05, 0.5 * g, 0.12);
+  mixInto(x, layer(sr, r, { dur: 0.25, decay: 0.05, type: 'bp', f: 500, q: 0.7 }), 0, 0.5 * g, sr);
+}
+
+/** 9M33: ignition (snap9M33) and a rushing roar. */
 function launch9M33(sr, r) {
   const x = new Float32Array(Math.ceil(5.5 * sr));
-  blast(x, sr, 0, 0.4, 0.006, 1.5, 0.0006);
-  thump(x, sr, 0, 80, 40, 0.05, 0.5, 0.12);
-  mixInto(x, layer(sr, r, { dur: 0.25, decay: 0.05, type: 'bp', f: 500, q: 0.7 }), 0, 0.5, sr);
+  snap9M33(x, sr, r);
   roar(x, sr, r, 0.1, 4.8, { attack: 0.1, decay: 1.6, f0: 6000, f1: 1200, rumble: 200, crackle: 0.45 });
   return x;
 }
@@ -627,28 +707,38 @@ function launch9M37(sr, r) {
   return x;
 }
 
-/** 9M317 (Buk): a hot launch off the rails; the motor lights on the rail with a whoomph and a clank, and a long heavy roar follows at once. */
+/** 9M317's motor lighting on the rail: the blast, the whoomph and the shoe leaving the rail with a clank. */
+function snap9M317(x, sr, r, g = 1) {
+  blast(x, sr, 0, 0.5 * g, 0.007, 1.5, 0.0006);
+  thump(x, sr, 0, 72, 34, 0.09, 0.7 * g, 0.28);
+  mixInto(x, layer(sr, r, { dur: 0.35, attack: 0.004, decay: 0.07, type: 'bp', f: 850, q: 0.7 }), 0, 0.6 * g, sr); // the whoomph
+  mixInto(x, layer(sr, r, { dur: 0.1, attack: 0.0003, decay: 0.02, type: 'hp', f: 2500 }), 0, 0.3 * g, sr);
+  modes(x, sr, 0.03, [[1650, 0.1 * g, 0.06], [3900, 0.05 * g, 0.035], [640, 0.1 * g, 0.09]], r); // the shoe leaving the rail
+}
+
+/** 9M317 (Buk): a hot launch off the rails (snap9M317); the motor lights on the rail with a whoomph and a clank, and a long heavy roar follows at once. */
 function launch9M317(sr, r) {
   const x = new Float32Array(Math.ceil(8.5 * sr));
-  blast(x, sr, 0, 0.5, 0.007, 1.5, 0.0006);
-  thump(x, sr, 0, 72, 34, 0.09, 0.7, 0.28);
-  mixInto(x, layer(sr, r, { dur: 0.35, attack: 0.004, decay: 0.07, type: 'bp', f: 850, q: 0.7 }), 0, 0.6, sr); // the whoomph
-  mixInto(x, layer(sr, r, { dur: 0.1, attack: 0.0003, decay: 0.02, type: 'hp', f: 2500 }), 0, 0.3, sr);
-  modes(x, sr, 0.03, [[1650, 0.1, 0.06], [3900, 0.05, 0.035], [640, 0.1, 0.09]], r); // the shoe leaving the rail
+  snap9M317(x, sr, r);
   roar(x, sr, r, 0.04, 8, { attack: 0.12, decay: 2.7, f0: 7500, f1: 800, rumble: 170, crackle: 0.5 });
   roar(x, sr, r, 0.1, 6, { attack: 0.3, decay: 2, f0: 1800, f1: 500, rumble: 90, crackle: 0.2, level: 0.45 });
   return x;
 }
 
-/** 9M338 (Tor): a gas-generator thump and the cell's cough, 0.9 s later (the sim's `eject`) the motor lights; a short, hard roar as it pitches over. */
+/** 9M338's catapult: a gas-generator thump and the cell's cough, the round thrown up out of it. */
+function pop9M338(x, sr, r, g = 1) {
+  blast(x, sr, 0, 0.5 * g, 0.012, 1.4, 0.0012);
+  thump(x, sr, 0, 78, 36, 0.07, 0.9 * g, 0.3);
+  thump(x, sr, 0, 140, 60, 0.04, 0.45 * g, 0.1);
+  mixInto(x, layer(sr, r, { dur: 0.5, attack: 0.004, decay: 0.12, f: 160 }), 0, 0.75 * g, sr);
+  mixInto(x, layer(sr, r, { dur: 0.3, decay: 0.07, type: 'bp', f: 420, q: 0.7 }), 0.02, 0.5 * g, sr); // the cough
+  mixInto(x, layer(sr, r, { dur: 0.5, attack: 0.1, decay: 0.15, sweep: (t) => 700 + 1800 * t }), 0.04, 0.1 * g, sr);
+}
+
+/** 9M338 (Tor): the catapult (pop9M338), 0.9 s later (the sim's `eject`) the motor lights; a short, hard roar as it pitches over. */
 function launch9M338(sr, r) {
   const x = new Float32Array(Math.ceil(6 * sr));
-  blast(x, sr, 0, 0.5, 0.012, 1.4, 0.0012);
-  thump(x, sr, 0, 78, 36, 0.07, 0.9, 0.3);
-  thump(x, sr, 0, 140, 60, 0.04, 0.45, 0.1);
-  mixInto(x, layer(sr, r, { dur: 0.5, attack: 0.004, decay: 0.12, f: 160 }), 0, 0.75, sr);
-  mixInto(x, layer(sr, r, { dur: 0.3, decay: 0.07, type: 'bp', f: 420, q: 0.7 }), 0.02, 0.5, sr); // the cough
-  mixInto(x, layer(sr, r, { dur: 0.5, attack: 0.1, decay: 0.15, sweep: (t) => 700 + 1800 * t }), 0.04, 0.1, sr);
+  pop9M338(x, sr, r);
   const t0 = 0.9; // MISSILES['9M338'].eject: the catapult throws it 16 to 21 m up before the motor lights
   blast(x, sr, t0, 0.55, 0.005, 1.5, 0.0004);
   mixInto(x, layer(sr, r, { dur: 0.12, attack: 0.001, decay: 0.025, type: 'hp', f: 2000 }), t0, 0.4, sr);
@@ -658,20 +748,25 @@ function launch9M338(sr, r) {
   return x;
 }
 
-/** 9M311 (Tunguska): a sharp rail launch, a booster that burns for little more than a second and a thin sustainer hiss behind it. */
+/** 9M311's sharp rail launch: the booster's blast and shock, the round's shoe leaving the rail. */
+function snap9M311(x, sr, r, g = 1) {
+  blast(x, sr, 0, 0.8 * g, 0.004, 1.5, 0.0003);
+  nWave(x, sr, 0.0002, 0.3 * g, 0.0005);
+  thump(x, sr, 0, 105, 50, 0.05, 0.7 * g, 0.12);
+  mixInto(x, layer(sr, r, { dur: 0.1, attack: 0.0003, decay: 0.02, type: 'hp', f: 2800 }), 0, 0.35 * g, sr);
+  modes(x, sr, 0.02, [[1900, 0.08 * g, 0.04], [4100, 0.04 * g, 0.025]], r);
+}
+
+/** 9M311 (Tunguska): a sharp rail launch (snap9M311), a booster that burns for little more than a second and a thin sustainer hiss behind it. */
 function launch9M311(sr, r) {
   const x = new Float32Array(Math.ceil(4.2 * sr));
-  blast(x, sr, 0, 0.8, 0.004, 1.5, 0.0003);
-  nWave(x, sr, 0.0002, 0.3, 0.0005);
-  thump(x, sr, 0, 105, 50, 0.05, 0.7, 0.12);
-  mixInto(x, layer(sr, r, { dur: 0.1, attack: 0.0003, decay: 0.02, type: 'hp', f: 2800 }), 0, 0.35, sr);
-  modes(x, sr, 0.02, [[1900, 0.08, 0.04], [4100, 0.04, 0.025]], r);
+  snap9M311(x, sr, r);
   roar(x, sr, r, 0.01, 1.5, { attack: 0.02, decay: 0.42, f0: 9500, f1: 2000, rumble: 280, crackle: 0.5, level: 1.1 });
   roar(x, sr, r, 1.1, 3, { attack: 0.35, decay: 1.1, f0: 4200, f1: 1500, rumble: 500, crackle: 0.2, level: 0.22 });
   return x;
 }
 
-const LAUNCH_RECIPES = { '48N6': [launch48N6, 10], '9M96': [launch9M96, 6.4], '57E6': [launch57E6, 4.5], '9M33': [launch9M33, 5.5], '9M37': [launch9M37, 3.6], '9M317': [launch9M317, 8.5], '9M338': [launch9M338, 6], '9M311': [launch9M311, 4.2] };
+const LAUNCH_RECIPES = { '48N6': [launch48N6, 10], '9M96': [launch9M96, 6.8], '57E6': [launch57E6, 4.5], '9M33': [launch9M33, 5.5], '9M37': [launch9M37, 3.6], '9M317': [launch9M317, 8.5], '9M338': [launch9M338, 6], '9M311': [launch9M311, 4.2] };
 
 // ---------------------------------------------------------------- Pantsir 2A38M
 
@@ -1161,6 +1256,204 @@ export function ww2Tasks(SR, make) {
   ];
 }
 
+// ---------------------------------------------------------------- the modern systems from recordings
+
+// The modern era's launches built from real recordings (RECORDINGS with a `role`; recordedTasks), as
+// Drumfire builds its guns and the WW2 era its 8.8 cm: recorded slices layered over the synthesized parts the
+// recordings lack. They replace the synthesized banks once decoded; without them the synthesized sounds play.
+
+const REC_TAKE = [1, 0.97, 1.03, 0.95]; // each take of a launch pitched a little apart
+
+/** x (sampled at `from`) at `to` Hz, pitched by `pitch` (under 1 lower and longer); low-passed first when samples are dropped. */
+function retime(x, from, to, pitch = 1) {
+  const rate = (from / to) * pitch;
+  if (Math.abs(rate - 1) < 1e-6) return Float32Array.from(x);
+  if (rate > 1.01) {
+    const fc = (0.46 * from) / rate; // a fourth-order Butterworth below the new Nyquist
+    return resample(biquad(biquad(Float32Array.from(x), from, 'lp', fc, 0.54), from, 'lp', fc, 1.31), rate);
+  }
+  return resample(x, rate);
+}
+
+/** The slices [t0, len] of a decoded recording { data, sr } (mono): DC removed, faded in over 3 ms and out over `fade` of their length. */
+function cutRec(rec, slices, fade) {
+  return slices.map(([t0, len]) => {
+    const a = Math.floor(t0 * rec.sr), n = Math.max(1, Math.min(Math.floor(len * rec.sr), rec.data.length - a));
+    const x = Float32Array.from(rec.data.subarray(a, a + n));
+    let mean = 0;
+    for (let i = 0; i < n; i++) mean += x[i];
+    mean /= n;
+    const fin = Math.min(n, Math.round(0.003 * rec.sr)), fout = Math.max(1, Math.round(n * fade));
+    for (let i = 0; i < n; i++) x[i] -= mean;
+    for (let i = 0; i < fin; i++) x[i] *= i / fin;
+    for (let i = 0; i < fout; i++) x[n - 1 - i] *= Math.pow(i / fout, 1.5);
+    return { x: normalize(x, 0.95), sr: rec.sr };
+  });
+}
+
+/** The set a RECORDINGS entry's slices join (REC_LAUNCH): its `set`, else its key. */
+const setOf = (key) => RECORDINGS[key].set ?? key;
+
+// how much of a slice's end is faded, by role: a launch's roar dies away, a burst already ends in its echo, a cold
+// launch's pop runs on into the motor's slice
+const REC_FADE = { launch: 0.3, pop: 0.15, roar: 0.08, recede: 0.3, burst: 0.03, round: 0.3, tail: 0.3 };
+
+/** Fade x out from t (s) with time constant tau (s): a booster burning out. */
+function fadeFrom(x, sr, t, tau) {
+  const i0 = Math.max(0, Math.round(t * sr));
+  for (let i = i0; i < x.length; i++) x[i] *= Math.exp(-(i - i0) / (tau * sr));
+  return x;
+}
+
+/**
+ * The launches built from recordings (recordedLaunch), missile by missile. layers: { set, at, pitch, gain, end, fadeIn }:
+ * a set of recorded slices (RECORDINGS entries with that `set`; each take uses another of its slices, which start just
+ * before their onset), where the slice starts (s), its pitch (under 1 lower: a bigger motor), its level, for a booster
+ * that burns out [t, tau]: when it fades and how fast, how long it takes to come in, and lp / hp: filters (Hz) that
+ * match it to the layers it joins. pop: the synthesized cold launch
+ * kept under the recordings and its level; sub: synthesized thumps [at, f0, f1, tau, amp, decay] for the low end a
+ * recording lacks; roll: the echo rolling back off the landscape (roll()) when the recordings are dry. mid / far: the layers heard from there (recordings made from off), else the nearer take through the
+ * distance filters. len: seconds; sat: the saturation that thickens the near mix; takes: how many near takes.
+ */
+const REC_LAUNCH = {
+  // 48N6: the S-400's own: the gas generator's pop, the motor lighting at the sim's `eject` (1.2 s), the roar, then the
+  // missile going away; from the main camera's launches a few hundred metres off for the mid
+  '48N6': {
+    len: 10, takes: 3, sat: 1.15,
+    sub: [[1.2, 52, 28, 0.2, 0.35, 0.4]],
+    layers: [{ set: 's400pop', at: 0 }, { set: 's400ign', at: 1.2, end: [4.6, 0.8] }, { set: 'recede', at: 3.0, gain: 0.5, fadeIn: 1.6, end: [8.2, 0.8] }],
+    mid: [{ set: 's400midpop', at: 0, gain: 0.8 }, { set: 's400midign', at: 1.2, end: [5.6, 0.9] }, { set: 'recede', at: 3.6, gain: 0.45, fadeIn: 1.6, end: [8.4, 0.8] }],
+  },
+  // 9M96: the same canisters, smaller: the pop and the motor pitched up, lighting at its `eject` (1 s), a brighter crackle
+  '9M96': {
+    len: 6.8, takes: 3, sat: 1.15,
+    pop: [pop9M96, 0.35],
+    layers: [{ set: 's400pop', at: 0, pitch: 1.14, gain: 0.8 }, { set: 's400ign', at: 1, pitch: 1.16, end: [3.8, 0.6] }, { set: 'crackle', at: 1.05, pitch: 0.8, gain: 0.22, end: [2.6, 0.5] }, { set: 'recede', at: 2.6, pitch: 1.1, gain: 0.45, fadeIn: 1.2, end: [5.4, 0.6] }],
+    mid: [{ set: 's400midpop', at: 0, pitch: 1.14, gain: 0.7 }, { set: 's400midign', at: 1, pitch: 1.16, end: [4.2, 0.7] }, { set: 'recede', at: 3, pitch: 1.1, gain: 0.4, fadeIn: 1.2, end: [5.6, 0.6] }],
+  },
+  // 9M37 (Strela-10): a Stinger's ejection pop and its motor lighting 0.12 s on, as the 9M37 does clear of its
+  // container, pitched down for the bigger round, with the Strela-10's own launch under it; the motor burns out at 2 s
+  '9M37': {
+    len: 4.2, takes: 4, sat: 1.1,
+    layers: [{ set: 'stingerpop', at: 0, pitch: 0.86 }, { set: 'stingerign', at: 0.12, pitch: 0.86, end: [1.3, 0.35] }, { set: 'strela', at: 0, gain: 0.35, hp: 400, end: [1.6, 0.4] }, { set: 'stingerrecede', at: 0.9, pitch: 0.86, gain: 0.6, fadeIn: 0.5, end: [3.2, 0.4] }],
+    mid: [{ set: 'stingermidpop', at: 0, pitch: 0.86 }, { set: 'stingermidign', at: 0.12, pitch: 0.86, end: [1.6, 0.4] }, { set: 'stingerrecede', at: 1.1, pitch: 0.86, gain: 0.35, fadeIn: 0.8, lp: 6000, end: [3.4, 0.4] }],
+  },
+  // 9M33 (Osa): no recording of it is free; the Hawk's rail launch pitched up for the smaller round, its ignition's
+  // blast (snap9M33) on top
+  '9M33': {
+    len: 6.4, takes: 2, sat: 1.1,
+    pop: [snap9M33, 0.6],
+    layers: [{ set: 'hawk', at: 0, pitch: 1.1 }],
+    mid: [{ set: 'hawkmid', at: 0, pitch: 1.1, end: [2.4, 0.5] }, { set: 'hawkrecede', at: 1.9, pitch: 1.1, gain: 0.55, fadeIn: 0.5, end: [4.8, 0.7] }],
+  },
+  // 57E6 (Pantsir): no near recording of it is free: its crack (snap57E6) over the Hellfire's booster, the Shtil
+  // motor's crack pitched up and the highs of a Stinger's motor and a solid motor's crackle, burning out at about 1.6 s, the echo rolling back; from 400 m the Pantsir's own
+  '57E6': {
+    len: 4.5, takes: 3, sat: 1.2,
+    pop: [snap57E6, 0.75],
+    roll: { count: 10, t0: 0.3, t1: 2.8, gain: 0.25, f: 500 },
+    layers: [{ set: 'hellfire', at: 0, pitch: 1.05, gain: 0.65, end: [1.6, 0.35] }, { set: 'shtilign', at: 0, pitch: 1.3, gain: 0.6, end: [1.0, 0.25] }, { set: 'stingerign', at: 0, pitch: 0.75, gain: 0.7, hp: 2000, end: [1.5, 0.3] }, { set: 'crackle', at: 0.02, pitch: 0.9, gain: 0.5, hp: 2500, end: [1.5, 0.3] }],
+    mid: [{ set: 'pantsir', at: 0, end: [2.2, 0.3] }, { set: 'hellfire', at: 0, gain: 0.35, lp: 4500, end: [1.6, 0.35] }],
+  },
+  // 9M317 (Buk): the Buk-M1's own hot launch with the 9M317M's motor lighting laid in, its roar and the missile going
+  // away; from far off, the Buk-M1's heard from 1.4 km, a slow swell
+  '9M317': {
+    len: 8.5, takes: 3, sat: 1.15,
+    pop: [snap9M317, 0.45],
+    layers: [{ set: 'bukign', at: 0 }, { set: 'shtilign', at: 0.01, gain: 0.8, end: [3.6, 0.7] }, { set: 'bukroar', at: 2.4, gain: 0.55, fadeIn: 0.8, end: [5.4, 0.9] }, { set: 'recede', at: 4, gain: 0.4, fadeIn: 1.2, end: [7.4, 0.6] }],
+    far: [{ set: 'bukfar', at: 0 }],
+  },
+  // 9M338 (Tor): the Tor's own catapult (its whoosh and the pitch-over burst) over the Shtil's gas-generator thump, the
+  // motor lighting at the sim's `eject` (0.9 s) and the roar dying as it climbs away
+  '9M338': {
+    len: 6, takes: 3, sat: 1.15,
+    pop: [pop9M338, 0.4],
+    layers: [{ set: 'thump', at: 0, pitch: 1.1, gain: 0.65 }, { set: 'torpop', at: 0 }, { set: 'torign', at: 0.9, end: [3.4, 0.6] }, { set: 'torrecede', at: 2.4, gain: 0.5, fadeIn: 0.8, end: [5.2, 0.5] }],
+    mid: [{ set: 'torpop', at: 0, gain: 0.5, lp: 4000 }, { set: 'tormidign', at: 0.9, end: [4, 0.6] }, { set: 'torrecede', at: 2.8, gain: 0.4, fadeIn: 0.8, end: [5.4, 0.5] }],
+  },
+  // 9M311 (Tunguska): the sharp rail launch (snap9M311) over the Hellfire's booster and the TOW's, which falls into a
+  // thinner sustainer
+  '9M311': {
+    len: 4.2, takes: 2, sat: 1.15,
+    pop: [snap9M311, 0.5],
+    layers: [{ set: 'hellfire', at: 0, pitch: 0.95, end: [1.5, 0.35] }, { set: 'tow', at: 0, pitch: 0.92, gain: 0.7 }],
+  },
+};
+
+/** Take `k` of a launch of `kind` from recordings (REC_LAUNCH; S maps a set to its slices), heard near, mid or far. */
+function recordedLaunch(sr, r, kind, S, k, band) {
+  const R = REC_LAUNCH[kind], p = REC_TAKE[k % REC_TAKE.length];
+  const own = band !== 'near' && R[band];
+  const x = new Float32Array(Math.ceil(R.len * sr));
+  const g = band === 'near' ? 1 : band === 'mid' ? 0.6 : 0.35;
+  if (R.pop) R.pop[0](x, sr, r, R.pop[1] * g);
+  for (const [at, f0, f1, tau, amp, decay] of R.sub || []) thump(x, sr, at, f0, f1, tau, amp * g, decay, 0.004);
+  for (const [j, L] of (own || R.layers).entries()) {
+    const list = S[L.set];
+    if (!list?.length) continue;
+    const s = list[(k + j) % list.length];
+    const a = retime(s.x, s.sr, sr, (L.pitch ?? 1) * p);
+    if (L.lp) biquad(a, sr, 'lp', L.lp, 0.6);
+    if (L.hp) biquad(a, sr, 'hp', L.hp, 0.6);
+    if (L.fadeIn) for (let i = 0, m = Math.round(L.fadeIn * sr); i < m && i < a.length; i++) a[i] *= i / m;
+    if (L.end) fadeFrom(a, sr, L.end[0] - L.at, L.end[1]);
+    mixInto(x, a, Math.max(0, L.at - s.lead / ((L.pitch ?? 1) * p)), L.gain ?? 1, sr);
+  }
+  if (R.roll && band === 'near') roll(x, x.slice(0, Math.round(0.6 * sr)), sr, r, R.roll);
+  biquad(x, sr, 'hp', 22);
+  if (band === 'near') return [tail(saturate(normalize(x), R.sat ?? 1.1), sr, 0.25)];
+  if (band === 'mid') biquad(x, sr, 'lp', 9000, 0.6);
+  else {
+    biquad(x, sr, 'lp', 2400, 0.6);
+    onePole(x, sr, 3200);
+  }
+  return [tail(normalize(x, 0.95), sr, 0.25)];
+}
+
+/**
+ * The banks built from the modern recordings: `rec` maps a RECORDINGS key to its decoded mono samples { data, sr }.
+ * Each task is [group, key, fn, true] (the engine keeps the synthesized bank it replaces, for the A/B on
+ * /audio.html). A launch is built only when its recordings are there.
+ */
+export function recordedTasks(SR, make, rec) {
+  const midSR = Math.min(SR, 32000), farSR = 16000;
+  let S = null; // the slices by set, cut when the first bank is built
+  const slices = () => {
+    if (S) return S;
+    S = {};
+    for (const [key, spec] of Object.entries(RECORDINGS)) {
+      if (!spec.role || !rec[key]) continue;
+      (S[setOf(key)] ||= []).push(...cutRec(rec[key], spec.slices, REC_FADE[spec.role] ?? 0.3).map((s) => ({ ...s, lead: spec.lead ?? 0.008 })));
+    }
+    return S;
+  };
+  const loaded = new Set(Object.keys(RECORDINGS).filter((key) => RECORDINGS[key].role && rec[key]).map(setOf));
+  const has = (sets) => sets.some((set) => loaded.has(set));
+  const tasks = [];
+  for (const [kind, R] of Object.entries(REC_LAUNCH)) {
+    if (!has(R.layers.map((L) => L.set))) continue;
+    const g = 'launch_' + kind, seed = 5100 + kind.charCodeAt(1) * 17 + kind.length;
+    const rolls = { count: 18, t0: 0.25, t1: 3.2, gain: 0.5, f: 380 };
+    const own = (b) => R[b] && has(R[b].map((L) => L.set));
+    const takes = {};
+    const take = (b, n) => (takes[b] ||= Array.from({ length: n }, (_, k) => recordedLaunch(midSR, mulberry(seed + (b === 'near' ? 0 : 101) + k * 7919), kind, slices(), k, b)[0]));
+    const near = () => take('near', R.takes ?? 3);
+    // mid: its own recordings, else the near take through the distance filters; far: its own, else the mid (or near) take
+    const mid = (k, r) => (own('mid') ? [take('mid', 2)[k]] : distant(midSR, r, near()[k], 'mid', { len: R.len + 1.5, roll: rolls }));
+    const far = (k, r) => {
+      if (own('far')) return recordedLaunch(farSR, r, kind, slices(), k, 'far');
+      const src = own('mid') ? take('mid', 2)[k] : near()[k];
+      return distant(farSR, r, retime(src, midSR, farSR), 'far', { len: R.len + 3, roll: { ...rolls, t1: 5 } });
+    };
+    tasks.push(
+      [g, 'near', () => near().map((x) => make([Float32Array.from(x)], midSR)), true],
+      [g, 'mid', () => [0, 1].map((k) => make(mid(k, mulberry(seed + 301 + k * 7919)), midSR)), true],
+      [g, 'far', () => [0, 1].map((k) => make(far(k, mulberry(seed + 401 + k * 7919)), farSR)), true]
+    );
+  }
+  return tasks;
+}
+
 export function bankTasks(SR, make) {
   const midSR = Math.min(SR, 32000), farSR = 16000, loopSR = Math.min(SR, 24000);
   const set = (n, seed, fn) => () => Array.from({ length: n }, (_, i) => fn(mulberry(seed + i * 7919)));
@@ -1264,6 +1557,9 @@ export class AudioEngine {
     this.lastPlay = {};
     this.used = {};
     this.bank = {};
+    this.synthBank = {}; // the synthesized banks the recordings replaced (setSynthesized)
+    this.recBank = {};
+    this.synthOnly = false;
     this.pending = [];
     this.bedEnergy = 0;
     this.combat = 0;
@@ -1395,8 +1691,28 @@ export class AudioEngine {
     if (this.idleKind) this.vehicle(this.idleKind);
   }
 
-  runTask([group, key, fn]) {
-    (this.bank[group] ||= {})[key] = fn();
+  runTask([group, key, fn, recorded]) {
+    const B = (this.bank[group] ||= {});
+    const out = fn();
+    if (!recorded) {
+      if (key === null) Object.assign(B, out);
+      else B[key] = out;
+      return;
+    }
+    // a bank from the modern recordings (recordedTasks): the synthesized one it replaces is kept for the A/B
+    if (!out) return;
+    for (const [k, v] of key === null ? Object.entries(out) : [[key, out]]) {
+      const S = (this.synthBank[group] ||= {});
+      if (!(k in S)) S[k] = B[k];
+      (this.recBank[group] ||= {})[k] = v;
+      if (!this.synthOnly) B[k] = v;
+    }
+  }
+
+  /** Hear the modern launches synthesized (true) or from their recordings (false, the default): /audio.html's A/B. */
+  setSynthesized(on) {
+    this.synthOnly = !!on;
+    for (const [g, keys] of Object.entries(on ? this.synthBank : this.recBank)) for (const [k, v] of Object.entries(keys)) if (v) this.bank[g][k] = v;
   }
 
   /**
@@ -1514,12 +1830,61 @@ export class AudioEngine {
       B.boom.huge = [make([normalize(pitch(b, 0.72), 0.95)])];
       if (dist.length) B.boom.far = dist.slice(0, 4).map((x) => make(distant(SR, rng, pitch(x, 0.8), 'far', { len: 5, roll: ROLL })));
     }
-    // the cannon's crack laid under the 57E6 booster up close
-    const cannon = cut('cannon');
-    if (cannon.length && B.launch_57E6?.near) B.launch_57E6.near = B.launch_57E6.near.map((b, i) => blend(b, cannon[i % cannon.length], 0.5));
     const brass = cut('brass');
     if (brass.length) (B.casing ||= {}).gun = brass.map((x) => make([normalize(pitch(x, 0.8), 0.9)]));
+    // the launches from their recordings (recordedTasks); without the 57E6's, the cannon's
+    // crack laid under its synthesized booster up close
+    const mono = {};
+    for (const [key, spec] of Object.entries(RECORDINGS)) {
+      const buf = this.rec[key];
+      if (!spec.role || !buf) continue;
+      const data = new Float32Array(buf.length);
+      for (let c = 0; c < buf.numberOfChannels; c++) {
+        const d = buf.getChannelData(c);
+        for (let i = 0; i < data.length; i++) data[i] += d[i] / buf.numberOfChannels;
+      }
+      mono[key] = { data, sr: buf.sampleRate };
+    }
+    const tasks = recordedTasks(SR, make, mono);
+    const cannon = cut('cannon');
+    if (cannon.length && B.launch_57E6?.near && !tasks.some((t) => t[0] === 'launch_57E6')) B.launch_57E6.near = B.launch_57E6.near.map((b, i) => blend(b, cannon[i % cannon.length], 0.5));
+    if (tasks.length) this.buildRecorded(SR, mono, tasks);
     this.recordingsInUse = Object.keys(this.rec);
+  }
+
+  /**
+   * The banks built from the modern recordings (recordedTasks): in a worker (src/audioWorker.js), each taking its
+   * synthesized bank's place as it arrives; with a given context (the tests), without workers or if the worker fails,
+   * here, one bank a tick.
+   */
+  buildRecorded(SR, mono, tasks) {
+    const local = () => {
+      const idle = !this.pending.length;
+      this.pending.push(...tasks);
+      if (this.given) while (this.pending.length) this.runTask(this.pending.shift());
+      else if (idle) this.pump();
+    };
+    if (this.given || typeof Worker === 'undefined') return local();
+    const buf = (s) => this.make(s.chans, s.sr);
+    try {
+      const w = new Worker(new URL('./audioWorker.js', import.meta.url), { type: 'module' });
+      let got = 0;
+      w.onmessage = ({ data }) => {
+        if (data.done) return w.terminate();
+        const { group, key, v } = data;
+        got++;
+        if (v) this.runTask([group, key, () => v.map(buf), true]);
+      };
+      w.onerror = (e) => {
+        e.preventDefault?.();
+        w.terminate();
+        tasks.splice(0, got); // the rest built here
+        local();
+      };
+      w.postMessage({ SR, rec: mono });
+    } catch {
+      local();
+    }
   }
 
   /**

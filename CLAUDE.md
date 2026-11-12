@@ -18,7 +18,7 @@ node tools/simtest.mjs 1 2 3 --both --quiet   # headless battles: all-auto vs a 
 node tools/simtest.mjs 1 2 3 --all --difficulty all --table   # + a scripted player with both Pantsirs; --table summary only, --log radio log, --jobs N, --era ID (default modern), --loadout KINDS|alt
 node tools/simtest.mjs 1 2 3 --era ww2 --all --table             # the WW2 era: all auto, a scripted heavy battery, the battery and the platoons
 node tools/careertest.mjs [--battles]          # the careers (src/career.js): trees, research, lineup, threat levels, saves; --battles plays a level 1 and a level 10 battle per era
-node tools/audiotest.mjs                       # renders every sound bank offline, reports levels
+node tools/audiotest.mjs                       # renders every sound bank offline, reports levels; checks the banks built from the modern recordings with stand-ins
 node tools/shot.mjs <path> <out.png> [--size WxH] [--wait ms] [--until expr] [--eval expr]   # headless capture
 node tools/menushots.mjs [kind ...]           # the main menu's stills (public/menu/<kind>.jpg): each unit firing, captured from the game; a new battle each run, so check them
 ```
@@ -61,7 +61,7 @@ Framework pieces from maxgfx keep their rules: `shaderlib.js` overrides three's 
 
 ### UI (`src/ui/`) and audio (`src/audio.js`)
 
-`Panel` reads only the data passed to `update` and talks back through `onSelect` and `onCommand(unitId, name, args)` (command table in DESIGN.md); one console per kind in `ui/consoles/`. It owns the console keys (Tab, Space, R, T, G, U, A, arrows, Q, L); main owns 1 to 5, C, V, B (the WW2 crew voices, `eras/ww2/voices.js`), F, M, H, F3, `[` and `]`. Each console has a status line under the header and a selected-track bar; a control that the AI crew would undo (slew, trigger, uncage, launch) first switches the unit to manual (`takeManual`). `AudioEngine` renders its banks at `start()` (a user gesture), lays the recordings over them when decoded, routes world sounds with travel delay and air absorption, runs threat engine loops with Doppler, the Pantsir gun loops, the Strela seeker tone and the console sounds.
+`Panel` reads only the data passed to `update` and talks back through `onSelect` and `onCommand(unitId, name, args)` (command table in DESIGN.md); one console per kind in `ui/consoles/`. It owns the console keys (Tab, Space, R, T, G, U, A, arrows, Q, L); main owns 1 to 5, C, V, B (the WW2 crew voices, `eras/ww2/voices.js`), F, M, H, F3, `[` and `]`. Each console has a status line under the header and a selected-track bar; a control that the AI crew would undo (slew, trigger, uncage, launch) first switches the unit to manual (`takeManual`). `AudioEngine` renders its banks at `start()` (a user gesture), lays the recordings over them when decoded, builds every modern launch from its recordings in a worker (`recordedTasks`, `REC_LAUNCH`, `src/audioWorker.js`; the sources and the recipe in `public/audio/CREDITS.md` and DESIGN.md; `/audio.html` has an A/B against the synthesized ones), routes world sounds with travel delay and air absorption, runs threat engine loops with Doppler, the Pantsir gun loops, the Strela seeker tone and the console sounds.
 
 ## README structure
 

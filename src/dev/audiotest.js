@@ -37,7 +37,14 @@ if (bar) {
     b.onclick = () => (audio.start(), fn());
     bar.append(b);
   };
-  for (const k of ['9M317', '9M338', '9M311', '48N6']) for (const d of [60, 1500]) btn(`launch ${k} ${d} m`, () => audio.launch(k, P(d, 0, -d / 4)));
+  // the modern launches from their recordings, or synthesized (the A/B), each near, mid and far
+  let synth = false;
+  const ab = document.createElement('button');
+  const label = () => (ab.textContent = synth ? 'A/B: SYNTHESIZED (click for recordings)' : 'A/B: RECORDINGS (click for synthesized)');
+  ab.onclick = () => (audio.start(), (synth = !synth), audio.setSynthesized(synth), label());
+  label();
+  bar.append(ab, document.createElement('br'));
+  for (const k of ['48N6', '9M96', '57E6', '9M33', '9M37', '9M317', '9M338', '9M311']) for (const d of [60, 1500, 5000]) btn(`launch ${k} ${d} m`, () => audio.launch(k, P(d, 0, -d / 4)));
   for (const sh of ['30mm', '30mm-tunguska', '23mm', '35mm']) {
     let on = false;
     btn(`gun ${sh} (toggle)`, () => audio.gun('btn-' + sh, (on = !on), P(25, 3, -10), sh));
@@ -105,6 +112,7 @@ const tick = (n) => {
   report.pending = audio.pending.length;
   report.voices = { pos: audio.posVoices, direct: audio.directVoices, inFlight: audio.inFlight.length, engines: audio.engines.filter((e) => e.id).length, guns: audio.guns.size };
   report.recordings = audio.recordingsInUse ?? null;
+  report.recorded = Object.fromEntries(Object.entries(audio.recBank).map(([g, b]) => [g, Object.keys(b)]));
   report.steps = report.steps.length;
   report.done = true;
   out.textContent = JSON.stringify(report, null, 1);

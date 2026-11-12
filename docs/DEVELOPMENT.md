@@ -34,7 +34,7 @@ These run on the dev server only.
   - `&era=ID` loads that era's lazily loaded models (and its markings and assets).
   - The rest of its options are listed at the top of `src/dev/modelviewer.js`.
 - **`/ui.html?unit=STR`:** the modern era's consoles against a mock battle (`src/ui/mock.js`). `unit` is any modern unit id (`S400`, `P1`, `P2`, `OSA`, `STR`, `BUK`, `T1`, `T2`, `TOR`, `SHK`).
-- **`/audio.html`:** a live smoke test of the audio engine.
+- **`/audio.html`:** a live smoke test of the audio engine, then buttons for every modern launch at 60, 1,500 and 5,000 m and each gun. An A/B button switches the modern launches between their recordings and the synthesized sounds.
 
 ## URL parameters for the game
 
@@ -63,7 +63,9 @@ These run on the dev server only.
 - **Speed.** `--jobs N` sets the worker threads.
 - **WW2.** With `--era ww2` the scripted players are the WW2 era's (a heavy battery player, and one who also runs the platoons) and the columns are its slots, with the heavy battery's own 2 cm guns apart (B20).
 
-**`node tools/audiotest.mjs`** renders every synthesized sound bank offline and reports levels (`--era ww2` adds the WW2 era's).
+**`node tools/careertest.mjs`** checks the careers (`src/career.js`): the research trees, research and its overflow, the lineup, the threat levels and their modifiers, unlocking and saves. `--battles` also plays a level 1 battle with the starting units and a level 10 battle with the elite lineup per era, to see that they run and pay (not a balance test).
+
+**`node tools/audiotest.mjs`** renders every synthesized sound bank offline and reports levels (`--era ww2` adds the WW2 era's). It also builds the banks made from the modern recordings. Node can't decode mp3, so noise bursts stand in where each recording's slices are. This checks the code paths and the levels, not how the recordings sound.
 
 **`node tools/shot.mjs "/?play=1&unit=1&quality=Low" shots/x.png --until "window.__iads?.state === 'playing'" --eval "window.__iads.fastForward(60)"`** makes a headless capture of the game.
 
@@ -138,6 +140,7 @@ src/
                    scope.js, tracktable.js, sightview.js, widgets.js, highlight.js (the tutorials' frames), fallback.js;
                    mock.js, mockbuktor.js, mockloadout.js for ui.html
   audio.js         audio engine: synthesized banks, recordings, threat engines, gun loops, seeker tone, music
+  audioWorker.js   builds the modern launches from their recordings (recordedTasks) off the main thread
   terrain.js       the terrain clipmap and an era's ground style; terrainHeight.js the pure height and line of sight; terrainField.js the field patchwork
   vegetation.js    trees and windbreak rows (the steppe's poplars, broadleaves, birches and bushes; the WW2 era's pines,
                    oaks, birches, shrubs and junipers, and its farmhouses, barns and churches); grass.js  grass

@@ -1,6 +1,6 @@
 // Renders every synthesized sound bank offline and reports duration, peak, RMS and problems.
 //   node tools/audiotest.mjs        (--era ww2 adds the WW2 era's banks)
-import { bankTasks, ww2Tasks } from '../src/audio.js';
+import { bankTasks, ww2Tasks, recordedTasks, RECORDINGS } from '../src/audio.js';
 
 const make = (chans, sr) => ({ chans, sr });
 const rows = [];
@@ -129,5 +129,40 @@ console.log('\nIDLES: centroid Hz, rms');
 for (const key of ['idle.v8', 'idle.genset', 'idle.trk_buk', 'idle.trk_tor', 'idle.trk_tun', 'idle.trk_shk']) {
   const b = keep[key];
   if (b) console.log(`${key.padEnd(14)} centroid ${spectrum(b).centroid.toFixed(0).padStart(5)}`);
+}
+
+// ---- the modern launches built from recordings (recordedTasks): Node cannot decode the mp3s, so noise bursts stand
+// in where each recording's slices are; this checks the code paths and the levels, not the sound of the recordings
+// (hear those on /audio.html)
+{
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const SR = 48000, rec = {};
+  for (const [key, spec] of Object.entries(RECORDINGS)) {
+    if (!spec.role) continue;
+    const end = Math.max(...spec.slices.map(([t0, len]) => t0 + len)), x = new Float32Array(Math.ceil((end + 0.5) * SR));
+    for (const [t0, len] of spec.slices) for (let i = Math.round((t0 + 0.01) * SR); i < Math.round((t0 + len) * SR); i++) x[i] += (rnd() * 2 - 1) * Math.exp(-(i / SR - t0) / Math.max(0.2, len / 3));
+    rec[key] = { data: x, sr: SR };
+  }
+  const tasks = recordedTasks(SR, make, rec);
+  let recBad = 0;
+  const groups = new Set();
+  const check = (ok, msg) => ok || (recBad++, console.log('  PROBLEM: ' + msg));
+  console.log(`\nFROM RECORDINGS (stand-ins): ${tasks.length} banks`);
+  for (const [group, key, fn] of tasks) {
+    groups.add(group);
+    const t = performance.now(), out = fn(), ms = performance.now() - t;
+    if (!check(out, `${group}.${key} built nothing`)) continue;
+    for (const [k, list] of key === null ? Object.entries(out) : [[key, out]]) for (const [i, b] of list.entries()) {
+      const x = b.chans[0];
+      let p = 0, nan = 0;
+      for (const v of x) Number.isFinite(v) ? (p = Math.max(p, Math.abs(v))) : nan++;
+      check(!nan && p <= 1.0001 && p > 0.05, `${group}.${k}[${i}] peak ${p.toFixed(2)} NaN ${nan}`);
+    }
+    if (key === 'near') console.log(`${group.padEnd(14)} ${out.length} near takes, ${(out[0].chans[0].length / out[0].sr).toFixed(1)} s, ${ms.toFixed(0)} ms`);
+  }
+  for (const g of ['launch_48N6', 'launch_9M96', 'launch_57E6', 'launch_9M33', 'launch_9M37', 'launch_9M317', 'launch_9M338', 'launch_9M311']) check(groups.has(g), `${g} is not built from recordings`);
+  console.log(recBad ? `${recBad} problems with the recorded banks` : 'every recorded bank sound');
+  bad += recBad;
 }
 console.log(`\n${bad ? bad + ' problem buffers' : 'all buffers sound'}, ${(performance.now() - t0).toFixed(0)} ms total`);

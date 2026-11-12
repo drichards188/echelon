@@ -24,9 +24,61 @@ rolling echo, is the 8.8 cm's report (close up, and through the distance filters
 single rounds over the 2 cm's; its bursts, three copies out of step, and the machine gun's bursts are the
 fighters' strafing; the distant explosions are the 8.8 cm's bursts heard from the ground.
 
-Only the Yle archive recording requires attribution: "Tykki, laukaus / Big gun, cannon, 76 mm, single
+Of these, only the Yle archive recording requires attribution: "Tykki, laukaus / Big gun, cannon, 76 mm, single
 shots, gunshots" by YleArkisto (https://freesound.org/s/332935/), licensed under CC BY 4.0. The rest are
 CC0 and credited as a courtesy.
+
+## The modern era's launches
+
+Every modern launch is built from these (`recordedTasks` and `REC_LAUNCH` in `src/audio.js`, in a worker,
+`src/audioWorker.js`). The files are excerpts cut from the soundtracks of the videos and recordings
+below: mixed to mono, high-passed at 20 Hz, some with one gain change, and re-encoded to mp3 (LAME VBR, quality 2).
+At load time they are cut into slices, pitched, filtered and layered with synthesized parts.
+
+- **Launches:** each is split where the motor lights, so a cold launch's recorded pop plays at once and its recorded
+  motor at the moment the game shows it.
+
+Without the files the synthesized sounds play.
+
+| File | Source | Author | License |
+|---|---|---|---|
+| `s400-launch-mil94169488.mp3`, `s400-flight-mil94169488.mp3` | [S-400 firing at the Ashuluk Training Ground (2020-09-15)](https://commons.wikimedia.org/?curid=94169488) | Ministry of Defence of the Russian Federation (mil.ru) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| `s400-launch-mil89106996.mp3` | [2nd Air Defense Division's S-400 SAMs firing at the Ashuluk Training Ground](https://commons.wikimedia.org/?curid=89106996) | mil.ru | CC BY 4.0 |
+| `s300-recede-mil57807729.mp3` | [S-300, all-army stage of the Keys to the Sky contest](https://commons.wikimedia.org/?curid=57807729) | mil.ru | CC BY 4.0 |
+| `tor-launch-mil163275622.mp3` | [A Tor-M1 crew of the Centre group of forces destroys a reconnaissance drone](https://commons.wikimedia.org/?curid=163275622) | mil.ru | CC BY 4.0 |
+| `tor-launch-mil163275761.mp3` | [A Tor-M2 crew covers the artillery's positions](https://commons.wikimedia.org/?curid=163275761) | mil.ru | CC BY 4.0 |
+| `buk-launch-mil145076957.mp3` | [A Buk-M1 at work](https://commons.wikimedia.org/?curid=145076957) | mil.ru | CC BY 4.0 |
+| `shtil-launch-mil116841072.mp3` | [9M317M surface-to-air missiles (3S90M Shtil, frigate Admiral Essen)](https://commons.wikimedia.org/?curid=116841072) | mil.ru | CC BY 4.0 |
+| `pantsir-launch-mil57987235.mp3` | [Pantsir-S1, third stage of the Keys to the Sky contest](https://commons.wikimedia.org/?curid=57987235) | mil.ru | CC BY 4.0 |
+| `strela10-launch-mil119124134.mp3` | [Airborne Troops air defence combat crews destroy a drone](https://commons.wikimedia.org/?curid=119124134) | mil.ru | CC BY 4.0 |
+| `stinger-launch-dvids563495.mp3` | [B-roll of SHORAD live fire at Artemis Strike](https://commons.wikimedia.org/?curid=188954773) (DVIDS 563495) | US Army, Sgt. 1st Class Jason Epperson | public domain |
+| `stinger-launch-dvids533527.mp3` | [2d LAAD Stinger live-fire](https://commons.wikimedia.org/?curid=60535549) (DVIDS 533527) | US Marine Corps, Lance Cpl. Zachary M. Ford | public domain |
+| `stinger-launch-dvids834385.mp3` | [Marines fire Stinger missiles in Norway](https://commons.wikimedia.org/?curid=147437753) (DVIDS 834385) | US Marine Corps, Adam Henke | public domain |
+| `hellfire-launch-162368.mp3` | [AGM-114 Hellfire Rocket Missile Launch](https://freesound.org/s/162368/) (from US government video) | qubodup | CC0 1.0 |
+| `hawk-launch-67544.mp3`, `hawk-launch-67545.mp3` | [MIM-23 Hawk missile launch 1](https://freesound.org/s/67544/) and [2](https://freesound.org/s/67545/) (from US government video) | qubodup | CC0 1.0 |
+| `tow-launch-67541.mp3` | [BGM-71 TOW missile launch 1](https://freesound.org/s/67541/) (from US government video) | qubodup | CC0 1.0 |
+| `tomahawk-recede-162379.mp3`, `tomahawk-recede-162380.mp3` | [Tomahawk Missile Rocket Launch 2](https://freesound.org/s/162379/) and [1](https://freesound.org/s/162380/) (from US government video) | qubodup | CC0 1.0 |
+| `hobbyrocket-roar-730041.mp3` | [hobby rocket blastoff](https://freesound.org/s/730041/) | reg7783 | CC0 1.0 |
+
+**What each one is.**
+- **S-400 (48N6, 9M96):** the S-400's own launches, cut where the motor lights. The 9M96's are pitched up.
+- **Tor:** the Tor-M1's and Tor-M2's own, over the Shtil's gas-generator thump.
+- **Buk:** the Buk-M1's own, with the Shtil's 9M317M motor laid in.
+- **Pantsir (57E6):** near, a Hellfire, the Shtil motor and a Stinger. From farther off it is the Pantsir's own.
+- **Strela-10 (9M37):** a Stinger's pop and motor, with the Strela-10's own under them.
+- **Osa (9M33):** the Hawk.
+- **Tunguska (9M311):** the Hellfire and the TOW.
+- **The motors going away:** the S-400's, the S-300's, the Tomahawks', the Tor's and the Stingers'.
+
+**Attribution (CC BY 4.0).**
+- **mil.ru:** the files marked mil.ru are excerpts from videos by the Ministry of Defence of the Russian Federation
+  (mil.ru), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Each is linked above to its
+  Wikimedia Commons page, which names the mil.ru original. They are cut, mixed to mono, filtered and re-encoded here.
+
+**The rest.**
+- The US Army and Marine Corps videos are works of the US federal government, in the public domain, and are
+  credited as a courtesy. No endorsement is implied.
+- The Freesound recordings are CC0.
 
 ## WW2 crew voices (`voice-de/`)
 
