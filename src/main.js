@@ -13,7 +13,8 @@ import { HUD } from './hud.js';
 import { ChaseCamera } from './camera.js';
 import { UNITS, DEFAULT_LOADOUT, ERA, setEra as deployEra } from './deploy.js';
 import { ERAS, eraById, loadEra } from './eras/index.js';
-import { ERA_KEY, store, migrateLoadout, canPlay, startEra, validLoadout, keptLoadout, keepLoadout, keptDifficulty, menuHref } from './choices.js';
+import { ERA_KEY, store, migrateLoadout, canPlay, startEra, validLoadout, keptLoadout, keepLoadout, keptDifficulty, menuHref, careerLevel } from './choices.js';
+import { loadCareer, saveCareer, devMode, lineupOf, hasUnits, levelSetup, parseModifiers, earn, finishLevel, unitInfo, nodeOf } from './career.js';
 import { heightAt, los, SHED_MAX } from './terrain.js';
 import { Sim } from './sim/sim.js';
 import { SYSTEMS, THREATS, MISSILES } from './sim/systems.js';
@@ -160,8 +161,21 @@ async function init() {
   // buildings and everything that flies are drawn from its state (src/render), its events drive fx,
   // sound and the HUD.
   const sim = new Sim({ heightAt, los, scene, seed: (Math.random() * 1e9) | 0 });
-  const loadout = keptLoadout(ERA, query.get('loadout'));
-  sim.newGame(lesson ? { scripted: true, loadout: lesson.loadout ?? DEFAULT_LOADOUT } : { difficulty: keptDifficulty(query), loadout });
+  // A career battle (?level=N, src/career.js): the era's career fields its lineup at that threat level (one
+  // not yet open plays the highest open one), with the modifiers the menu rolled (?mods=); every kill pays
+  // research points into the career at once. Otherwise the loadout kept at the difficulty asked.
+  const askedLevel = lesson ? null : careerLevel(query);
+  const career = askedLevel && ERA.career ? loadCareer(ERA) : null;
+  const dev = devMode();
+  let level = null;
+  let loadout = keptLoadout(ERA, query.get('loadout'));
+  if (career) {
+    const n = askedLevel;
+    level = levelSetup(ERA, n, parseModifiers(ERA, query.get('mods')));
+    loadout = lineupOf(ERA, career, dev);
+    if (!hasUnits(loadout)) loadout = lineupOf(ERA, { ...career, lineup: ERA.slots.map(() => null) }, dev);
+  }
+  sim.newGame(lesson ? { scripted: true, loadout: lesson.loadout ?? DEFAULT_LOADOUT } : { difficulty: keptDifficulty(query), loadout, level });
   const views = new UnitViews(scene, sim);
   const entities = new Entities(scene);
   // the camera anchors by unit id (rebuilt with the rigs when the loadout changes)
@@ -213,6 +227,7 @@ async function init() {
     difficulty: keptDifficulty(query),
     era: ERA.id,
     loadout,
+    level, // a career battle's threat level (career.js levelSetup), or null
     fov: 50,
     elevation: 38,
     sunBearing: 215,
@@ -248,7 +263,8 @@ async function init() {
   const SKY = { elevation: 38, sunBearing: 215, weather: 'Clear' };
   const skySet = new Set();
   const applySky = () => {
-    const sky = { ...SKY, ...(ERA.terrain?.sky ?? {}) };
+    // (a career battle's modifier may bring its own weather)
+    const sky = { ...SKY, ...(ERA.terrain?.sky ?? {}), ...(params.level?.weather ? { weather: params.level.weather } : {}) };
     for (const k of ['elevation', 'sunBearing']) if (!skySet.has(k)) params[k] = sky[k];
     if (!skySet.has('weather') && params.weather !== sky.weather) {
       params.weather = sky.weather;
@@ -487,8 +503,9 @@ async function init() {
     hud.hideEnd();
     following = false;
     chase.goalDist = 28;
-    newBattle({ difficulty: params.difficulty, loadout: params.loadout, seed: (Math.random() * 1e9) | 0 });
-    selectUnit(selected);
+    newBattle({ difficulty: params.difficulty, loadout: params.loadout, level: params.level, seed: (Math.random() * 1e9) | 0 });
+    selectUnit(Math.min(selected, UNITS.length - 1));
+    battleDone = [];
     hud.toast('Echelon', ERA.text.sub, 3000);
     hud.setScore(0);
     audio.vehicle(UNITS[selected].kind);
@@ -539,6 +556,7 @@ async function init() {
     applySky();
     params.era = era.id;
     params.loadout = keptLoadout(ERA);
+    params.level = null; // a career battle's level belongs to its era
     applyEraLook();
     panel.setTheme(ERA.theme);
     terrain.relayout(camera);
@@ -776,8 +794,22 @@ async function init() {
     fx.explosion(t.pos, t.falling ? size * 0.7 : size * 0.8, { debris: true });
     audio.explosion(t.pos, size);
     const u = sim.unitById.get(by.unitId);
-    hud.kill(`${u?.callsign ?? by.unitId}: ${KILL_NAME[t.type]}, ${WEAPON_NAME[by.weapon] ?? by.weapon}`, THREATS[t.type].points, by.unitId !== UNITS[selected].id);
+    // a career battle's feed shows the research points the kill paid
+    const pts = sim.level ? `${Math.round(THREATS[t.type].points * sim.level.pay)} RP` : THREATS[t.type].points;
+    hud.kill(`${u?.callsign ?? by.unitId}: ${KILL_NAME[t.type]}, ${WEAPON_NAME[by.weapon] ?? by.weapon}`, pts, by.unitId !== UNITS[selected]?.id);
     hud.setScore(sim.score.points);
+  };
+  // A career battle's pay goes into the career as it is earned (src/career.js), so leaving early keeps it;
+  // a unit researched with it is announced at once.
+  let battleDone = [];
+  const banked = (done) => {
+    battleDone.push(...done);
+    for (const k of done) hud.toast('Researched', `${unitInfo(ERA, k).name}: in your lineup from the next battle`, 4000);
+  };
+  ev.reward = (rp) => {
+    if (!career || state !== 'playing') return;
+    banked(earn(ERA, career, rp));
+    saveCareer(ERA, career);
   };
   ev.impact = (t, pos, victim) => {
     if (THREATS[t.type].plane || t.type === 'gpbomb' || t.type === 'rp3') {
@@ -918,15 +950,33 @@ async function init() {
     for (const w of sim.stats.waves) for (const v of Object.values(w === sim.stats.cur ? sim.stats.fired : w.fired)) n += v;
     return n;
   };
+  // the end card's career lines: the level, the pay (kills and the victory bonus), the research and what it
+  // researched this battle
+  const careerEnd = (won) => {
+    if (!career || !sim.level) return [];
+    const before = career.earned;
+    banked(finishLevel(ERA, career, sim.level.n, won));
+    saveCareer(ERA, career);
+    const bonus = career.earned - before;
+    const t = career.target && nodeOf(ERA, career.target);
+    return [
+      ['Research points', `+${(sim.rp + bonus).toLocaleString('en-US')}`, bonus ? `${bonus.toLocaleString('en-US')} for the victory` : ''],
+      t ? ['Researching', unitInfo(ERA, t.kind).name, `${(career.progress[t.kind] ?? 0).toLocaleString('en-US')} / ${t.cost.toLocaleString('en-US')} RP`] : ['Research', 'Tree complete'],
+      ...(battleDone.length ? [['Researched', battleDone.map((k) => unitInfo(ERA, k).name).join(', ')]] : []),
+    ];
+  };
   const endGame = (s) => {
     state = 'ended';
     const sc = sim.score;
+    const n = sim.raids.length;
+    const lv = sim.level ? `Threat level ${sim.level.n}, ${sim.level.name}: ` : '';
     hud.showEnd(
       {
         title: s === 'victory' ? ERA.text.victory : ERA.text.defeat,
-        sub: s === 'victory' ? `All ${ERA.waves.length} raids beaten off.` : `Overrun in wave ${sim.wave} of ${ERA.waves.length}.`,
+        sub: lv + (s === 'victory' ? (n > 1 ? `all ${n} raids beaten off.` : 'the raid beaten off.') : `overrun in wave ${sim.wave} of ${n}.`).replace(/^./, (c) => (lv ? c : c.toUpperCase())),
         victory: s === 'victory',
         stats: [
+          ...careerEnd(s === 'victory'),
           ['Score', sc.points.toLocaleString('en-US')],
           ['Kills', sc.kills],
           ['Leakers', sc.leaks],
@@ -1157,7 +1207,7 @@ async function init() {
     tutorial,
     renderer, scene, camera, terrain, atmosphere, post, fx, hud, chase, params, frame, clouds, weather, eyes,
     sim, views, entities, panel, audio, sight, voices, // (voices: the WW2 crew voices, null in other eras; voices.log lists every line)
-    select: selectUnit, start, setTimeScale, setLoadout, setEra, eras: ERAS,
+    select: selectUnit, start, setTimeScale, setLoadout, setEra, eras: ERAS, career, // (career: a career battle's, else null)
     // headless tests: stop the loop, run `seconds` of battle without drawing, then draw a few frames
     fastForward(seconds, { unit = null, scale = 8, settle = 6 } = {}) {
       renderer.setAnimationLoop(null);

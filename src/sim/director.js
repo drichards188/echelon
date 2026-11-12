@@ -3,7 +3,8 @@ import { THREATS } from './systems.js';
 
 // The battle: the era in play's waves (eras/<era>.js `waves`: groups of threats with their bearing
 // offset from the threat axis, spawn range, delay and what they go for), lulls between them, win and loss.
-// WAVES is deploy.js's live binding, exported here as before.
+// WAVES is deploy.js's live binding, exported here as before. The battle runs `sim.raids`: WAVES, or a
+// career threat level's own raids (src/career.js levelSetup).
 export { WAVES };
 
 const BRIEF = 15;
@@ -35,7 +36,7 @@ export class Director {
 
   startWave() {
     const sim = this.sim;
-    const w = WAVES[this.wave];
+    const w = sim.raids[this.wave];
     sim.wave = this.wave + 1;
     sim.stats.beginWave(sim.wave);
     // later waves come from a wider arc
@@ -74,7 +75,7 @@ export class Director {
           !((t.type === 'fighter' || t.type === 'helo' || THREATS[t.type].plane) && (t.phase === 'egress' || t.phase === 'straggle')));
         if (!this.pending.length && !busy && this.t > 10) {
           sim.stats.endWave();
-          if (this.wave + 1 >= WAVES.length) {
+          if (this.wave + 1 >= sim.raids.length) {
             if (sim.attract) {
               // the demonstration battle starts over, with the supply column up
               this.wave = 0;

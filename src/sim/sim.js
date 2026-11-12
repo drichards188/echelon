@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ERA, ASSETS, partPlacements, setLoadout, setEra } from '../deploy.js';
+import { ERA, ASSETS, WAVES, partPlacements, setLoadout, setEra } from '../deploy.js';
 import { mulberry32 } from '../noise.js';
 import { Ballistics, SHELLS } from '../ballistics.js';
 import { THREATS, MISSILES, DIFFICULTY, SYSTEMS } from './systems.js';
@@ -79,14 +79,20 @@ export class Sim {
   // threatAI.spawnOne), nothing is damaged or lost, the launchers start erected and interceptors hit
   // reliably so a lesson never stalls on bad luck. era: the era id (deploy.js setEra; a new era starts
   // on its default loadout); loadout: one kind per slot (deploy.js setLoadout); without them the era
-  // and the units in deploy.js as they are.
-  newGame({ difficulty = 'Normal', attract = false, scripted = false, seed = this.seed, loadout = null, era = null } = {}) {
+  // and the units in deploy.js as they are. level: a career battle's threat level (src/career.js
+  // levelSetup: its raids, difficulty, visibility and pay); every kill then pays research points
+  // (`sim.rp`, the `reward` event). Without one the battle is the era's waves at `difficulty`.
+  newGame({ difficulty = 'Normal', attract = false, scripted = false, seed = this.seed, loadout = null, era = null, level = null } = {}) {
     if (era) setEra(era);
     if (loadout) setLoadout(loadout);
     this.era = ERA.id;
     this.rng = mulberry32(seed);
-    this.difficultyName = difficulty;
-    this.difficulty = DIFFICULTY[difficulty] ?? DIFFICULTY.Normal;
+    this.level = level;
+    this.raids = level?.raids ?? WAVES;
+    this.rp = 0;
+    this.visibility = level?.visibility ?? 1;
+    this.difficultyName = level ? `Threat level ${level.n}` : difficulty;
+    this.difficulty = level?.difficulty ?? DIFFICULTY[difficulty] ?? DIFFICULTY.Normal;
     if (scripted) this.difficulty = { ...this.difficulty, hit: 2.5, damage: 0 };
     this.attract = attract;
     this.scripted = scripted;
@@ -310,6 +316,12 @@ export class Sim {
     if (!this.attract && !this.scripted && this.state !== 'victory' && this.state !== 'defeat') {
       this.score.points += def.points;
       this.score.kills++;
+      // a career battle pays research points for every kill, as it happens
+      if (this.level && def.points > 0) {
+        const rp = Math.round(def.points * this.level.pay);
+        this.rp += rp;
+        this.events.reward?.(rp, t, by);
+      }
     }
     this.stats.add('kills', `${by.unitId}:${by.weapon}`);
     this.events.threatKilled?.(t, by);

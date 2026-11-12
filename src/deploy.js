@@ -45,23 +45,29 @@ export let WAVES = ERA.waves;
 // the kind picked for each slot; the first option of every slot
 export let DEFAULT_LOADOUT = ERA.defaultLoadout;
 
+// a loadout entry for a site left empty (a career's lineup may leave sites empty, src/career.js)
+export const EMPTY = 'none';
+
 /**
  * Unit definitions for a loadout (one kind per slot; a missing, null or empty entry takes the slot's
- * default).
+ * default; EMPTY leaves the slot without a unit, so the units are then fewer than the slots and
+ * `slot` says which site each fills).
  * Throws on a kind the slot does not offer. Returns fresh objects: { id, kind, name, callsign, slot,
  * x, z, bearing, parts: [{ kind, dx, dz }] }.
  */
 export function buildUnits(loadout = DEFAULT_LOADOUT) {
-  return SLOT_OPTIONS.map((opts, slot) => {
+  return SLOT_OPTIONS.flatMap((opts, slot) => {
+    if (loadout[slot] === EMPTY) return [];
     const kind = loadout[slot] || opts[0].kind;
     const o = opts.find((x) => x.kind === kind);
     if (!o) throw new Error(`slot ${slot} has no option '${kind}' (${opts.map((x) => x.kind).join(', ')})`);
-    return { ...o, slot, ...SITES[slot], parts: o.parts.map((p) => ({ ...p })) };
+    return [{ ...o, slot, ...SITES[slot], parts: o.parts.map((p) => ({ ...p })) }];
   });
 }
 
-// The units in play and their kinds. Both arrays are changed in place by setLoadout, so modules that
-// import them see the new loadout; they must not keep anything derived from them at import time.
+// The units in play and their kinds (LOADOUT one per slot, EMPTY for a slot without a unit). Both arrays
+// are changed in place by setLoadout, so modules that import them see the new loadout; they must not keep
+// anything derived from them at import time.
 export const UNITS = buildUnits();
 export const LOADOUT = [...DEFAULT_LOADOUT];
 
@@ -71,7 +77,7 @@ export function setLoadout(loadout = DEFAULT_LOADOUT) {
   UNITS.length = 0;
   UNITS.push(...next);
   LOADOUT.length = 0;
-  LOADOUT.push(...next.map((u) => u.kind));
+  LOADOUT.push(...SLOT_OPTIONS.map((_, slot) => next.find((u) => u.slot === slot)?.kind ?? EMPTY));
   return UNITS;
 }
 

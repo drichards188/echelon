@@ -227,6 +227,54 @@ export default {
     'CP DOWN': ['КП ПОРАЖЁН', 'COMMAND POST OUT: NO LINK', 2],
   },
 
+  // The career (src/career.js, DESIGN.md "Career"): the research tree in columns by type, the threat levels
+  // of the career battle and their modifiers. A career owns the `start` kinds; every other unit is researched
+  // in its column's order (`after`) with research points. Level 1 is for the starting units, level 10 for the
+  // whole elite lineup (the last unit of every column). Level fields: waves (indices into `waves`), base (the
+  // DIFFICULTY row for hit, damage and aim), enemy and air (the raids' size, as DIFFICULTY's), pay (RP x),
+  // mods (modifiers rolled for a battle). The values are first guesses, not yet balanced.
+  career: {
+    start: ['osa', 'strela'],
+    columns: [
+      { id: 'area', name: 'Area defense' },
+      { id: 'point', name: 'Point defense' },
+      { id: 'short', name: 'Short range' },
+      { id: 'vshorad', name: 'Very short range' },
+    ],
+    tree: [
+      { kind: 'buk', column: 'area', rank: 3, after: null, cost: 2500 },
+      { kind: 's400', column: 'area', rank: 4, after: 'buk', cost: 6000 },
+      { kind: 'tunguska', column: 'point', rank: 2, after: null, cost: 900 },
+      { kind: 'pantsir', column: 'point', rank: 3, after: 'tunguska', cost: 3000 },
+      { kind: 'osa', column: 'short', rank: 1, after: null, cost: 0 },
+      { kind: 'tor', column: 'short', rank: 2, after: 'osa', cost: 1200 },
+      { kind: 'strela', column: 'vshorad', rank: 1, after: null, cost: 0 },
+      { kind: 'shilka', column: 'vshorad', rank: 1, after: 'strela', cost: 500 },
+      { kind: 'gepard', column: 'vshorad', rank: 2, after: 'shilka', cost: 1500 },
+    ],
+    levels: [
+      { n: 1, name: 'Quiet sector', fits: 'Osa-AKM and Strela-10M3', sub: 'One raid of drones, low and slow.', waves: [0], base: 'Easy', enemy: 0.5, air: 0.5, pay: 1, mods: 0 },
+      { n: 2, name: 'Drone nights', fits: 'Osa, Shilka-M4 and a Tunguska', sub: 'Drones, then cruise missiles on the deck.', waves: [0, 1], base: 'Easy', enemy: 0.6, air: 0.6, pay: 1.25, mods: 0 },
+      { n: 3, name: 'Suppression', fits: 'Tor, Shilka and two Tunguskas', sub: 'Su-34s come for your radars.', waves: [0, 1, 2], base: 'Easy', enemy: 0.7, air: 0.7, pay: 1.5, mods: 0 },
+      { n: 4, name: 'Standoff', fits: 'Buk-M2, two Tunguskas, Tor and Gepard', sub: 'Glide bombs from beyond the short-range units.', waves: [0, 1, 2, 3], base: 'Normal', enemy: 0.8, air: 0.8, pay: 1.75, mods: 0 },
+      { n: 5, name: 'Helicopter hunt', fits: 'Buk-M2, a Pantsir and a Tunguska, Tor and Gepard', sub: 'Ka-52s hunt the short-range units.', waves: [0, 1, 2, 3, 4], base: 'Normal', enemy: 0.9, air: 0.9, pay: 2, mods: 1 },
+      { n: 6, name: 'Ballistic threat', fits: 'S-400, a Pantsir and a Tunguska, Tor and Gepard', sub: 'Iskander-M missiles join the raids.', waves: [0, 1, 2, 3, 4, 5], base: 'Normal', enemy: 1, air: 1, pay: 2.25, mods: 1 },
+      { n: 7, name: 'Full raid', fits: 'S-400, two Pantsirs, Tor and Gepard', sub: 'All seven raids, at the strength of a Normal battle.', waves: [0, 1, 2, 3, 4, 5, 6], base: 'Normal', enemy: 1.15, air: 1, pay: 2.5, mods: 1 },
+      { n: 8, name: 'Saturation', fits: 'The elite lineup', sub: 'Bigger raids, sharper attackers, two modifiers.', waves: [0, 1, 2, 3, 4, 5, 6], base: 'Hard', enemy: 1.3, air: 1.1, pay: 3, mods: 2 },
+      { n: 9, name: 'Hard pressed', fits: 'The elite lineup, well handled', sub: 'The strength of a Hard battle, two modifiers.', waves: [0, 1, 2, 3, 4, 5, 6], base: 'Hard', enemy: 1.45, air: 1.2, pay: 3.5, mods: 2 },
+      { n: 10, name: 'Total war', fits: 'The elite lineup at its best', sub: 'Everything they have, with nothing to spare.', waves: [0, 1, 2, 3, 4, 5, 6], base: 'Hard', enemy: 1.6, air: 1.35, pay: 4, mods: 2 },
+    ],
+    // rolled for a battle from level 5 (one) and level 8 (two). `count` multiplies the raids' size, `flank`
+    // turns every other group of a raid by that many degrees off the threat axis, `add` puts a group into
+    // every raid from the second, `visibility` is sim.visibility and `weather` the page's weather preset.
+    modifiers: [
+      { id: 'massed', name: 'Massed raids', line: 'A third more of everything in every raid.', count: 1.33 },
+      { id: 'flank', name: 'Second axis', line: 'Half of every raid swings in from the north.', flank: 90 },
+      { id: 'sead', name: 'SEAD escort', line: 'Su-34s with anti-radar missiles join every raid from the second.', add: { type: 'fighter', count: 2, bearing: 12, range: 85000, spread: 10, delay: 30, role: 'sead', weapons: 2, target: 'assets' } },
+      { id: 'cloud', name: 'Low cloud', line: 'Rain and low cloud: the optical sights see less far.', visibility: 0.55, weather: 'Rain' },
+    ],
+  },
+
   // the lessons on the Tutorials list (tutorial.js TUTORIALS ids), in order
   tutorials: ['basics', 's400', 'pantsir', 'osa', 'strela', 'buk', 'tunguska', 'tor', 'shilka', 'gepard'],
 };

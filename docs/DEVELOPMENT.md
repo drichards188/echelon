@@ -95,10 +95,12 @@ vite.config.js     the dev server on port 5200
 public/audio/      the recordings and CREDITS.md
 public/menu/       the main menu's stills, one per unit kind (tools/menushots.mjs)
 docs/              the README's screenshot and these pages (PLAYING, MODELLED, HISTORY, DEVELOPMENT)
-tools/             simtest.mjs, audiotest.mjs, shot.mjs, menushots.mjs
+tools/             simtest.mjs, careertest.mjs, audiotest.mjs, shot.mjs, menushots.mjs
 src/
   boot.js          the page's entry: the WebGL check (ui/gpu.js), then the main menu, or a game page (?play=1, ?tutorial=ID) that loads main.js
   choices.js       the era, loadout and difficulty kept between the menu and the game, and the URLs between them
+  career.js        the careers: research, the lineup, the threat levels and their modifiers (the trees and levels are in each era's `career`)
+  parade.js        the menu's parade as data: the line's order, the crews, each unit's display of munitions (Node-safe)
   main.js          a game page: renderer, quality presets, settings, game flow, event wiring, main loop
   style.css        the page, the main menu, the loading card, the HUD and the tutorial card
   eras/            one module per era: map layout, slots and options, raids, text, alert captions, theme

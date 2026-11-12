@@ -79,9 +79,15 @@ const href = (p, from) => {
   const s = p.toString();
   return s ? `${location.pathname}?${s}` : location.pathname;
 };
-// A game page: a battle in `era` at `difficulty`, or the lesson `tutorial`. The loadout is the one kept.
-export const gameHref = ({ era, difficulty, tutorial = null }, from) =>
-  href(new URLSearchParams(tutorial ? { tutorial, era } : { play: '1', era, difficulty }), from);
+// A game page: a battle in `era` at `difficulty`, a career battle at threat `level` with its modifiers `mods`
+// (src/career.js; the lineup is the career's), or the lesson `tutorial`. A battle's loadout is the one kept.
+export const gameHref = ({ era, difficulty, tutorial = null, level = null, mods = [] }, from) =>
+  href(new URLSearchParams(tutorial ? { tutorial, era } : level ? { play: '1', era, level, ...(mods.length ? { mods: mods.join(',') } : {}) } : { play: '1', era, difficulty }), from);
+// a career battle's threat level, from its page's URL (?level=N), or null
+export const careerLevel = (q) => (q.get('play') && Number(q.get('level')) >= 1 ? Number(q.get('level')) | 0 : null);
+// the menu's mode: the career, or a quick battle with a free loadout at a difficulty
+export const MODE_KEY = 'echelon.mode';
+export const keptMode = () => (stored(MODE_KEY) === 'battle' ? 'battle' : 'career');
 // back to the menu from a game: its era, and the tutorial list open when `lessons`
 export const menuHref = (q, { era = null, lessons = false } = {}) => {
   const p = new URLSearchParams();

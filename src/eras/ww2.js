@@ -287,6 +287,42 @@ export default {
   // the lessons on the Tutorials list (tutorial.js): the heavy battery, the flak tower, then one per platoon kind
   tutorials: ['flak88', 'flakturm', 'flak43', 'flakvierling', 'flak38'],
 
+  // The career (src/career.js; fields as the modern era's): one gun platoon to start, the flak tower at the top
+  // of the heavy column. The values are first guesses, not yet balanced.
+  career: {
+    start: ['flak38'],
+    columns: [
+      { id: 'heavy', name: 'Heavy flak' },
+      { id: 'medium', name: 'Medium flak' },
+      { id: 'light', name: 'Light flak' },
+    ],
+    tree: [
+      { kind: 'flak88', column: 'heavy', rank: 3, after: null, cost: 2000 },
+      { kind: 'flakturm', column: 'heavy', rank: 4, after: 'flak88', cost: 5000 },
+      { kind: 'flak43', column: 'medium', rank: 2, after: null, cost: 800 },
+      { kind: 'flak38', column: 'light', rank: 1, after: null, cost: 0 },
+      { kind: 'flakvierling', column: 'light', rank: 2, after: 'flak38', cost: 500 },
+    ],
+    levels: [
+      { n: 1, name: 'Quiet morning', fits: 'A 2 cm Flak 38 platoon', sub: 'A photo aircraft and a sweep of Mustangs.', waves: [0], base: 'Easy', enemy: 0.5, air: 0.5, pay: 1, mods: 0 },
+      { n: 2, name: 'Jabo weather', fits: 'Flak 38 and a 3.7 cm platoon', sub: 'Thunderbolts dive on the flak.', waves: [0, 1], base: 'Easy', enemy: 0.6, air: 0.6, pay: 1.25, mods: 0 },
+      { n: 3, name: 'Rocket Typhoons', fits: 'Flak 38, two 3.7 cm platoons and the Vierlinge', sub: 'Typhoons with rockets, Tempests strafing.', waves: [0, 1, 2], base: 'Easy', enemy: 0.7, air: 0.7, pay: 1.5, mods: 0 },
+      { n: 4, name: 'Invaders', fits: 'The 8.8 cm battery and the light platoons', sub: 'Medium bombers in boxes, with Window.', waves: [0, 1, 2, 3], base: 'Normal', enemy: 0.8, air: 0.8, pay: 1.75, mods: 0 },
+      { n: 5, name: 'Fortresses', fits: 'The 8.8 cm battery and every platoon', sub: 'B-17s at 7 km behind the fighter-bombers.', waves: [0, 1, 2, 3, 4], base: 'Normal', enemy: 0.9, air: 0.9, pay: 2, mods: 1 },
+      { n: 6, name: 'The Rhine crossing', fits: 'The 8.8 cm battery and every platoon', sub: 'All six raids, lighter than a Normal battle.', waves: [0, 1, 2, 3, 4, 5], base: 'Normal', enemy: 1, air: 1, pay: 2.25, mods: 1 },
+      { n: 7, name: 'Every air force', fits: 'The battery, the platoons and the flak tower', sub: 'All six raids, at the strength of a Normal battle.', waves: [0, 1, 2, 3, 4, 5], base: 'Normal', enemy: 1.15, air: 1, pay: 2.5, mods: 1 },
+      { n: 8, name: 'Bomber stream', fits: 'The elite lineup', sub: 'Bigger raids, sharper bomb aimers, two modifiers.', waves: [0, 1, 2, 3, 4, 5], base: 'Hard', enemy: 1.3, air: 1.1, pay: 3, mods: 2 },
+      { n: 9, name: 'Thousand-plane day', fits: 'The elite lineup, well handled', sub: 'The strength of a Hard battle, two modifiers.', waves: [0, 1, 2, 3, 4, 5], base: 'Hard', enemy: 1.45, air: 1.2, pay: 3.5, mods: 2 },
+      { n: 10, name: 'Götterdämmerung', fits: 'The elite lineup at its best', sub: 'Everything they have, with nothing to spare.', waves: [0, 1, 2, 3, 4, 5], base: 'Hard', enemy: 1.6, air: 1.35, pay: 4, mods: 2 },
+    ],
+    modifiers: [
+      { id: 'massed', name: 'Massed raids', line: 'A third more aircraft in every raid.', count: 1.33 },
+      { id: 'flank', name: 'Second axis', line: 'Half of every raid comes in from the north.', flank: 90 },
+      { id: 'jabo', name: 'Jabo hunt', line: 'A flight of Thunderbolts dives on the flak in every raid from the second.', add: { type: 'p47', count: 4, bearing: -20, range: 26000, spread: 8, delay: 45, alt: 2500, dive: 55, release: 750, target: 'flak' } },
+      { id: 'cloud', name: 'Low cloud', line: 'Rain and low cloud: the observers and the sights see less far.', visibility: 0.55, weather: 'Rain' },
+    ],
+  },
+
   // its models, consoles and reload scenes, fetched only when the era is picked (eras/index.js loadEra)
   content: () => import('./ww2/content.js'),
 };

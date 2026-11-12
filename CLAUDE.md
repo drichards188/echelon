@@ -17,6 +17,7 @@ npm run build    # production bundle in dist/
 node tools/simtest.mjs 1 2 3 --both --quiet   # headless battles: all-auto vs a scripted S-400 player
 node tools/simtest.mjs 1 2 3 --all --difficulty all --table   # + a scripted player with both Pantsirs; --table summary only, --log radio log, --jobs N, --era ID (default modern), --loadout KINDS|alt
 node tools/simtest.mjs 1 2 3 --era ww2 --all --table             # the WW2 era: all auto, a scripted heavy battery, the battery and the platoons
+node tools/careertest.mjs [--battles]          # the careers (src/career.js): trees, research, lineup, threat levels, saves; --battles plays a level 1 and a level 10 battle per era
 node tools/audiotest.mjs                       # renders every sound bank offline, reports levels
 node tools/shot.mjs <path> <out.png> [--size WxH] [--wait ms] [--until expr] [--eval expr]   # headless capture
 node tools/menushots.mjs [kind ...]           # the main menu's stills (public/menu/<kind>.jpg): each unit firing, captured from the game; a new battle each run, so check them

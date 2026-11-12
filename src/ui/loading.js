@@ -1,5 +1,6 @@
 import { eraById } from '../eras/index.js';
-import { startEra, keptLoadout, keptDifficulty, menuHref, optionById } from '../choices.js';
+import { startEra, keptLoadout, keptDifficulty, menuHref, optionById, careerLevel } from '../choices.js';
+import { loadCareer, devMode, lineupOf, levelOf, parseModifiers, modifierOf, EMPTY } from '../career.js';
 import { backdrop } from './backdrop.js';
 
 // A game page's loading screen: what is being started (a battle: its era, difficulty and units; or a
@@ -33,8 +34,29 @@ export function showLoading(q, root = document.getElementById('loading')) {
     }, () => {});
     return;
   }
-  const loadout = keptLoadout(era, q.get('loadout'));
   const unit = Number(q.get('unit') ?? 0);
+  // a career battle: its threat level, the career's lineup and the modifiers rolled for it
+  const n = era.career ? careerLevel(q) : null;
+  if (n) {
+    const career = loadCareer(era);
+    const lv = levelOf(era, n);
+    const lineup = lineupOf(era, career, devMode());
+    $('.ld-kicker').textContent = `Career · ${era.name}, ${era.years}`;
+    $('.ld-diff').textContent = `Threat level ${lv.n}`;
+    $('.ld-title').textContent = lv.name;
+    $('.ld-blurb').textContent = `${lv.sub} ${era.text.setting ?? ''}`;
+    $('.ld-lines').replaceChildren(
+      ...era.slots.flatMap((s, i) => {
+        const o = s.options.find((x) => x.kind === lineup[i]);
+        return lineup[i] === EMPTY || !o ? [] : [line(`${i + 1}  ${s.cls}: ${o.name}`)];
+      }),
+      ...parseModifiers(era, q.get('mods')).map((id) => line(`Modifier: ${modifierOf(era, id).name}. ${modifierOf(era, id).line}`))
+    );
+    const fielded = lineup.filter((k) => k !== EMPTY);
+    still([fielded[unit] ?? fielded[0]]);
+    return;
+  }
+  const loadout = keptLoadout(era, q.get('loadout'));
   $('.ld-kicker').textContent = `Battle · ${era.name}, ${era.years}`;
   $('.ld-diff').textContent = keptDifficulty(q);
   $('.ld-title').textContent = era.text.sub;

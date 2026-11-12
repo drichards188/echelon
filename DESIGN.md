@@ -1388,6 +1388,52 @@ repaired between raids (one unbroken box levelled 700); four Thunderbolts at the
 out its guns before the bombers came); the fighters weaving inbound (straight and level they lost 7 a wave to
 the 8.8 cm); Hard's `aim` 1.5 (at 1.3 the scripted battery still won 21 of 48).
 
+### Career (`src/career.js`, the eras' `career`)
+
+One career per era, as War Thunder's nations. An era's `career` (eras/modern.js, eras/ww2.js; plain data) holds:
+
+```js
+career: {
+  start: ['osa', 'strela'],                       // the units a new career owns (cost 0 in the tree)
+  columns: [{ id: 'area', name: 'Area defense' }, ...],   // the research tree's columns, one per type, left to right
+  tree: [{ kind, column, rank, after, cost }],    // every slot option of the era once; `after` the unit before it in
+                                                  // its column (null: open from the start), `cost` in RP, `rank` I to IV
+  levels: [{ n, name, fits, sub, waves, base, enemy, air, pay, mods }],   // the ten threat levels
+  modifiers: [{ id, name, line, count?, flank?, add?, visibility?, weather? }],
+}
+```
+
+- **Research.** A career battle pays research points (RP) for every kill as it happens (`THREATS[type].points` times
+  the level's `pay`; the sim's `reward(rp, t, by)` event, `sim.rp`), and `WIN_RP` (300) times `pay` for a victory.
+  The RP go to `target`; a unit done is owned, and the rest goes on to the next in its column, else the open unit
+  with the least to go. A unit is open when the one before it in its column is owned. Leaks cost score, never RP.
+- **Lineup.** One entry per slot: a kind the slot offers and the career owns, `EMPTY` ('none', a site left
+  empty), or null (the best owned there: the highest rank). `lineupOf(era, c, dev)` resolves it for the battle;
+  at least one site must field a unit. Sites keep the era's slot options: the tree decides only what is owned.
+- **Threat levels** replace the difficulty in a career battle. Level 1 is built for the starting units, level 10
+  for the elite lineup (the last unit of every column). A level names the era's `waves` it plays (indices), the
+  `DIFFICULTY` row for hit, damage and aim (`base`), the raid sizes (`enemy`, `air`, as DIFFICULTY's) and the
+  modifiers to roll (`mods`: 0, 1 from level 5, 2 from level 8). `levelSetup(era, n, mods)` gives the sim its
+  `{ n, name, pay, mods, raids, difficulty, visibility, weather }`: the raids are copies of the era's waves with
+  the modifiers applied (`count` multiplies `enemy` and `air`, `flank` turns every other group by that many
+  degrees, `add` puts a group into every raid from the second, `visibility` sets `sim.visibility`, `weather`
+  the page's weather). Every level is open from the start (`levelOpen`); `finishLevel` records the highest
+  reached (`unlocked`) and pays the victory bonus; leaving early keeps the RP earned. The values are first guesses: not balanced yet.
+- **Sim.** `sim.newGame({ level, loadout })` runs `level.raids` (`sim.raids`; the director reads it) at
+  `level.difficulty`; without a level `sim.raids` is the era's `WAVES` and nothing changes (the simtest output is
+  identical). A loadout entry `EMPTY` (deploy.js) leaves that slot without a unit: `UNITS` and `sim.units` are
+  then fewer than the slots, `unit.slot` names the site and `unit.index` the place in `sim.units` (the number
+  keys follow it).
+- **Pages.** A career battle is `?play=1&era=<id>&level=<n>&mods=<ids>` (`choices.js` `gameHref`, `careerLevel`):
+  main.js loads the career, fields `lineupOf` at `levelSetup`,
+  banks each `reward` into the career at once and puts the career's lines on the end card.
+- **Storage.** `echelon.career.<era>` (`{ v: 1, owned, progress, target, lineup, unlocked, level, battles,
+  earned }`; another version starts over) and `echelon.career.dev` (dev mode: every unit owned for the lineup,
+  the career going on underneath).
+- **Tests.** `node tools/careertest.mjs [--battles]` checks the trees, research, the lineup, the levels and their
+  modifiers, unlocking and saves; `--battles` plays a level 1 battle with the starting units and a level 10
+  battle with the elite lineup per era, to see that they run and pay.
+
 ### Pages: the main menu and a game (`src/boot.js`, `src/choices.js`, `src/ui/menu.js`, `src/ui/loading.js`)
 
 `index.html` boots `src/boot.js`. A URL with `play` (a battle) or `tutorial=<id>` (a lesson) is a game
@@ -1601,3 +1647,4 @@ Reuse the maxgfx engine core (distance delay, air absorption, voice stealing, re
 - Modern attackers are Russian types (refs/threats-ru): `models/threats.js` builds `fighter` as the Su-34 (Kh-31P under the wings, UMPK glide bombs under the nacelles, Khibiny wingtip pods, red stars), `decoy` the Kh-55 flown with ballast, `cruise` the Kh-101, `drone` the Geran-2 in black, `arm` the Kh-31P, `glide` a FAB-500 with the UMPK kit, `helo` the Ka-52 (two coaxial rotors), `tbm` the Iskander-M's 9M723, `atgm` the Vikhr; new helpers `hull` (a smooth hull through cross-sections), `kh31`, `umpk`, `starPts`. A spinning part may carry `dir: -1` (turns the other way; `render/entities.js`). THREATS carry `name` for the modern types too; the kill call reads it (`sim.js`), the kill toasts name the types (main.js `KILL_NAME`), and the modern waves carry their own `radio` call (the default lower-cases the subtitle, type names included). Sim values unchanged: modern and WW2 simtest identical but for the names in the radio log.
 - Loadout: the Flakpanzer Gepard (`gepard`, unit id 'GEP', callsign Cheetah) is a third option in slot 5 (see "Loadout"): SYSTEMS `gepard` (guns only, `eoFallback`), SHELLS `'35mm'` (id 6), the model `src/models/v/gepard.js` on the new Leopard 1 chassis `src/models/v/leopard1.js` (refs/gepard; rig: `turret`, `elevation` with both external gun mounts, `searchRadar` on its arm at the turret rear (`setDeploy` raises the arm and turns the antenna round from its face-down stowage), `trackRadar` the head between the guns, rotation.x only; two `muzzles` [left, right] at x -+1.42; `sight` the gunner's periscope), CAMO `'nato'` (the Bundeswehr three-tone), markings `gepard`, render `UnitViews.gepard`, main `SHELL`/`FLASH`/`BRASS` entries (natural sight picture, not TV), audio `'35mm'` (bank `gun_35`, 1100 rounds/min) and idle `trk_gep`, the console `ui/consoles/gepard.js` in German (shared pieces gain a language: `Header(kindRu, kindEn, { lang, alerts })`, `SelBar(lang)`, `setTrigger(..., lang)`, `MODE_ITEMS_DE`, `TrackTable`'s `heads` and `none`, `SightView`'s `legend`; Russian stays the default), the lesson 'gepard', the menu still `public/menu/gepard.jpg`. No reload scene: the supply column refills its rounds at the end of a raid. Default loadout and WW2 simtest unchanged.
 - Crew voices (WW2): `src/eras/ww2/voices.js` and `voices.css` (page code, read-only on the sim), 53 German clips in `public/audio/voice-de/` copied from Drumfire (credits in `public/audio/CREDITS.md`). Main builds `CrewVoices` only when the page opens in the WW2 era, decodes the clips behind the loading screen ("Briefing the crews"), chains it onto `sim.events` (`wave`, `state`, `salvo`, `muzzle`, `feed`, `partDestroyed`, `unitDamaged`, `strafe`, `threatLaunch`) after its own handlers, calls `update(sim)` before `audio.update`; key B and the panel's VOICES button (`#voice-btn`, localStorage `echelon.voices`); `__iads.voices.log` lists every line spoken. The selected unit's crew speaks: the air raid warning, cover from bombs, rockets and strafing, casualties, a gun knocked out, the battery's new target, first salvo, barrage (with the rounds a gun will fire in it), range-source change, single shot, guns ready after a fight and the voiced gun's loading calls, a platoon opening fire (Erster or Zweiter Zug, else the gun), HOLD, and the Abteilung on the telephone at the raid's end.
+- Career: one per era (`src/career.js`, the eras' `career`: a research tree in columns by type, ten threat levels with modifiers; see "Career"). `sim.newGame({ level })` runs `sim.raids` (the director reads it instead of WAVES) at the level's difficulty and pays RP per kill (`sim.rp`, event `reward(rp, t, by)`); a loadout entry `EMPTY` ('none', deploy.js) leaves a slot without a unit, so `sim.units` may be fewer than the slots. Without a level nothing changes. Menu modes Career and Quick battle (`echelon.mode`); `?level=N&mods=` on a battle page; `tools/careertest.mjs`.
