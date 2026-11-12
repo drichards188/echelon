@@ -11,7 +11,8 @@
 - **Modern era:** an S-400 battalion for the long range, two Pantsir-S1 for point defense, an Osa-AKM and a Strela-10M3 for short range, against seven Russian raids: Geran-2 drones, Kh-101 cruise missiles, Su-34s, decoys, Ka-52 helicopters and Iskander-M ballistic missiles.
 - **WW2 era:** an 8.8 cm battery, two 3.7 cm platoons, 2 cm Flakvierlinge and a what-if flak tower, against six day raids, from a Spitfire photo run to B-17 boxes dropping Window.
 - **Two halves:** the selected unit in 3D on the left, its console on the right. Crews fight on their own in auto, but wastefully; in manual you give the orders.
-- **Loadout:** pick a unit for each of five slots. Every modern slot has an alternative (slot 5 two: the Shilka or the German Gepard); in WW2 so far only slot 5.
+- **Career:** start with the cheapest units and research the rest, a column per type of unit, with the points every battle pays; ten threat levels, all open, from a raid of drones to everything at once for the elite lineup.
+- **Quick battle:** pick any unit for each of five slots at Easy, Normal or Hard.
 - **Tutorials:** fifteen guided lessons on a quiet range, one per kind of unit plus the basics.
 
 ## Play it
@@ -43,9 +44,11 @@ All keys: [How to play](docs/PLAYING.md#controls).
 
 ## Status
 
-Both eras play start to finish on three difficulties, with every loadout option and all fifteen lessons.
+Both eras play start to finish: a career with a research tree and ten threat levels each, quick battles on three difficulties with every loadout option, and all fifteen lessons.
 
 Not done yet:
+
+- Balancing the career: the research costs, the pay and the threat levels are first guesses.
 
 - WW2 alternatives for slots 1 to 4 (planned; candidates in the local `refs/ww2/README.md`, section 3).
 - A fresh side-by-side check of the other WW2 models against their reference photos (the flak towers and the 12.8 cm twin have had theirs).

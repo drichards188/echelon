@@ -1388,7 +1388,7 @@ repaired between raids (one unbroken box levelled 700); four Thunderbolts at the
 out its guns before the bombers came); the fighters weaving inbound (straight and level they lost 7 a wave to
 the 8.8 cm); Hard's `aim` 1.5 (at 1.3 the scripted battery still won 21 of 48).
 
-### Career (`src/career.js`, the eras' `career`)
+### Career (`src/career.js`, the eras' `career`, `src/ui/menu.js`)
 
 One career per era, as War Thunder's nations. An era's `career` (eras/modern.js, eras/ww2.js; plain data) holds:
 
@@ -1426,7 +1426,13 @@ career: {
   keys follow it).
 - **Pages.** A career battle is `?play=1&era=<id>&level=<n>&mods=<ids>` (`choices.js` `gameHref`, `careerLevel`):
   main.js loads the career, fields `lineupOf` at `levelSetup`,
-  banks each `reward` into the career at once and puts the career's lines on the end card.
+  banks each `reward` into the career at once and puts the career's lines on the end card. The menu (see
+  "Pages") shows the career in its garage: the lineup's five sites along the bottom of the Hangar, each with a
+  bench of the units it can take (`slotChoices`, the rest locked until researched, and Empty), the threat level
+  and the modifiers rolled for the next battle in the chooser, dev mode and the reset in the top bar, and the
+  Research screen (the tree in its columns, a click on a unit shows it, Research this makes it the target,
+  `researchedShare` the percentage on the Research tab). `echelon.mode` ('career' or 'battle') picks which the
+  sites show: the lineup, or the quick battle's free loadout.
 - **Storage.** `echelon.career.<era>` (`{ v: 1, owned, progress, target, lineup, unlocked, level, battles,
   earned }`; another version starts over) and `echelon.career.dev` (dev mode: every unit owned for the lineup,
   the career going on underneath).
@@ -1434,22 +1440,61 @@ career: {
   modifiers, unlocking and saves; `--battles` plays a level 1 battle with the starting units and a level 10
   battle with the elite lineup per era, to see that they run and pay.
 
-### Pages: the main menu and a game (`src/boot.js`, `src/choices.js`, `src/ui/menu.js`, `src/ui/loading.js`)
+### Pages: the main menu and a game (`src/boot.js`, `src/choices.js`, `src/ui/menu.js`, `src/ui/hangar.js`, `src/parade.js`, `src/ui/loading.js`)
 
 `index.html` boots `src/boot.js`. A URL with `play` (a battle) or `tutorial=<id>` (a lesson) is a game
 page; anything else is the main menu.
 
-- **The menu** (`ui/menu.js` `mountMenu`, the `#menu` markup) is DOM only: no renderer, no sim, nothing of
-  the world. The era toggle, the difficulty and the loadout picker are kept in local storage
-  (`choices.js`); Take command opens `gameHref({ era, difficulty })`, a lesson in the Tutorials list
-  `gameHref({ era, tutorial })`. The list's lessons come from `tutorial.js` `TUTORIALS`, imported after the
-  menu is up (it brings three.js, which the game page fetches next anyway); a tick marks the ones in
-  `echelon.tutorials`. `?lessons=1` opens the list, `?era=<id>` shows that era without keeping it (a pick
-  keeps it and drops the parameter).
-- **The stills** behind the menu and the loading card (`ui/backdrop.js`): `public/menu/<kind>.jpg`, a
-  unit of each kind in `STILLS` firing in a raid, captured from the game by `tools/menushots.mjs`. The
-  menu turns through the loadout's units every 9 s and jumps to an option when it is picked; two layers
-  crossfade and drift (none of it under `prefers-reduced-motion`).
+- **The menu** (`ui/menu.js` `mountMenu`, its markup built into `#menu`, its look `ui/menu.css`) is a garage,
+  after Drumfire's. A top bar: the era tabs (`ERAS`; an era not playable greyed), **Hangar** and **Research**
+  (the era's tree researched, in per cent), the three lists **Career battle**, **Quick battle** and
+  **Tutorials** with the chooser that drops from them (the ten threat levels with the chosen one's card and the
+  modifiers rolled for it; the difficulty; the era's lessons from `tutorial.js` `TUTORIALS`, imported after the
+  menu is up, a tick on the ones in `echelon.tutorials`), **To battle**, and dev mode and the career's reset on
+  the right. To battle opens `gameHref({ era, level, mods })`, `gameHref({ era, difficulty })` or
+  `gameHref({ era, tutorial })`. Nothing reloads the page. Kept in local storage: the era, the mode, the
+  difficulty, the loadouts and the careers as before (`choices.js`, `career.js`), and the menu's own choices in
+  `echelon.menu` (`{ view, tab, sel: { era: site }, rs: { era: kind }, lesson: { era: id } }`). `?lessons=1`
+  opens the chooser on the Tutorials list, `?era=<id>` shows that era without keeping it.
+- **The Hangar** draws the unit of the site chosen (or one previewed from Research) on parade in 3D behind the
+  panels: on the left its rank, column and era, name and role, its figures (reach, ceiling, missiles or guns,
+  rounds ready and in reserve, reload or feed, targets at once, vehicles, crew on parade: `SYSTEMS`,
+  `MISSILES`, ballistics.js `reachOf`, parade.js), Leave out of battle or Take into battle (a career) and its
+  research state; on the right its armament as the display shows it (hovering a row takes the camera to that
+  piece) and the next unit of its column with Research it and Preview on parade; along the bottom the five
+  sites, each card with a swap that opens the bench above the bar (a career: the owned options, the rest
+  locked, Empty; a quick battle: every option, kept with `keepLoadout`). Left and Right walk the sites, Escape
+  closes the chooser, the bench or a preview.
+- **The parade** (`ui/hangar.js` `createHangar`, the data in `src/parade.js`, the display pieces in
+  `models/munitions.js`): the unit's slot option's parts side by side in one line, their fronts dressed on one
+  line and facing the front, the launchers and guns at its head, then loaders and close-defence guns, then
+  radars, predictors and command posts (`paradeLine`, by `PART_ROLE` and the unit's `roles`); a part of role
+  'tower' (the flak tower's concrete) stands behind the line. Every vehicle's crew stands in ranks in front of
+  it, its commander a pace ahead of the right; an officer and his sergeant face the head of the line. The modern
+  crews are `models/v/crew.js` figures posed standing and baked into instanced meshes (`CREW` men a vehicle);
+  the WW2 crews are `Crew44` men (one per crew spot of each gun, `jobs44.js`; a piece without spots borrows
+  them), stood with `m.at` and the `stand` pose, their pose solved for their first frames only. In front of
+  the officer the display (`displayOf(kind)`: every missile in `SYSTEMS[kind].stocks` on two stands beside its
+  container, `CONTAINER` tube, box or none; the gun's rounds by its feed: a belt and ammunition boxes for
+  the modern guns, the WW2 heavy guns' rounds in a rack and wicker baskets, the 3.7 cm's clips, the 2 cm's
+  magazines), a placard naming each. A unit added to an era's slots parades from these fallbacks without a
+  line of code; `CREW`, `CONTAINER` and `DISPLAY[kind]` correct them. The ground by era (`ERA_LOOK`: the modern
+  era's concrete apron with hardened shelters behind, the WW2 era's gravel square inside whitewashed stones
+  with timber barracks and birches). The camera looks along the line from its right front, fitted to the head
+  of the line between the panels, sways slowly when left alone, glides to a new unit or a display piece and
+  orbits with the mouse. The hangar imports three.js, the models and an era's lazy content (`loadEra`, then
+  deploy.js `setEra` for its markings) the first time it shows a unit, behind the menu's loading screen; a
+  parade is built off the scene, compiled (`compileAsync`) and swapped in (the last four kept), and the canvas
+  draws only while the Hangar is on screen. Its scene is its own: it sets shaderlib.js's shared uniforms for a
+  clear day with plain distance fog (`fogHeightFalloff` 0, no cloud shadows), so the patched WW2 crews and
+  the unpatched models render alike. Without WebGL (`checkGpu`, or a renderer that fails) the unit's still
+  (`public/menu/<kind>.jpg`) stands in; `window.__hangar` exposes it to the headless tools.
+- **The Research screen**: the unit being researched with its bar, the era's tree in its columns (`columnOf`),
+  each unit's rank and state; a click shows it on the right with its still, figures and status, Research
+  this (`setTarget`) and Preview on parade (the Hangar shows it at full strength, with the way back).
+- **The stills** (`ui/backdrop.js`): `public/menu/<kind>.jpg`, a unit of each kind in `STILLS` firing in a
+  raid, captured from the game by `tools/menushots.mjs`, now behind a game page's loading card, on the
+  Research card and in the Hangar without WebGL.
 - **A game page** shows its loading card (`ui/loading.js` `showLoading(q)`: a battle's era, difficulty
   and units, or the lesson's name and steps, from the URL and the choices kept) before `main.js` is even
   fetched; `hud.setLoading(p, msg)` fills its bar while `init()` builds the world for that game (the
@@ -1648,3 +1693,4 @@ Reuse the maxgfx engine core (distance delay, air absorption, voice stealing, re
 - Loadout: the Flakpanzer Gepard (`gepard`, unit id 'GEP', callsign Cheetah) is a third option in slot 5 (see "Loadout"): SYSTEMS `gepard` (guns only, `eoFallback`), SHELLS `'35mm'` (id 6), the model `src/models/v/gepard.js` on the new Leopard 1 chassis `src/models/v/leopard1.js` (refs/gepard; rig: `turret`, `elevation` with both external gun mounts, `searchRadar` on its arm at the turret rear (`setDeploy` raises the arm and turns the antenna round from its face-down stowage), `trackRadar` the head between the guns, rotation.x only; two `muzzles` [left, right] at x -+1.42; `sight` the gunner's periscope), CAMO `'nato'` (the Bundeswehr three-tone), markings `gepard`, render `UnitViews.gepard`, main `SHELL`/`FLASH`/`BRASS` entries (natural sight picture, not TV), audio `'35mm'` (bank `gun_35`, 1100 rounds/min) and idle `trk_gep`, the console `ui/consoles/gepard.js` in German (shared pieces gain a language: `Header(kindRu, kindEn, { lang, alerts })`, `SelBar(lang)`, `setTrigger(..., lang)`, `MODE_ITEMS_DE`, `TrackTable`'s `heads` and `none`, `SightView`'s `legend`; Russian stays the default), the lesson 'gepard', the menu still `public/menu/gepard.jpg`. No reload scene: the supply column refills its rounds at the end of a raid. Default loadout and WW2 simtest unchanged.
 - Crew voices (WW2): `src/eras/ww2/voices.js` and `voices.css` (page code, read-only on the sim), 53 German clips in `public/audio/voice-de/` copied from Drumfire (credits in `public/audio/CREDITS.md`). Main builds `CrewVoices` only when the page opens in the WW2 era, decodes the clips behind the loading screen ("Briefing the crews"), chains it onto `sim.events` (`wave`, `state`, `salvo`, `muzzle`, `feed`, `partDestroyed`, `unitDamaged`, `strafe`, `threatLaunch`) after its own handlers, calls `update(sim)` before `audio.update`; key B and the panel's VOICES button (`#voice-btn`, localStorage `echelon.voices`); `__iads.voices.log` lists every line spoken. The selected unit's crew speaks: the air raid warning, cover from bombs, rockets and strafing, casualties, a gun knocked out, the battery's new target, first salvo, barrage (with the rounds a gun will fire in it), range-source change, single shot, guns ready after a fight and the voiced gun's loading calls, a platoon opening fire (Erster or Zweiter Zug, else the gun), HOLD, and the Abteilung on the telephone at the raid's end.
 - Career: one per era (`src/career.js`, the eras' `career`: a research tree in columns by type, ten threat levels with modifiers; see "Career"). `sim.newGame({ level })` runs `sim.raids` (the director reads it instead of WAVES) at the level's difficulty and pays RP per kill (`sim.rp`, event `reward(rp, t, by)`); a loadout entry `EMPTY` ('none', deploy.js) leaves a slot without a unit, so `sim.units` may be fewer than the slots. Without a level nothing changes. Menu modes Career and Quick battle (`echelon.mode`); `?level=N&mods=` on a battle page; `tools/careertest.mjs`.
+- Menu: the main menu is a garage after Drumfire's (`ui/menu.js`, `ui/menu.css`): era tabs, Hangar and Research, the lists Career battle, Quick battle and Tutorials with their chooser, To battle, dev mode and reset; the Hangar draws the unit on parade in 3D (`ui/hangar.js`: its vehicles in a line, the crews in ranks, its munitions on display, `models/munitions.js`), from the data in `src/parade.js` (`paradeLine`, `CREW`, `displayOf`, `CONTAINER`). `career.js` adds `researchedShare` and `researchShareOf`; `mountMenu(root, { webgl })`. The menu is no longer DOM only: three.js loads behind its loading screen (see "Pages").

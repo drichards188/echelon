@@ -50,23 +50,14 @@ body { display: flex; }
 #hud { position: absolute; inset: 0; pointer-events: none; transition: opacity 0.6s; }
 body.ui-hidden #hud { opacity: 0; }
 
-/* ---------------------------------------------------------- the main menu (ui/menu.js) and a game page's
-   loading screen (ui/loading.js). Neither draws the world: stills from the game behind them (ui/backdrop.js),
-   the menu's title and options over the left, the loading screen's card in the middle. */
+/* ---------------------------------------------------------- the main menu's frame (its garage is ui/menu.css)
+   and a game page's loading screen (ui/loading.js): the still from the game behind the loading card
+   (ui/backdrop.js), the card in the middle. */
 #menu[hidden], #loading[hidden] { display: none; }
 body.menu #view, body.menu #panel { display: none; }
 #menu, #loading { position: fixed; inset: 0; background: #0b0d0b; }
 #menu { z-index: 50; }
-#title-screen {
-  position: absolute;
-  left: 7%;
-  bottom: 10%;
-  z-index: 2;
-  max-width: min(560px, 86%);
-  transition: opacity 0.6s ease, transform 0.6s ease;
-}
-/* the stills: two layers crossfading, each drifting slowly its own way, under a shade darkest behind the
-   menu on the left */
+/* the stills: two layers crossfading, each drifting slowly its own way, under a shade */
 .bd { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .bd-still {
   position: absolute;
@@ -90,101 +81,7 @@ body.menu #view, body.menu #panel { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .bd-still { animation: none; transition: none; }
 }
-.brand h1 {
-  font-size: clamp(44px, 7vw, 96px);
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  line-height: 0.95;
-  text-shadow: 0 6px 50px rgba(143, 227, 154, 0.3), var(--shadow);
-}
-.brand .sub {
-  margin: 10px 0 12px 4px;
-  font-size: 12px;
-  letter-spacing: 0.45em;
-  text-transform: uppercase;
-  color: var(--accent);
-  text-shadow: var(--shadow);
-}
-.brand .blurb { margin: 0 0 20px 4px; max-width: 440px; font-size: 14px; line-height: 1.55; text-shadow: var(--shadow); }
-#options { margin: 0 0 16px 4px; }
-/* the era toggle, the menu's main control: a button per era (src/eras), the era's years under its name;
-   one still in development is greyed out with a tag and cannot be picked. The line under it is the
-   setting of the era in play, or of the one under the pointer. */
-#era-box { margin-bottom: 14px; }
-#era { display: flex; flex-wrap: wrap; gap: 8px; }
-#era button {
-  font: inherit;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  min-width: 150px;
-  padding: 8px 16px 7px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(0, 0, 0, 0.35);
-  color: var(--ui-dim);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s, color 0.2s;
-}
-#era button b { font-size: 15px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; }
-#era button span { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
-#era button small { font: 10px var(--mono); letter-spacing: 0.06em; color: var(--ui-dim); }
-#era button em { font-style: normal; font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--amber); }
-#era button:hover:not(.soon) { border-color: rgba(255, 255, 255, 0.5); color: var(--ui); }
-#era button.on { border-color: var(--accent); color: #e6ffe9; background: var(--accent-soft); }
-#era button.on small { color: rgba(230, 255, 233, 0.75); }
-#era button.soon { border-style: dashed; color: rgba(255, 255, 255, 0.38); cursor: not-allowed; }
-#era-desc { margin-top: 6px; font-size: 11px; line-height: 1.35; min-height: 1.35em; color: rgba(255, 255, 255, 0.7); text-shadow: var(--shadow); }
-#difficulty { display: flex; gap: 8px; }
-#difficulty button {
-  font: inherit;
-  font-size: 11px;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  padding: 7px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(0, 0, 0, 0.3);
-  color: var(--ui-dim);
-  cursor: pointer;
-}
-#difficulty button.on { border-color: var(--accent); color: #e6ffe9; background: var(--accent-soft); }
-/* the loadout picker: a row per slot (number key, class, its two options) and the chosen option's
-   trade-off under it */
-#loadout-box { margin-top: 14px; }
-.lo-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; text-shadow: var(--shadow); }
-.lo-head b { font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
-.lo-head span { font-size: 11px; color: var(--ui-dim); }
-#loadout { display: grid; gap: 3px; }
-.lo-slot {
-  display: grid;
-  grid-template-columns: 12px 168px auto;
-  column-gap: 8px;
-  align-items: center;
-  padding: 3px 8px;
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.12));
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
-}
-.lo-key { font: 10px var(--mono); color: var(--ui-dim); }
-.lo-class { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ui-dim); white-space: nowrap; text-shadow: var(--shadow); }
-.lo-opts { display: flex; gap: 6px; }
-.lo-opts button {
-  font: inherit;
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  min-width: 104px;
-  padding: 3px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(0, 0, 0, 0.3);
-  color: var(--ui-dim);
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s, color 0.2s;
-}
-.lo-opts button:hover { border-color: rgba(255, 255, 255, 0.5); color: var(--ui); }
-.lo-opts button.on { border-color: var(--accent); color: #e6ffe9; background: var(--accent-soft); }
-.lo-desc { grid-column: 2 / 4; margin-top: 1px; font-size: 11px; line-height: 1.25; color: rgba(255, 255, 255, 0.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: var(--shadow); }
-#play, #end button {
+#end button {
   font: inherit;
   font-size: 13px;
   font-weight: 700;
@@ -197,7 +94,7 @@ body.menu #view, body.menu #panel { display: none; }
   cursor: pointer;
   transition: background 0.25s, letter-spacing 0.25s, opacity 0.4s;
 }
-#play:hover, #end button:hover { background: rgba(143, 227, 154, 0.3); letter-spacing: 0.38em; }
+#end button:hover { background: rgba(143, 227, 154, 0.3); letter-spacing: 0.38em; }
 .keys { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 22px; font-size: 11px; color: var(--ui-dim); text-shadow: var(--shadow); }
 kbd { font-family: var(--mono); font-size: 10px; padding: 2px 6px; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 3px; margin-right: 4px; color: var(--ui); }
 
@@ -396,77 +293,6 @@ body.loaded #loading { opacity: 0; pointer-events: none; }
 .gpu-actions button.quiet:hover { background: rgba(255, 255, 255, 0.14); }
 
 /* ---------------------------------------------------------- tutorials */
-.actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
-#tutorials {
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  padding: 14px 30px 14px 34px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(0, 0, 0, 0.35);
-  color: var(--ui);
-  cursor: pointer;
-  transition: background 0.25s, opacity 0.4s;
-}
-#tutorials:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
-#tutorials:disabled { opacity: 0; pointer-events: none; }
-
-#tut-menu {
-  position: absolute;
-  left: 7%;
-  bottom: 5%;
-  max-height: 90%;
-  display: flex;
-  flex-direction: column;
-  z-index: 11;
-  width: min(560px, 88%);
-  opacity: 0;
-  transform: translateY(12px);
-  pointer-events: none;
-  transition: opacity 0.5s ease, transform 0.5s ease;
-}
-body.tut-menu #tut-menu { opacity: 1; transform: none; pointer-events: auto; }
-body.tut-menu #title-screen { opacity: 0; transform: translateY(12px); pointer-events: none; }
-#tut-menu h2 { font-size: 34px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; text-shadow: var(--shadow); }
-.tm-sub { margin: 6px 0 16px; font-size: 13px; line-height: 1.5; color: var(--ui-dim); text-shadow: var(--shadow); }
-#tut-list { display: grid; gap: 8px; margin-bottom: 16px; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
-#tut-back { align-self: flex-start; flex: none; }
-.tut-item {
-  display: grid;
-  grid-template-columns: 26px 1fr;
-  column-gap: 12px;
-  align-items: baseline;
-  text-align: left;
-  font: inherit;
-  padding: 10px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(8, 12, 8, 0.62);
-  color: var(--ui);
-  cursor: pointer;
-  backdrop-filter: blur(3px);
-  transition: border-color 0.2s, background 0.2s;
-}
-.tut-item:hover { border-color: var(--accent); background: rgba(143, 227, 154, 0.14); }
-.tut-item .ti-mark { grid-row: 1 / span 2; align-self: center; width: 22px; height: 22px; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 50%; text-align: center; font: 700 13px/20px var(--mono); color: transparent; }
-.tut-item.done .ti-mark { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.tut-item b { font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase; }
-.tut-item b small { margin-left: 10px; font: 11px var(--mono); letter-spacing: 0.05em; text-transform: none; color: var(--ui-dim); font-weight: 400; }
-.tut-item i { font-style: normal; font-size: 12px; line-height: 1.45; color: var(--ui-dim); }
-#tut-back {
-  font: inherit;
-  font-size: 12px;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  padding: 10px 26px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: rgba(0, 0, 0, 0.35);
-  color: var(--ui);
-  cursor: pointer;
-}
-#tut-back:hover { background: rgba(255, 255, 255, 0.14); }
-
 /* the instruction card sits low on the left of the 3D view, clear of the unit in the middle */
 #tut-card {
   position: absolute;
@@ -529,12 +355,7 @@ body.tutorial #hint { bottom: auto; top: 20%; }
   50% { outline-color: rgba(255, 212, 90, 0.3); outline-offset: 6px; }
 }
 
-/* short screens: the key list gives way to the picker */
+/* short screens: the key list gives way */
 @media (max-height: 820px) {
   .keys { display: none; }
-  .brand .blurb { margin-bottom: 14px; line-height: 1.45; }
-  #era-box { margin-bottom: 10px; }
-  #era button { flex-direction: row; align-items: baseline; gap: 12px; padding: 6px 14px; }
-  #era-desc { margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #loadout-box { margin-top: 10px; }
 }

@@ -8,13 +8,29 @@ The left half of the screen is a third-person view of the unit you have selected
 
 ## The main menu
 
-The menu comes up at once: nothing of the battlefield is built until you start a battle or a lesson. Behind it, pictures from the game show the units of your loadout firing. Pick an era, a difficulty and a loadout and click **Take command**.
+The menu is a garage. Its top bar picks the era, the screen and what to play; the **Hangar** shows a unit drawn up on parade in 3D, and **To battle** starts. A loading screen covers the first moments while the hangar is built (on a computer without graphics acceleration, a picture from the game stands in).
 
-- **Era.** The toggle at the top of the options picks **Modern** (2020s) or **WW2** (1944 to 1945). The line under it gives the era's setting (point at the other era to read its own). An era brings its own map, units, raids and consoles; the loadout picker and the tutorials follow it.
-- **Difficulty.** **Easy**, **Normal** or **Hard** change the size of the raids, the hit chances of your missiles and shells, the damage that gets through (less on Easy) and, in WW2, how well the gun crews and the Allied aircraft aim.
-- **Loadout.** Under the difficulty the menu lists the five slots (the number keys) with their options, the default first: two each in the modern era, and in WW2 so far only slot 5 has a choice. The line under a slot gives the chosen option's trade-off (point at the other option to read its own). Picking an option shows that unit behind the menu.
-- **Kept.** The era, the difficulty and the loadout (one per era) are kept in the browser for the next visit.
-- **Loading.** **Take command** opens the battle: a card names the era, the difficulty and your units while the world is built, then the battle starts.
+- **Era.** **Modern** (2020s) or **WW2** (1944 to 1945), at the left of the bar. An era brings its own map, units, raids and consoles; the career, the sites and the tutorials follow it.
+- **Hangar.** The unit of the chosen site on a parade ground (modern: a concrete apron by the airbase; WW2: a gravel square): every vehicle or gun of it in one line, the launchers and guns at the head, each crew in ranks in front of its vehicle, an officer facing them, and its missiles and rounds laid out in front with a placard each. Drag to orbit, wheel to zoom. On the left: what the unit is, its figures (reach, ceiling, missiles or guns, rounds, reload, vehicles, crew) and its place in your career; on the right: its armament (point at a row to see that piece on the display) and the next unit of its column.
+- **Sites.** The five cards along the bottom are the five sites of the battle. Click one to see its unit; **⇄** opens the units that site can take (and, in a career, **Leave it empty**). Left and Right walk the sites.
+- **Research.** The era's research tree, with the share researched beside the tab (see the career below). Click a unit to see it, **Research this** to research it next, **Preview on parade** to see it in the hangar.
+- **What to play.** **Career battle**, **Quick battle** or **Tutorials** open the chooser under the bar: the ten threat levels, the difficulty, or the lessons. **To battle** (in the bar or the chooser) starts the one chosen.
+- **Dev mode** (top right) opens every unit of the era for the lineup, for testing; **Reset** (click twice) starts the era's career over.
+
+**The career** (one per era):
+
+- **Research.** You start with the cheapest units (modern: the Osa-AKM and the Strela-10M3; WW2: a 2 cm Flak 38 platoon). Every career battle pays research points (RP) for each kill as it happens, and a bonus for a victory; they go into the unit you are researching. **Research** shows the era's units in a column per type (modern: area defense, point defense, short range, very short range; WW2: heavy, medium and light flak), each column researched top to bottom. Pick an open unit and **Research this** to research it next; when one is done the points go on to the next.
+- **Lineup.** Each of the five sites takes a unit you own of its class, or stays empty: **⇄** on a site's card, or **Leave out of battle** and **Take into battle** in the hangar. Until you choose, a site fields the best unit you own for it. Units not yet researched show dashed on the bench.
+- **Threat level.** Ten levels, all open from the start. Level 1 is a single raid of drones (WW2: a sweep of Mustangs) for the starting units; level 10 is every raid at full strength, built for the elite lineup (modern: the S-400, two Pantsir-S1, the Tor-M2 and the Gepard; WW2: the 8.8 cm battery, two 3.7 cm platoons, the Vierlinge and the flak tower). Choose it under **Career battle**: the level's card says what it brings, the lineup it is built for and its pay (×1 to ×4).
+- **Modifiers.** From level 5 one, from level 8 two, rolled for each battle and shown on the card: massed raids, a second axis, an escort of anti-radar aircraft (WW2: a Thunderbolt hunt on the flak) or low cloud.
+- **Leaving early** keeps the RP earned. The end screen shows the RP, the research and what it opened.
+
+**A quick battle:**
+
+- **Difficulty.** Chosen under **Quick battle**: **Easy**, **Normal** or **Hard** change the size of the raids, the hit chances of your missiles and shells, the damage that gets through (less on Easy) and, in WW2, how well the gun crews and the Allied aircraft aim.
+- **Loadout.** In a quick battle the five sites take any option of their slot (**⇄** on a card): two or three each in the modern era, and in WW2 so far only slot 5 has a choice. The bench gives each option's trade-off; picking one shows it on parade.
+- **Kept.** The era, the mode, the careers, the difficulty, the loadout (one per era) and the menu's last screen and choices are kept in the browser for the next visit.
+- **Loading.** **To battle** opens the battle: a card names the era, the threat level or difficulty and your units while the world is built, then the battle starts.
 - **Back to the menu.** **Main menu** at the bottom right of the 3D view (beside the ⚙) or on the end screen leaves the battle; **Fight again** on the end screen starts a new one at once.
 
 ## The battle
@@ -24,7 +40,7 @@ The menu comes up at once: nothing of the battlefield is built until you start a
 - **In WW2** the guns' ammunition is brought up the same way, and the runway, if it still stands, gets back a quarter of its strength.
 - **You win** when every raid has been beaten off.
 - **You lose** when the runway and the command post (in WW2 the Flak command post) are both destroyed, or when no unit is left.
-- **Score.** Every kill scores points; a weapon that gets through and hits something costs half its points.
+- **Score.** Every kill scores points; a weapon that gets through and hits something costs half its points. In a career battle the kill feed shows the research points each kill pays.
 - **The end screen** gives the score, kills, leakers, missiles spent and their cost (in WW2 the rounds fired), damage taken and units still standing.
 
 ## Modes
@@ -115,7 +131,8 @@ Alternatives for slots 1 to 4 come later (`DESIGN.md`, "WW2 era").
 | Key | Action |
 |---|---|
 | Click an era | main menu: switch between Modern and WW2 |
-| Click a loadout option | main menu: swap that slot's unit for the next battle |
+| ⇄ on a site | main menu: the units that site can take |
+| Left, Right | main menu: walk the sites in the hangar |
 | `1`-`5` | select a unit (or click its tab above the console) |
 | Drag, wheel | orbit and zoom the camera |
 | `V` | padlock: the camera keeps the selected track in view |
@@ -148,7 +165,7 @@ The console keys act on the selected unit. Click a track on a scope, plot or tab
 
 ## Tutorials
 
-**Tutorials** on the main menu opens a list of short guided lessons for the era in play: one for each vehicle or gun unit, the loadout alternatives included, and in the modern era one for the basics. A tick shows the ones you have finished (kept in the browser's local storage).
+**Tutorials** in the main menu's bar opens a list of short guided lessons for the era in play: one for each vehicle or gun unit, the loadout alternatives included, and in the modern era one for the basics. A tick shows the ones you have finished (kept in the browser's local storage).
 
 - **A quiet range.** Each lesson runs with the raids off: nothing is scored, nothing can be destroyed, and the other units stand down.
 - **Steps.** A card over the 3D view gives the step, a pulsing amber frame marks the console control it is about, and the step completes when you do the thing.

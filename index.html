@@ -8,54 +8,8 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <!-- the main menu (ui/menu.js): DOM only, nothing of the world is built until a game is started -->
-    <div id="menu" hidden>
-      <div id="title-screen">
-        <div class="brand">
-          <h1>ECHELON</h1>
-          <p class="sub" id="title-sub"></p>
-          <p class="blurb" id="title-blurb"></p>
-        </div>
-        <div id="options">
-          <div id="era-box">
-            <div id="era" role="radiogroup" aria-label="Era"></div>
-            <p id="era-desc"></p>
-          </div>
-          <div id="difficulty" role="radiogroup" aria-label="Difficulty">
-            <button type="button" role="radio" data-d="Easy">Easy</button>
-            <button type="button" role="radio" data-d="Normal">Normal</button>
-            <button type="button" role="radio" data-d="Hard">Hard</button>
-          </div>
-          <div id="loadout-box">
-            <div class="lo-head"><b>Loadout</b><span>each unit or an alternative of its class</span></div>
-            <div id="loadout"></div>
-          </div>
-        </div>
-        <div class="actions">
-          <button id="play" type="button">Take command</button>
-          <button id="tutorials" type="button">Tutorials</button>
-        </div>
-        <ul class="keys">
-          <li><kbd>1</kbd>-<kbd>5</kbd> select unit</li>
-          <li><kbd>Drag</kbd> orbit</li>
-          <li><kbd>Wheel</kbd> zoom</li>
-          <li><kbd>F</kbd> chase the unit's latest missile</li>
-          <li><kbd>C</kbd> free camera</li>
-          <li><kbd>V</kbd> padlock the selected track</li>
-          <li><kbd>M</kbd> mute</li>
-          <li><kbd>[</kbd> <kbd>]</kbd> time compression</li>
-          <li><kbd>H</kbd> hide overlay</li>
-          <li><kbd>F3</kbd> stats</li>
-        </ul>
-      </div>
-
-      <div id="tut-menu">
-        <h2>Tutorials</h2>
-        <p class="tm-sub">Short guided lessons on a quiet range. Nothing is scored and nothing is destroyed.</p>
-        <div id="tut-list"></div>
-        <button id="tut-back" type="button">Back</button>
-      </div>
-    </div>
+    <!-- the main menu (ui/menu.js): a garage, its hangar's 3D view (ui/hangar.js) loaded behind its own loading screen -->
+    <div id="menu" hidden></div>
 
     <!-- a game page's loading screen (ui/loading.js): what is being started, while the world builds behind it -->
     <div id="loading" hidden>

@@ -19,7 +19,7 @@ npm run preview  # serves dist/ on http://localhost:4173
 - **Build and serve.** Build it and put `dist/` on a web server.
 - **Any folder.** `vite.config.js` sets `base: './'`, so the build loads its files relative to its page and works from a site's root or any folder in it. It still needs a web server: opened straight from disk (`file://`) it fails.
 - **itch.io.** Zip what is inside `dist/` (`index.html` at the top of the zip, not in a folder), upload it as an HTML game and tick "This file will be played in the browser". In Embed options pick "Click to launch in fullscreen" (the screen is split in two halves, so it wants room), or embed at 1280 x 720 or larger with the Fullscreen button; leave Mobile friendly and SharedArrayBuffer off.
-- **What's in it.** The build holds only the game page. Its first file is the main menu's, small and without three.js; the game's code is fetched when a battle or a lesson starts, and the WW2 era's models and consoles when that era is played. The development pages are not part of it.
+- **What's in it.** The build holds only the game page. Its first file is the main menu's, small and without three.js; the menu's hangar fetches three.js and the unit's models behind its loading screen, the game's code is fetched when a battle or a lesson starts, and the WW2 era's models and consoles when that era is played. The development pages are not part of it.
 
 ## Checks
 
@@ -38,19 +38,20 @@ These run on the dev server only.
 
 ## URL parameters for the game
 
-- **The pages.** `/` is the main menu: plain HTML, nothing of the world is built (`src/boot.js`). **`?play=1`** is a battle's page and **`?tutorial=ID`** a lesson's (see [Tutorials](PLAYING.md#tutorials)): its loading card at once, then the world is built and the game starts. The menu's buttons open these; on the menu, **`?lessons=1`** opens the tutorial list.
+- **The pages.** `/` is the main menu (`src/boot.js`): a garage whose hangar draws a unit on parade in 3D, nothing of the battlefield. **`?play=1`** is a battle's page and **`?tutorial=ID`** a lesson's (see [Tutorials](PLAYING.md#tutorials)): its loading card at once, then the world is built and the game starts. The menu's buttons open these; on the menu, **`?lessons=1`** opens the chooser on the tutorial list.
 - **`?quality=Low|Medium|High|Ultra`** (default Medium) and **`?dev=1`** pass between the menu and the game. **`?difficulty=Easy|Normal|Hard`** sets a battle's (default: the one the menu kept, else Normal). **`?unit=N`** selects unit N, counted from 0 in slot order.
 - **`?era=modern`** or **`?era=ww2`** starts in that era without saving it (on the menu: shows it). `?dev=1` would let an era still marked in development be played (none is at present).
 - **`?loadout=buk,tunguska,pantsir,tor,shilka`** starts with that loadout without saving it. Give the kinds in slot order; empty entries or anything a slot does not offer take the default; `alt` picks every slot's first alternative (slot 5's Shilka; the Gepard is `gepard`).
 
 ## `window.__iads`
 
-- **Game pages only.** The menu builds no systems, so it has no `__iads`.
+- **Game pages only.** The menu builds no systems, so it has no `__iads`; it has `window.__hangar` instead (`three`, `park`, `show`, `lookAt`).
 - **Systems.** It exposes every system: `sim`, `renderer`, `scene`, `camera`, `terrain`, `post`, `fx`, `hud`, `panel`, `audio`, `tutorial`, `params` and more.
 - **Functions.** `select(i)`, `start()`, `setTimeScale(k)`, `setLoadout(kinds)`, `setEra(id)` and `frame(dt, draw)` (one frame).
 - **`fastForward(seconds, { unit, scale })`** stops the loop, runs the battle without drawing, draws a few frames and returns a summary.
 - **State and hooks.** `state`, `era`, `eras`, `events` (start, select) and `onFrame` (per-frame callbacks).
-- **Local storage** keeps `echelon.era`, the loadout per era in `echelon.loadout.<era>`, `echelon.difficulty` and the finished lessons in `echelon.tutorials` (`src/choices.js`).
+- **Local storage** keeps `echelon.era`, `echelon.mode` (career or quick battle), the loadout per era in `echelon.loadout.<era>`, `echelon.difficulty` and the finished lessons in `echelon.tutorials` (`src/choices.js`), and each era's career in `echelon.career.<era>` with dev mode in `echelon.career.dev` (`src/career.js`).
+- **Career battles** are `?play=1&era=ID&level=N&mods=IDS`: the era's career fields its lineup at that threat level with those modifiers.
 
 ## Tools
 
@@ -69,7 +70,7 @@ These run on the dev server only.
 - **Options.** `--size WxH` (default 1600x900) and `--wait ms`.
 - **Needs** the dev server running. It launches its own headless Chromium from `~/.cache/ms-playwright`.
 
-**`node tools/menushots.mjs [kind ...]`** takes the main menu's background stills from the game itself: for each unit kind, a battle with it in its slot, run on until it fires, the console and overlay hidden. It writes `public/menu/<kind>.jpg`.
+**`node tools/menushots.mjs [kind ...]`** takes the units' stills from the game itself (a game page's loading card, the menu's Research card and its hangar without WebGL): for each unit kind, a battle with it in its slot, run on until it fires, the console and overlay hidden. It writes `public/menu/<kind>.jpg`.
 
 - **Options.** `--size WxH` (default 1920x1080), `--quality` (default High), `--out dir`.
 - **Check them.** Each run plays a new battle, so look at the pictures before keeping them.
@@ -93,7 +94,7 @@ These run on the dev server only.
 index.html         the game page; models.html, ui.html, audio.html the development pages
 vite.config.js     the dev server on port 5200
 public/audio/      the recordings and CREDITS.md
-public/menu/       the main menu's stills, one per unit kind (tools/menushots.mjs)
+public/menu/       the units' stills, one per unit kind (tools/menushots.mjs)
 docs/              the README's screenshot and these pages (PLAYING, MODELLED, HISTORY, DEVELOPMENT)
 tools/             simtest.mjs, careertest.mjs, audiotest.mjs, shot.mjs, menushots.mjs
 src/
@@ -102,8 +103,8 @@ src/
   career.js        the careers: research, the lineup, the threat levels and their modifiers (the trees and levels are in each era's `career`)
   parade.js        the menu's parade as data: the line's order, the crews, each unit's display of munitions (Node-safe)
   main.js          a game page: renderer, quality presets, settings, game flow, event wiring, main loop
-  style.css        the page, the main menu, the loading card, the HUD and the tutorial card
-  eras/            one module per era: map layout, slots and options, raids, text, alert captions, theme
+  style.css        the page, the loading card, the HUD and the tutorial card (the main menu's own look is ui/menu.css)
+  eras/            one module per era: map layout, slots and options, raids, career, text, alert captions, theme
     index.js       the registry (ERAS), the derived default loadouts, loadEra (an era's lazily loaded content)
     modern.js      the modern era (the airbase on the steppe)
     ww2.js         the WW2 era: Fliegerhorst Hopsten, February to March 1945, its flak, six day raids
@@ -130,7 +131,8 @@ src/
     entities.js    everything that flies, instanced, with plumes and wreck trails (distant flyers are enlarged to stay visible)
     reload.js      the reload scenes' driver; reload/ one scene per unit kind (s400, buk, pantsir, tunguska, osa, tor, strela, shilka) and their shared helpers
   sight.js         the consoles' sight pictures (the modern sights, the WW2 gun sights and the predictor's telescope)
-  ui/              menu.js (the main menu), loading.js (a game page's loading card), backdrop.js (their stills),
+  ui/              menu.js and menu.css (the main menu, a garage), hangar.js (its 3D parade), loading.js (a game
+                   page's loading card), backdrop.js (the stills),
                    gpu.js (the card when graphics acceleration is off);
                    the right half: panel.js (the unit tabs and the console), consoles/ (one per modern kind, common.js),
                    scope.js, tracktable.js, sightview.js, widgets.js, highlight.js (the tutorials' frames), fallback.js;
@@ -155,6 +157,7 @@ src/
                    t9t244, tzmpantsir, t2f77m, kamaz5350), their chassis (maz543, ural, kamaz, baz5937, mtlb, gm352, gm355,
                    gm567, gm569, gm575, leopard1), crew.js (the reload crews) and swap.js
     threats.js     the attackers and the interceptors; site.js the modern airbase; markings.js the national markings
+    munitions.js   the missiles and rounds the menu's parade lays out on display
     kit.js, rig.js, trucks.js   shared modelling helpers
   dev/             modelviewer.js and audiotest.js, behind models.html and audio.html
 ```
