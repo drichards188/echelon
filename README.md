@@ -70,7 +70,7 @@ Not done yet:
 
 - **Libraries:** [three.js](https://threejs.org) and [lil-gui](https://lil-gui.georgealways.com) (MIT); Vite (MIT) and playwright-core (Apache 2.0) for development.
 - **Recordings:** ([list](public/audio/CREDITS.md))
-  - **Under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/):** the modern systems' launches by the Ministry of Defence of the Russian Federation (mil.ru), via Wikimedia Commons, and ["Tykki, laukaus / Big gun, cannon, 76 mm, single shots, gunshots"](https://freesound.org/s/332935/) by YleArkisto.
+  - **Under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/):** the modern systems' launches and bursts by the Ministry of Defence of the Russian Federation (mil.ru), via Wikimedia Commons; ["A-10 Thunderbolt (Warthog) 30mm GAU cannon"](https://commons.wikimedia.org/?curid=131797331) by nicStage; and ["Tykki, laukaus / Big gun, cannon, 76 mm, single shots, gunshots"](https://freesound.org/s/332935/) by YleArkisto.
   - **The rest:** US government video (public domain) and Freesound recordings under CC0.
 - **Voices:** the WW2 crews' German callouts are synthetic speech made with [Piper](https://github.com/OHF-Voice/piper1-gpl): the `de_DE-mls-medium` voice, trained on Multilingual LibriSpeech by Pratap et al. ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), and `de_DE-thorsten_emotional-medium` (Thorsten-Voice, CC0); details and a licence note in [public/audio/CREDITS.md](public/audio/CREDITS.md).
 - **WW2 terrain:** heights from EU-DEM v1.1 (Copernicus Land Monitoring Service, funded by the European Union); waterways and villages © OpenStreetMap contributors (ODbL).

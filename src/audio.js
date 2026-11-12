@@ -36,7 +36,7 @@ export const RECORDINGS = {
   distant: { file: 'distant-explosions-438693.mp3', slices: [[1.35, 2.4], [6.2, 2.6], [14.1, 2.6], [29.0, 2.6], [34.35, 2.6], [48.1, 2.6], [53.6, 2.6], [72.4, 2.6], [76.15, 2.6], [87.4, 2.6]] }, // (CC0)
   cannon: { file: 'cannon-shot-187767.mp3', slices: [[0.1, 2.4], [6.36, 2.4]] }, // a gun's crack, laid under the 57E6 booster
   brass: { file: 'shell-casings-318964.mp3', slices: [[8.49, 0.4], [13.04, 0.25], [16.8, 0.2], [18.95, 0.5], [20.92, 0.25], [23.17, 0.5], [25.9, 0.3], [27.83, 0.5], [39.2, 0.5]] }, // (CC0)
-  // the modern era's launches built from recordings (recordedTasks, REC_LAUNCH): `role` what the
+  // the modern era's launches and guns built from recordings (recordedTasks, REC_LAUNCH, REC_GUN): `role` what the
   // slices are, `set` the layer they join; slices start just before their onset, or `lead` seconds before it (a motor's
   // slice keeps the quiet before it lights, to run on from the pop's). The S-400's (mil.ru, CC BY 4.0): two
   // clips from Ashuluk, the ground camera's cold launches cut at the motor's lighting (the gas generator's pop, the
@@ -89,6 +89,21 @@ export const RECORDINGS = {
   bukfar: { file: 'buk-launch-mil145076957.mp3', role: 'launch', set: 'bukfar', slices: [[6.54, 7.55]] },
   // a Pantsir-S1's 57E6 from about 400 m (mil.ru, CC BY 4.0); no nearer one is free
   pantsir: { file: 'pantsir-launch-mil57987235.mp3', role: 'launch', set: 'pantsir', slices: [[0.07, 2.52]] },
+  // the 30 mm's stand-ins: a land Phalanx at Al-Tanf from a few metres (US Army video, public domain), a C-RAM from 30
+  // to 60 m (US Air Force video, public domain), their 20 mm bursts with every round marked at their rate (`steady`: the
+  // fire at full rate, the Gatlings' spin-up and wind-down left out); a GAU-8 heard far downrange (nicStage, CC BY 4.0)
+  ciws: { file: 'phalanx-burst-us195837326.mp3', role: 'burst', set: 'ciws', rate: 78.8, slices: [[0.1038, 3.0462]], steady: [[1.03, 2.08]] },
+  ciwsB: { file: 'cram-burst-us123700451.mp3', role: 'burst', set: 'ciws', rate: 69.1, slices: [[0.2776, 4.9224]], steady: [[0.66, 3.36]] },
+  gau8far: { file: 'gau8-burst-c131797331.mp3', role: 'burst', set: 'gau8far', rate: 98, slices: [[0.4632, 1.2948]], steady: [[0.7, 1.24]] },
+  // the 23 mm: a ZU-23-2 on a truck from 15 to 30 m (mil.ru, CC BY 4.0), the Shilka's own from a camera on its turret
+  // and from a few hundred metres (mil.ru, CC BY 4.0); `steady`: where each burst's steady fire is, `last`: its last
+  // round, where the echo begins
+  zu23: { file: 'zu23-burst-mil149149050.mp3', role: 'burst', set: 'zu23', rate: 17.3, slices: [[21.146, 2.674], [8.34, 1.5], [2.809, 2.601], [0.031, 2.759], [5.699, 2.611], [18.491, 2.379]], steady: [[21.16, 21.94], [8.37, 9.18], [2.82, 3.58], [0.04, 0.8], [5.71, 6.62], [18.5, 19.25]], last: [21.93, null, 3.56, 0.77, 6.62, null] },
+  shilka: { file: 'shilka-burst-mil57988260.mp3', role: 'burst', set: 'shilka', rate: 16.2, slices: [[0.025, 0.985], [1.282, 0.808]], steady: [[0.03, 0.45], [1.29, 1.65]] },
+  shilkafar: { file: 'shilka-burst-mil57988260.mp3', role: 'burst', set: 'shilkafar', rate: 16.2, slices: [[2.364, 1.021], [3.658, 0.762]], steady: [[2.37, 2.8], [3.66, 3.89]] },
+  // the Gepard's own, Romanian Gepards from 50 to 100 m (US Army video, public domain): pairs of rounds a bunch
+  gepard: { file: 'gepard-burst-us137606083.mp3', role: 'burst', set: 'gepard', rate: 8.66, slices: [[0.06, 2.44]], steady: [[0.1, 1.79]], last: [1.78] },
+  gepardB: { file: 'gepard-burst-us137606083.mp3', role: 'burst', set: 'gepard', rate: 7.06, slices: [[2.83, 1.69]], steady: [[2.84, 3.82]], last: [3.81] },
   // stand-ins (qubodup, from US government video, CC0): the Hawk's rail launch for the Osa's, the Hellfire's and the
   // TOW's sharp boosters for the Tunguska's
   hawk: { file: 'hawk-launch-67545.mp3', role: 'launch', set: 'hawk', slices: [[0.01, 6.985]] },
@@ -1258,7 +1273,7 @@ export function ww2Tasks(SR, make) {
 
 // ---------------------------------------------------------------- the modern systems from recordings
 
-// The modern era's launches built from real recordings (RECORDINGS with a `role`; recordedTasks), as
+// The modern era's launches and guns built from real recordings (RECORDINGS with a `role`; recordedTasks), as
 // Drumfire builds its guns and the WW2 era its 8.8 cm: recorded slices layered over the synthesized parts the
 // recordings lack. They replace the synthesized banks once decoded; without them the synthesized sounds play.
 
@@ -1291,7 +1306,7 @@ function cutRec(rec, slices, fade) {
   });
 }
 
-/** The set a RECORDINGS entry's slices join (REC_LAUNCH): its `set`, else its key. */
+/** The set a RECORDINGS entry's slices join (REC_LAUNCH, REC_GUN): its `set`, else its key. */
 const setOf = (key) => RECORDINGS[key].set ?? key;
 
 // how much of a slice's end is faded, by role: a launch's roar dies away, a burst already ends in its echo, a cold
@@ -1411,19 +1426,265 @@ function recordedLaunch(sr, r, kind, S, k, band) {
 }
 
 /**
+ * The guns built from recordings (recordedGun): the rounds of real bursts laid again at the gun's own rate, a
+ * pitch-synchronous overlap-add (every round a grain two periods long, centred on its onset, in a Hann window), so the
+ * rate and the pitch are set apart. src: RECORDINGS keys of `burst` slices (each with its measured `rate`); pitch: how
+ * much lower (a bigger round); rate, shots: the game's rounds a second and the loop's length in rounds; barrels: each
+ * barrel's level in turn; jitter: the rounds' spread in periods; up: the first rounds' length (s); links: the belt's
+ * links snapping off and the cases ringing, close up; lp: a low-pass (Hz) on the recordings; double: [s, level] for each
+ * further round laid with every one (more barrels together than the recording's); fade: how fast the last round's
+ * echo dies (s); far, farPitch: bursts
+ * recorded far off, for the far loop, and their pitch. The first source's first burst gives the loop.
+ */
+const REC_GUN = {
+  // the 2A38M pair (Pantsir, Tunguska): no recording of it is free; a land Phalanx's and a C-RAM's 20 mm, pitched down
+  // about as much as the bigger round's report is lower, laid at the 2A38M's rate; far off, a GAU-8's 30 mm growl
+  gun: { src: ['ciws'], rate: GUN30.rate, shots: GUN30.shots, pitch: 0.76, lp: 7500, barrels: [1, 0.94], up: 0.25, links: true, far: ['gau8far'], farPitch: 0.85 },
+  gun_30t: { src: ['ciws'], rate: GUN30T.rate, shots: GUN30T.shots, pitch: 0.7, lp: 7000, barrels: [1, 0.94], up: 0.25, links: true, far: ['gau8far'], farPitch: 0.75 },
+  // the Shilka's four 2A7: the real Shilka fires its rounds bunched, about 16 bunches a second (its recordings); the
+  // ZU-23's two 2A14 fire the same 23 mm round about as fast, recorded cleaner from 15 to 30 m, each bunch doubled for
+  // four barrels; from far off the Shilkas' own
+  gun_23: { src: ['zu23', 'shilka'], rate: 16.2, shots: 32, pitch: 1, barrels: [1], double: [[0.0045, 0.7]], up: 0.25, links: true, far: ['shilkafar'] },
+  // the Gepard's two KDA at 550 rounds a minute each, in pairs whose spacing drifts as the barrels fall out of step
+  // (its own recording: a bunch is a pair)
+  gun_35: { src: ['gepard'], rate: 550 / 60, shots: 11, pitch: 1, barrels: [1], up: 0.2, links: true, fade: 0.2 },
+};
+
+/** max of e over [i - w, i + w] for every i (a monotonic deque). */
+function slidingMax(e, w) {
+  const n = e.length, out = new Float32Array(n), q = new Int32Array(n);
+  let h = 0, t = 0;
+  for (let j = 0; j < n + w; j++) {
+    if (j < n) {
+      while (t > h && e[q[t - 1]] <= e[j]) t--;
+      q[t++] = j;
+    }
+    const i = j - w;
+    if (i < 0) continue;
+    while (q[h] < i - w) h++;
+    out[i] = e[q[h]];
+  }
+  return out;
+}
+
+/** Every round of a recorded burst firing about `rate` rounds a second: the peaks of its high-passed envelope, a period or so apart (with each one's level, `level`). */
+function roundMarks(x, sr, rate) {
+  const P = sr / rate, h = biquad(Float32Array.from(x), sr, 'hp', 250), e = new Float32Array(h.length);
+  const a = 1 - Math.exp(-1 / (0.0004 * sr));
+  let y = 0;
+  for (let i = 0; i < h.length; i++) e[i] = y += a * (Math.abs(h[i]) - y);
+  const near = slidingMax(e, Math.max(1, Math.round(0.4 * P))), wide = slidingMax(e, Math.round(3 * P));
+  // a round stands out from its neighbourhood and is within 20 dB of the burst's loudest (not the echo's ripples)
+  const floor = 0.1 * peak(e), m = [];
+  for (let i = 1; i < e.length - 1; i++) if (e[i] === near[i] && e[i] > 0.2 * wide[i] && e[i] > floor && (!m.length || i - m[m.length - 1] > 0.6 * P)) m.push(i);
+  m.level = m.map((i) => e[i]); // each round's level
+  return m;
+}
+
+/**
+ * The bursts of `sets` at `sr`, pitched (and low-passed at `lp` Hz): each { x, m (round marks), P (period, samples), a, b
+ * (the marks of its steady fire, a Gatling's spin-up and wind-down left out) }, the irregular ones left out.
+ */
+function burstsOf(S, sets, sr, pitch, lp) {
+  const out = [];
+  for (const set of sets) {
+    for (const s of S[set] || []) {
+      if (!s.rate) continue;
+      const x = retime(s.x, s.sr, sr, pitch);
+      if (lp) biquad(x, sr, 'lp', lp, 0.6);
+      const m = roundMarks(x, sr, s.rate * pitch);
+      if (m.length < (s.steady ? 4 : 8)) continue;
+      // the steady part: the slice's `steady` window, else all but the first 3 and last 2 rounds
+      let a = 3, b = m.length - 2;
+      if (s.steady) {
+        const [t0, t1] = s.steady.map((t) => (t / pitch) * sr);
+        a = m.findIndex((v) => v >= t0);
+        b = m.findIndex((v) => v > t1);
+        if (b < 0) b = m.length;
+      }
+      if (a < 0 || b - a < (s.steady ? 3 : 6)) continue;
+      const gaps = m.slice(a + 1, b).map((v, i) => v - m[a + i]).sort((u, v) => u - v), P = gaps[gaps.length >> 1];
+      if (gaps[Math.floor(gaps.length * 0.9)] > 1.6 * P) continue; // rounds missing or not a steady burst
+      // the burst's last round, where the slice gives it: the mark nearest
+      let last = null;
+      if (s.last != null) {
+        const t = (s.last / pitch) * sr;
+        last = m.reduce((u, v) => (Math.abs(v - t) < Math.abs(u - t) ? v : u));
+      }
+      out.push({ x, m, P, a, b, last });
+    }
+  }
+  return out;
+}
+
+/**
+ * Overlap-add grain `i` of burst `b` centred at sample c (wrapping round `out` when circ); its window is summed in `ws`.
+ * `pre` scales the half before the round (the earlier rounds' sound under it): 0 for a burst's first round. Without
+ * `ws` the grain is laid over the rest (a doubling), not counted in the overlap.
+ */
+function grain(out, ws, b, i, c, H, gain, circ, pre = 1) {
+  const { x, m } = b, n = out.length, mi = m[i];
+  for (let d = -H + 1; d < H; d++) {
+    let j = c + d;
+    if (circ) j = ((j % n) + n) % n;
+    else if (j < 0 || j >= n) continue;
+    const w = 0.5 + 0.5 * Math.cos((Math.PI * d) / H), s = mi + d;
+    out[j] += (s >= 0 && s < x.length ? x[s] : 0) * w * gain * (d < 0 ? pre : 1);
+    if (ws) ws[j] += w;
+  }
+}
+
+/** The belt's link snapping off each round and now and then a case ringing off the mount, at the rounds' centres. */
+function links(x, sr, r, centres, circ) {
+  const n = x.length;
+  for (const [k, c] of centres.entries()) {
+    const il = c + Math.round((0.002 + 0.003 * r()) * sr);
+    for (let i = 0; i < 0.0015 * sr; i++) {
+      const j = circ ? (il + i) % n : il + i;
+      if (j < n) x[j] += (r() * 2 - 1) * 0.06 * Math.exp(-i / (0.0004 * sr));
+    }
+    if (k % 6 === 2) {
+      const f = 1500 + 900 * r(), ph = r() * TAU, w = (TAU * f) / sr;
+      for (let i = 0; i < 0.04 * sr; i++) {
+        const j = circ ? (il + i) % n : il + i;
+        if (j < n) x[j] += 0.035 * Math.exp(-i / (0.012 * sr)) * Math.sin(ph + w * i);
+      }
+    }
+  }
+}
+
+/**
+ * A gun of REC_GUN[group] from recordings, near, mid and far: { up, loop, down }, each a buffer per band. The loop is
+ * `shots` rounds at `rate` (seamless, round the buffer); `up` starts on the first rounds of a real burst and runs into
+ * the loop's own rounds, so the loop takes over sample for sample at up.loopAt (s); `down` is the recorded end of a
+ * burst, its last round at down.onsetAt (s) and its echo, which the engine starts so that round lands where the loop's
+ * next one would (loop.period, s). Null when no burst is usable.
+ */
+function recordedGun(sr, r, group, S, make) {
+  const G = REC_GUN[group], Q = sr / G.rate, n = Math.round((G.shots / G.rate) * sr);
+  const near = burstsOf(S, G.src, sr, G.pitch, G.lp);
+  if (!near.length) return null;
+  const farB = G.far ? burstsOf(S, G.far, sr, G.farPitch ?? G.pitch, G.lp) : [];
+  const out = { up: [], loop: [], down: [] };
+  for (const band of ['near', 'mid', 'far']) {
+    const B = band === 'far' && farB.length ? farB : near;
+    // the loop: rounds in order from the first burst's steady part (the first listed source is the one to hear)
+    const b = B[0], i0 = b.a, i1 = b.b, H = Math.round(Math.max(b.P, Q));
+    const plan = [];
+    for (let k = 0; k < G.shots; k++) {
+      const c = Math.round(k * Q + (r() - 0.5) * (G.jitter ?? 0.04) * Q);
+      plan.push([i0 + (k % (i1 - i0)), c, G.barrels[k % G.barrels.length] * (0.92 + 0.16 * r())]);
+    }
+    const loop = new Float32Array(n), lw = new Float32Array(n);
+    // each round, and its doublings (more barrels firing together than the recording's): another round a few ms on
+    const lay = (dst, ws, i, c, g, circ, pre = 1) => {
+      grain(dst, ws, b, i, c, H, g, circ, pre);
+      for (const [j, [dt, dg]] of (G.double || []).entries()) grain(dst, null, b, i0 + ((i - i0 + 3 + 2 * j) % (i1 - i0)), c + Math.round(dt * sr), H, g * dg, circ, pre);
+    };
+    for (const [i, c, g] of plan) lay(loop, lw, i, c, g, true);
+    for (let j = 0; j < n; j++) loop[j] /= Math.max(lw[j], 1);
+    // the first rounds: the loop's burst's steady rounds from silence, the earlier rounds' sound under each building
+    // up over the first four (the guns here fire at full rate at once: no Gatling's spin-up, and a recording's first
+    // rounds are often hot, before the camera's gain comes down), then the loop's last few, so its end runs into the
+    // loop's start
+    const lead = Math.ceil((2 * H) / Q) + 1, count = Math.max(lead + 2, Math.round((G.up ?? 0.25) * G.rate));
+    const t0 = H, ts = t0 + count * Q, un = Math.round(ts);
+    const up = new Float32Array(un), uw = new Float32Array(un);
+    for (let k = 0; k < count - lead; k++) lay(up, uw, i0 + (k % (i1 - i0)), Math.round(t0 + k * Q), G.barrels[k % G.barrels.length], false, Math.min(1, k / 4));
+    // the loop's last `lead` rounds and its first few, where they fall before ts
+    for (const [kk, [i, c, g]] of plan.entries()) {
+      const back = G.shots - kk; // rounds before the loop's start
+      const at = back <= lead ? un - n + c : kk < lead ? un + c : null;
+      if (at !== null) lay(up, uw, i, Math.round(at), g, false);
+    }
+    for (let j = 0; j < un; j++) up[j] /= Math.max(uw[j], 1);
+    // the end: the loop's rounds up to half a period before the next, then a real burst's last round and its echo
+    // (its last round as loud as its steady fire's, at least half: not a Gatling's slowing last rounds)
+    const lastOf = (c) => {
+      if (c.last != null) return c.last;
+      const lv = c.m.level.slice(c.a, c.b).sort((u, v) => u - v), med = lv[lv.length >> 1];
+      let j = c.m.length - 1;
+      while (j > c.a && c.m.level[j] < 0.5 * med) j--;
+      return c.m[j];
+    };
+    const ends = B.some((c) => c.last != null) ? B.filter((c) => c.last != null) : B; // the ones whose last round is known
+    const e = ends.reduce((a, c) => (c.x.length - lastOf(c) > a.x.length - lastOf(a) ? c : a));
+    const last = lastOf(e), pre = Math.round(0.5 * Q), down = Float32Array.from(e.x.subarray(Math.max(0, last - pre)));
+    for (let j = 0; j < Math.min(pre, down.length); j++) down[j] *= j / pre;
+    if (G.double) {
+      // the last bunch doubled as every one in the loop is, its echo with it
+      const dd = Float32Array.from(down);
+      for (const [dt, dg] of G.double) mixInto(down, dd, dt, dg, sr);
+    }
+    // the echo dies away (`fade`, s) under any noise the recording runs on into, and the last round is as loud as
+    // the loop's rounds (it may come from another burst, recorded from elsewhere)
+    const hold = pre + Math.round(0.15 * sr), tau = (G.fade ?? 0.5) * sr;
+    for (let j = hold; j < down.length; j++) down[j] *= Math.exp(-(j - hold) / tau);
+    const rms = (x, a, len) => {
+      let q = 0;
+      for (let j = a; j < a + len && j < x.length; j++) q += x[j] * x[j];
+      return Math.sqrt(q / Math.max(1, Math.min(len, x.length - a)));
+    };
+    const match = clamp(rms(loop, 0, n) / Math.max(rms(down, pre, Math.round(Q)), 1e-9), 0.5, 2.5);
+    for (let j = 0; j < down.length; j++) down[j] *= match;
+    if (band === 'near' && G.links) {
+      links(loop, sr, r, plan.map(([, c]) => c), true);
+      links(up, sr, r, Array.from({ length: count }, (_, k) => Math.round(t0 + k * Q)), false);
+    }
+    // one level for all three (the loop's), each shaped for its band; the mid and far through the distance filters
+    const shape = (x, circ) => {
+      if (band === 'near') return x;
+      // warmed round the loop so the filters' state is the same at both ends
+      const w = Math.min(x.length, Math.round(0.05 * sr)), y = new Float32Array(x.length + (circ ? w : 0));
+      if (circ) y.set(x.subarray(x.length - w));
+      y.set(x, circ ? w : 0);
+      if (band === 'mid') biquad(y, sr, 'lp', 3600, 0.6);
+      else {
+        biquad(y, sr, 'lp', 1000, 0.6);
+        onePole(y, sr, 1500);
+      }
+      biquad(y, sr, 'hp', band === 'far' ? 40 : 30);
+      return circ ? y.subarray(w) : y;
+    };
+    const L = shape(loop, true), U = shape(up, false);
+    let D = shape(down, false);
+    if (band !== 'near') {
+      // heard from off: the last round's echo rolls back off the landscape
+      const t1 = band === 'far' ? 1.6 : 0.9, y = new Float32Array(D.length + Math.round((t1 + 0.3) * sr));
+      y.set(D);
+      roll(y, tail(D.slice(0, Math.round(0.3 * sr)), sr, 0.1), sr, r, { count: 16, t0: 0.1, t1, gain: 0.2, f: 600 });
+      D = y;
+    }
+    const k = 0.9 / Math.max(peak(L), 1e-9);
+    for (const x of [L, U, D]) for (let j = 0; j < x.length; j++) x[j] = Math.tanh(x[j] * k * 1.1) / Math.tanh(1.1);
+    const top = Math.max(peak(L), peak(U), peak(D));
+    if (top > 0.98) for (const x of [L, U, D]) for (let j = 0; j < x.length; j++) x[j] *= 0.98 / top;
+    const lb = make([Float32Array.from(L)], sr), ub = make([Float32Array.from(U)], sr), db = make([tail(Float32Array.from(D), sr, 0.15)], sr);
+    lb.period = Q / sr;
+    ub.loopAt = un / sr;
+    db.onsetAt = pre / sr;
+    out.loop.push(lb);
+    out.up.push(ub);
+    out.down.push(db);
+  }
+  return out;
+}
+
+/**
  * The banks built from the modern recordings: `rec` maps a RECORDINGS key to its decoded mono samples { data, sr }.
  * Each task is [group, key, fn, true] (the engine keeps the synthesized bank it replaces, for the A/B on
- * /audio.html). A launch is built only when its recordings are there.
+ * /audio.html); a gun's task has key null and gives { up, loop, down }. A launch or gun is built only when its
+ * recordings are there.
  */
 export function recordedTasks(SR, make, rec) {
-  const midSR = Math.min(SR, 32000), farSR = 16000;
+  const midSR = Math.min(SR, 32000), farSR = 16000, loopSR = Math.min(SR, 24000);
   let S = null; // the slices by set, cut when the first bank is built
   const slices = () => {
     if (S) return S;
     S = {};
     for (const [key, spec] of Object.entries(RECORDINGS)) {
       if (!spec.role || !rec[key]) continue;
-      (S[setOf(key)] ||= []).push(...cutRec(rec[key], spec.slices, REC_FADE[spec.role] ?? 0.3).map((s) => ({ ...s, lead: spec.lead ?? 0.008 })));
+      (S[setOf(key)] ||= []).push(...cutRec(rec[key], spec.slices, REC_FADE[spec.role] ?? 0.3).map((s, i) => ({ ...s, rate: spec.rate, lead: spec.lead ?? 0.008, steady: spec.steady?.[i]?.map((t) => t - spec.slices[i][0]), last: spec.last?.[i] != null ? spec.last[i] - spec.slices[i][0] : null })));
     }
     return S;
   };
@@ -1450,6 +1711,10 @@ export function recordedTasks(SR, make, rec) {
       [g, 'mid', () => [0, 1].map((k) => make(mid(k, mulberry(seed + 301 + k * 7919)), midSR)), true],
       [g, 'far', () => [0, 1].map((k) => make(far(k, mulberry(seed + 401 + k * 7919)), farSR)), true]
     );
+  }
+  for (const [group, G] of Object.entries(REC_GUN)) {
+    if (!has(G.src)) continue;
+    tasks.push([group, null, () => recordedGun(loopSR, mulberry(5300 + group.length * 31 + G.rate), group, slices(), make), true]);
   }
   return tasks;
 }
@@ -1709,7 +1974,7 @@ export class AudioEngine {
     }
   }
 
-  /** Hear the modern launches synthesized (true) or from their recordings (false, the default): /audio.html's A/B. */
+  /** Hear the modern launches and guns synthesized (true) or from their recordings (false, the default): /audio.html's A/B. */
   setSynthesized(on) {
     this.synthOnly = !!on;
     for (const [g, keys] of Object.entries(on ? this.synthBank : this.recBank)) for (const [k, v] of Object.entries(keys)) if (v) this.bank[g][k] = v;
@@ -1832,7 +2097,7 @@ export class AudioEngine {
     }
     const brass = cut('brass');
     if (brass.length) (B.casing ||= {}).gun = brass.map((x) => make([normalize(pitch(x, 0.8), 0.9)]));
-    // the launches from their recordings (recordedTasks); without the 57E6's, the cannon's
+    // the launches and guns from their recordings (recordedTasks), one bank a tick; without the 57E6's, the cannon's
     // crack laid under its synthesized booster up close
     const mono = {};
     for (const [key, spec] of Object.entries(RECORDINGS)) {
@@ -1865,7 +2130,11 @@ export class AudioEngine {
       else if (idle) this.pump();
     };
     if (this.given || typeof Worker === 'undefined') return local();
-    const buf = (s) => this.make(s.chans, s.sr);
+    const buf = (s) => {
+      const b = this.make(s.chans, s.sr);
+      for (const k of ['period', 'loopAt', 'onsetAt']) if (s[k] != null) b[k] = s[k];
+      return b;
+    };
     try {
       const w = new Worker(new URL('./audioWorker.js', import.meta.url), { type: 'module' });
       let got = 0;
@@ -1873,7 +2142,7 @@ export class AudioEngine {
         if (data.done) return w.terminate();
         const { group, key, v } = data;
         got++;
-        if (v) this.runTask([group, key, () => v.map(buf), true]);
+        if (v) this.runTask([group, key, () => (key === null ? Object.fromEntries(Object.entries(v).map(([k, list]) => [k, list.map(buf)])) : v.map(buf)), true]);
       };
       w.onerror = (e) => {
         e.preventDefault?.();
@@ -2601,16 +2870,21 @@ export class AudioEngine {
       out.connect(send).connect(this.reverbSend);
       const now = ctx.currentTime;
       const iBand = { near: 0, mid: 1, far: 2 }[band];
+      // the rounds (up, then the loop) through their own gain, so a recorded gun's fire can be cut between rounds
+      const feed = ctx.createGain();
+      feed.connect(lp);
       const up = ctx.createBufferSource();
       up.buffer = G.up[iBand];
-      up.connect(lp);
+      up.connect(feed);
       up.start(now);
       const loop = ctx.createBufferSource();
       loop.buffer = G.loop[iBand];
       loop.loop = true;
-      loop.connect(lp);
-      loop.start(now + up.buffer.duration * 0.92);
-      v = { lp, pan, out, send, loop, up, pos: here(pos), band: iBand, on: true, G, spec };
+      loop.connect(feed);
+      // a recorded gun's loop takes over from its first rounds sample for sample (loopAt)
+      const loopT0 = now + (up.buffer.loopAt ?? up.buffer.duration * 0.92);
+      loop.start(loopT0);
+      v = { lp, pan, out, send, feed, loop, loopT0, up, pos: here(pos), band: iBand, on: true, G, spec };
       this.guns.set(unitId, v);
       this.combat = 1;
     } else if (v && on) {
@@ -2619,23 +2893,37 @@ export class AudioEngine {
         // fire again before the tail ended: drop the tail and restart the loop
         v.on = true;
         v.tail?.stop();
-        const loop = this.ctx.createBufferSource();
+        const ctx = this.ctx, feed = ctx.createGain();
+        feed.connect(v.lp);
+        const loop = ctx.createBufferSource();
         loop.buffer = v.G.loop[v.band];
         loop.loop = true;
-        loop.connect(v.lp);
+        loop.connect(feed);
         loop.start();
-        v.loop = loop;
+        Object.assign(v, { feed, loop, loopT0: ctx.currentTime, up: null });
       }
     } else if (v && !on && v.on) {
       v.on = false;
-      const now = this.ctx.currentTime;
-      v.loop.stop(now + 0.02);
-      const tail = this.ctx.createBufferSource();
+      const now = this.ctx.currentTime, P = v.loop.buffer.period, tail = this.ctx.createBufferSource();
       tail.buffer = v.G.down[v.band];
       tail.connect(v.lp);
-      tail.start(now + 0.01);
+      const lead = tail.buffer.onsetAt;
+      if (P && lead != null) {
+        // a recorded gun: the rounds stop half a round before the next one is due and the burst's recorded last
+        // round, with its echo, lands in its place
+        const at = v.loopT0 + Math.ceil((now + lead + 0.012 - v.loopT0) / P) * P, cut = at - lead;
+        v.feed.gain.setValueAtTime(1, cut);
+        v.feed.gain.linearRampToValueAtTime(0, cut + lead);
+        v.up?.stop(cut + lead + 0.01);
+        v.loop.stop(cut + lead + 0.01);
+        tail.start(cut);
+        v.endAt = cut + tail.buffer.duration + 0.1;
+      } else {
+        v.loop.stop(now + 0.02);
+        tail.start(now + 0.01);
+        v.endAt = now + tail.buffer.duration + 0.1;
+      }
       v.tail = tail;
-      v.endAt = now + tail.buffer.duration + 0.1;
     }
   }
 
@@ -2645,7 +2933,7 @@ export class AudioEngine {
     for (const s of [v.up, v.loop, v.tail]) {
       try { s?.stop(); } catch { /* already stopped */ }
     }
-    for (const n of [v.lp, v.pan, v.out, v.send]) n.disconnect();
+    for (const n of [v.feed, v.lp, v.pan, v.out, v.send]) n.disconnect();
     this.guns.delete(id);
   }
 
@@ -2656,7 +2944,7 @@ export class AudioEngine {
       v.lp.frequency.setTargetAtTime(this.absorb(d), now, 0.05);
       this.setPannerPos(v.pan, v.pos.x, v.pos.y, v.pos.z, 0.03);
       if (!v.on && now > v.endAt) {
-        for (const n of [v.lp, v.pan, v.out, v.send]) n.disconnect();
+        for (const n of [v.feed, v.lp, v.pan, v.out, v.send]) n.disconnect();
         this.guns.delete(id);
       }
       // brass rattling off the mount, close up only

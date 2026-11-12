@@ -1550,7 +1550,7 @@ audio.explosion(pos, size); audio.airburst(pos); audio.impact(pos, size);
 audio.seeker(level, locked);          // Strela seeker tone (0 = silent)
 audio.ui(name);                       // 'click' | 'switch' | 'button' | 'alarm' | 'warning' | 'lock'
 audio.setVolume(v); audio.setMusicVolume(v); audio.toggleMute();
-audio.setSynthesized(on);             // /audio.html's A/B: the modern launches synthesized (true) or from their recordings (false, the default)
+audio.setSynthesized(on);             // /audio.html's A/B: the modern launches and guns synthesized (true) or from their recordings (false, the default)
 // the WW2 era ("WW2 era", Render, fx and audio): its banks are rendered and its recordings fetched once it is set
 audio.setEra(id);                     // main.js at start and on every switch of era
 audio.shot(kind, pos);                // '88mm' | '128mm' | '37mm': one round, heard late with its distance; a heavy one close by deafens
@@ -1564,9 +1564,11 @@ audio.strafe(pos, type); audio.whistle(pos, seconds); audio.feed(what, pos);   /
 Reuse the maxgfx engine core (distance delay, air absorption, voice stealing, reverb, recordings in
 `public/audio` with `CREDITS.md`).
 
-**The modern launches from recordings.** `RECORDINGS` entries with a `role` are what they are built from:
-- **Roles:** `pop`, `launch`, `roar`, `recede`.
+**The modern launches and guns from recordings.** `RECORDINGS` entries with a `role` are what they are built from:
+- **Roles:** `pop`, `launch`, `roar`, `recede`, `burst`.
 - **Grouping:** `set` is the layer a slice joins.
+- **Burst fields:** `rate` is the measured rounds or bunches a second; `steady` and `last` mark each slice's steady
+  fire and last round.
 - **Lead:** `lead` is how far before its onset a motor's slice starts.
 
 `recordedTasks(SR, make, rec)` builds the banks they replace. `rec` maps a key to its decoded mono `{ data, sr }`. The
@@ -1579,6 +1581,15 @@ main thread one bank a tick with a given context, without workers, or if the wor
   - `mid` and `far` take recordings made from there, or the nearer take through the distance filters.
   - A cold launch is cut where the motor lights, so the recorded motor lights at the sim's `eject` (48N6 1.2 s,
     9M96 1 s, 9M338 0.9 s; the 9M37's at 0.12 s).
+- **Guns (`REC_GUN`).**
+  - A pitch-synchronous overlap-add: each recorded round, or bunch, is a Hann grain two periods long centred on its
+    onset. The grains are laid at the gun's rate, so rate and pitch are set apart.
+  - It gives `{ up, loop, down }`, each a buffer per band. The loop is seamless round its buffer.
+  - `up` starts from silence and its last rounds are the loop's own, so the loop takes over sample for sample at
+    `up.loopAt`.
+  - `down` is a real last round and its echo, the round at `down.onsetAt`, level-matched to the loop.
+  - On release `gun()` cuts the rounds half a period (`loop.period`) before the next is due, through the voice's
+    `feed` gain, and starts `down` so its round lands there. The synthesized banks keep the old timing.
 
 ## Changelog
 
@@ -1711,4 +1722,4 @@ main thread one bank a tick with a given context, without workers, or if the wor
 - Crew voices (WW2): `src/eras/ww2/voices.js` and `voices.css` (page code, read-only on the sim), 53 German clips in `public/audio/voice-de/` copied from Drumfire (credits in `public/audio/CREDITS.md`). Main builds `CrewVoices` only when the page opens in the WW2 era, decodes the clips behind the loading screen ("Briefing the crews"), chains it onto `sim.events` (`wave`, `state`, `salvo`, `muzzle`, `feed`, `partDestroyed`, `unitDamaged`, `strafe`, `threatLaunch`) after its own handlers, calls `update(sim)` before `audio.update`; key B and the panel's VOICES button (`#voice-btn`, localStorage `echelon.voices`); `__iads.voices.log` lists every line spoken. The selected unit's crew speaks: the air raid warning, cover from bombs, rockets and strafing, casualties, a gun knocked out, the battery's new target, first salvo, barrage (with the rounds a gun will fire in it), range-source change, single shot, guns ready after a fight and the voiced gun's loading calls, a platoon opening fire (Erster or Zweiter Zug, else the gun), HOLD, and the Abteilung on the telephone at the raid's end.
 - Career: one per era (`src/career.js`, the eras' `career`: a research tree in columns by type, ten threat levels with modifiers; see "Career"). `sim.newGame({ level })` runs `sim.raids` (the director reads it instead of WAVES) at the level's difficulty and pays RP per kill (`sim.rp`, event `reward(rp, t, by)`); a loadout entry `EMPTY` ('none', deploy.js) leaves a slot without a unit, so `sim.units` may be fewer than the slots. Without a level nothing changes. Menu modes Career and Quick battle (`echelon.mode`); `?level=N&mods=` on a battle page; `tools/careertest.mjs`.
 - Menu: the main menu is a garage after Drumfire's (`ui/menu.js`, `ui/menu.css`): era tabs, Hangar and Research, the lists Career battle, Quick battle and Tutorials with their chooser, To battle, dev mode and reset; the Hangar draws the unit on parade in 3D (`ui/hangar.js`: its vehicles in a line, the crews in ranks, its munitions on display, `models/munitions.js`), from the data in `src/parade.js` (`paradeLine`, `CREW`, `displayOf`, `CONTAINER`). `career.js` adds `researchedShare` and `researchShareOf`; `mountMenu(root, { webgl })`. The menu is no longer DOM only: three.js loads behind its loading screen (see "Pages").
-- Audio: the modern launches are built from recordings (`RECORDINGS` with a `role`, `recordedTasks`, `REC_LAUNCH`, `src/audioWorker.js`); `setSynthesized(on)` for the A/B; the 9M96's synthesized motor lights at its `eject` (1 s, was 0.55 s).
+- Audio: the modern launches and guns are built from recordings (`RECORDINGS` with a `role`, `recordedTasks`, `REC_LAUNCH`, `REC_GUN`, `src/audioWorker.js`); `setSynthesized(on)` for the A/B; a gun bank's buffers may carry `loopAt` (up), `period` (loop) and `onsetAt` (down), which `gun()` uses to join the loop and cut it between rounds; the 9M96's synthesized motor lights at its `eject` (1 s, was 0.55 s).

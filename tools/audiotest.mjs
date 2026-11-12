@@ -131,9 +131,9 @@ for (const key of ['idle.v8', 'idle.genset', 'idle.trk_buk', 'idle.trk_tor', 'id
   if (b) console.log(`${key.padEnd(14)} centroid ${spectrum(b).centroid.toFixed(0).padStart(5)}`);
 }
 
-// ---- the modern launches built from recordings (recordedTasks): Node cannot decode the mp3s, so noise bursts stand
-// in where each recording's slices are; this checks the code paths and the levels, not the sound of the recordings
-// (hear those on /audio.html)
+// ---- the modern launches and guns built from recordings (recordedTasks): Node cannot decode the mp3s, so stand-ins
+// go where each recording's slices are (noise bursts for launches, round trains at the measured rate for bursts); this
+// checks the code paths, the levels and the guns' joins, not the sound of the recordings (hear those on /audio.html)
 {
   let seed = 7;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -141,7 +141,14 @@ for (const key of ['idle.v8', 'idle.genset', 'idle.trk_buk', 'idle.trk_tor', 'id
   for (const [key, spec] of Object.entries(RECORDINGS)) {
     if (!spec.role) continue;
     const end = Math.max(...spec.slices.map(([t0, len]) => t0 + len)), x = new Float32Array(Math.ceil((end + 0.5) * SR));
-    for (const [t0, len] of spec.slices) for (let i = Math.round((t0 + 0.01) * SR); i < Math.round((t0 + len) * SR); i++) x[i] += (rnd() * 2 - 1) * Math.exp(-(i / SR - t0) / Math.max(0.2, len / 3));
+    for (const [t0, len] of spec.slices) {
+      if (spec.role === 'burst') {
+        for (let t = t0 + 0.01, k = 0; t < t0 + len - 0.5; t += (1 / spec.rate) * (0.98 + 0.04 * rnd()), k++) {
+          const i0 = Math.round(t * SR);
+          for (let i = 0; i < 0.2 * SR && i0 + i < x.length; i++) x[i0 + i] += (k % 2 ? 0.8 : 1) * (rnd() * 2 - 1) * Math.exp(-i / (0.005 * SR));
+        }
+      } else for (let i = Math.round((t0 + 0.01) * SR); i < Math.round((t0 + len) * SR); i++) x[i] += (rnd() * 2 - 1) * Math.exp(-(i / SR - t0) / Math.max(0.2, len / 3));
+    }
     rec[key] = { data: x, sr: SR };
   }
   const tasks = recordedTasks(SR, make, rec);
@@ -159,9 +166,19 @@ for (const key of ['idle.v8', 'idle.genset', 'idle.trk_buk', 'idle.trk_tor', 'id
       for (const v of x) Number.isFinite(v) ? (p = Math.max(p, Math.abs(v))) : nan++;
       check(!nan && p <= 1.0001 && p > 0.05, `${group}.${k}[${i}] peak ${p.toFixed(2)} NaN ${nan}`);
     }
-    if (key === 'near') console.log(`${group.padEnd(14)} ${out.length} near takes, ${(out[0].chans[0].length / out[0].sr).toFixed(1)} s, ${ms.toFixed(0)} ms`);
+    if (key === null) {
+      // a gun: the up ends on the loop's own last samples (the loop takes over there), a period and a last round set
+      for (let i = 0; i < 3; i++) {
+        const u = out.up[i].chans[0], l = out.loop[i].chans[0];
+        let d = 0, lv = 0;
+        for (let j = 1; j <= 32; j++) (d = Math.max(d, Math.abs(u[u.length - j] - l[l.length - j]))), (lv = Math.max(lv, Math.abs(l[l.length - j])));
+        check(d <= 0.15 * Math.max(lv, 0.05) || i === 0, `${group} band ${i}: the up does not run into the loop (${d.toFixed(3)})`);
+        check(out.loop[i].period > 0 && out.up[i].loopAt > 0 && out.down[i].onsetAt > 0, `${group} band ${i}: period, loopAt or onsetAt missing`);
+      }
+      console.log(`${group.padEnd(14)} loop ${(out.loop[0].chans[0].length / out.loop[0].sr).toFixed(2)} s at ${(1 / out.loop[0].period).toFixed(1)} rounds/s, up ${out.up[0].loopAt.toFixed(2)} s, ${ms.toFixed(0)} ms`);
+    } else if (key === 'near') console.log(`${group.padEnd(14)} ${out.length} near takes, ${(out[0].chans[0].length / out[0].sr).toFixed(1)} s, ${ms.toFixed(0)} ms`);
   }
-  for (const g of ['launch_48N6', 'launch_9M96', 'launch_57E6', 'launch_9M33', 'launch_9M37', 'launch_9M317', 'launch_9M338', 'launch_9M311']) check(groups.has(g), `${g} is not built from recordings`);
+  for (const g of ['launch_48N6', 'launch_9M96', 'launch_57E6', 'launch_9M33', 'launch_9M37', 'launch_9M317', 'launch_9M338', 'launch_9M311', 'gun', 'gun_30t', 'gun_23', 'gun_35']) check(groups.has(g), `${g} is not built from recordings`);
   console.log(recBad ? `${recBad} problems with the recorded banks` : 'every recorded bank sound');
   bad += recBad;
 }

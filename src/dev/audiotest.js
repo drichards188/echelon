@@ -37,7 +37,7 @@ if (bar) {
     b.onclick = () => (audio.start(), fn());
     bar.append(b);
   };
-  // the modern launches from their recordings, or synthesized (the A/B), each near, mid and far
+  // the modern launches and guns from their recordings, or synthesized (the A/B); each launch near, mid and far
   let synth = false;
   const ab = document.createElement('button');
   const label = () => (ab.textContent = synth ? 'A/B: SYNTHESIZED (click for recordings)' : 'A/B: RECORDINGS (click for synthesized)');
@@ -45,10 +45,16 @@ if (bar) {
   label();
   bar.append(ab, document.createElement('br'));
   for (const k of ['48N6', '9M96', '57E6', '9M33', '9M37', '9M317', '9M338', '9M311']) for (const d of [60, 1500, 5000]) btn(`launch ${k} ${d} m`, () => audio.launch(k, P(d, 0, -d / 4)));
-  for (const sh of ['30mm', '30mm-tunguska', '23mm', '35mm']) {
+  bar.append(document.createElement('br'));
+  for (const sh of ['30mm', '30mm-tunguska', '23mm', '35mm']) for (const d of [25, 900, 3000]) {
     let on = false;
-    btn(`gun ${sh} (toggle)`, () => audio.gun('btn-' + sh, (on = !on), P(25, 3, -10), sh));
+    btn(`gun ${sh} ${d} m (toggle)`, () => audio.gun(`btn-${sh}-${d}`, (on = !on), P(d, 3, -d / 3), sh));
+    btn(`${sh} ${d} m burst 1.5 s`, () => {
+      audio.gun(`b-${sh}-${d}`, true, P(d, 3, -d / 3), sh);
+      setTimeout(() => audio.gun(`b-${sh}-${d}`, false, P(d, 3, -d / 3), sh), 1500);
+    });
   }
+  bar.append(document.createElement('br'));
   for (const k of ['buk', 'tor', 'tunguska', 'shilka', 'gepard', 'pantsir', 's400']) btn(`idle ${k}`, () => audio.vehicle(k));
   // the WW2 era's heavy guns (WW2 era first: its banks render and its recordings load in a few seconds), one
   // round and a battery's salvo of six guns 25 m apart; close ones dull the ears (deafen)
